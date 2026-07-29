@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import QRCode from "qrcode";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
@@ -19,7 +19,7 @@ import { SubResourceTab } from "./detail/SubResourceTab";
 import { FileResourceTab } from "./detail/FileResourceTab";
 import { ReportTab } from "./detail/ReportTab";
 import { ActivityLogTab } from "./detail/ActivityLogTab";
-import { HarnessDetailPage } from "./HarnessDetailPage";
+import { Skeleton, SkeletonText } from "../../components/Skeleton";
 
 type TabKey =
   | "profile" | "impact" | "location" | "os" | "components" | "volumes" | "software"
@@ -95,11 +95,28 @@ export function AssetDetailPage() {
   }
 
   if (isLoading || !asset) {
-    return <div className="row" style={{ justifyContent: "center", padding: 60 }}><div className="spinner" /></div>;
+    return (
+      <div className="ad-shell">
+        <div className="ad-header">
+          <Skeleton width={220} height={22} />
+        </div>
+        <div className="ad-body">
+          <div className="ad-sidebar">
+            <Skeleton height={16} width="60%" />
+            <div className="stack gap-2" style={{ marginTop: 12 }}>
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} height={30} />)}
+            </div>
+          </div>
+          <div className="ad-content">
+            <div className="ad-panel"><SkeletonText lines={6} /></div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (asset.category?.name === "Harness") {
-    return <HarnessDetailPage asset={asset} onUpdated={invalidate} />;
+    return <Navigate to={`/harness/${asset.id}`} replace />;
   }
 
   const isOnline = asset.device ? Date.now() - new Date(asset.device.lastSeen).getTime() < 15 * 60 * 1000 : null;

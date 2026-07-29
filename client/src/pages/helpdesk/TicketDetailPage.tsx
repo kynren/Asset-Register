@@ -8,6 +8,7 @@ import { Icon } from "../../components/Icon";
 import { PermissionGate, usePermission } from "../../auth/PermissionGate";
 import { useAuth } from "../../auth/AuthContext";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { Skeleton, SkeletonText } from "../../components/Skeleton";
 
 const STATUS_FLOW = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 
@@ -98,7 +99,15 @@ export function TicketDetailPage() {
   }
 
   if (isLoading || !ticket) {
-    return <div className="row" style={{ justifyContent: "center", padding: 60 }}><div className="spinner" /></div>;
+    return (
+      <div className="stack gap-3">
+        <Skeleton height={60} />
+        <div className="grid grid-cols-2" style={{ gap: 14 }}>
+          <div className="card"><SkeletonText lines={5} /></div>
+          <div className="card"><SkeletonText lines={4} /></div>
+        </div>
+      </div>
+    );
   }
 
   const isOverdue = ticket.dueAt && dayjs(ticket.dueAt).isBefore(dayjs()) && !["RESOLVED", "CLOSED"].includes(ticket.status);

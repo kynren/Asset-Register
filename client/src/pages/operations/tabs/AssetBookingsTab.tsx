@@ -5,6 +5,7 @@ import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { PermissionGate } from "../../../auth/PermissionGate";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { SkeletonText } from "../../../components/Skeleton";
 
 interface Booking {
   id: number;
@@ -93,7 +94,7 @@ export function AssetBookingsTab() {
         <div className="ad-panel">
           <div className="ad-panel-title">Upcoming Bookings</div>
           {isLoading ? (
-            <div className="ad-empty">Loading...</div>
+            <div className="stack gap-2"><SkeletonText lines={3} /></div>
           ) : upcoming.length > 0 ? (
             <div className="stack gap-2">
               {upcoming.map((b) => (

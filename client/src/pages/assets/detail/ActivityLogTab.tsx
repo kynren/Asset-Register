@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { AssetDetail, AuditLogEntry } from "./types";
+import { SkeletonTableRows } from "../../../components/Skeleton";
 
 const ACTION_LABELS: Record<string, string> = {
   "asset.create": "Asset created",
@@ -44,7 +45,14 @@ export function ActivityLogTab({ asset }: { asset: AssetDetail }) {
 
       <div className="ad-panel">
         {isLoading ? (
-          <div className="ad-empty">Loading...</div>
+          <table className="ad-table">
+            <thead>
+              <tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr>
+            </thead>
+            <tbody>
+              <SkeletonTableRows columns={4} />
+            </tbody>
+          </table>
         ) : logs && logs.length > 0 ? (
           <table className="ad-table">
             <thead>

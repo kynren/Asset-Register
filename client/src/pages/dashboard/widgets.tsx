@@ -6,6 +6,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { KpiCard } from "../../components/KpiCard";
 import { SimpleBarChart, SimplePieChart } from "../../components/ChartWrapper";
 import { DataTable } from "../../components/DataTable";
+import { SkeletonBlock } from "../../components/Skeleton";
 
 interface Summary {
   kpis: {
@@ -53,7 +54,7 @@ export function AssetsByStatusWidget() {
   return (
     <>
       <h3 className="mt-0">Assets by Status</h3>
-      {data ? <SimpleBarChart data={data.assetsByStatus} xKey="status" yKey="count" /> : <div className="spinner" />}
+      {data ? <SimpleBarChart data={data.assetsByStatus} xKey="status" yKey="count" /> : <SkeletonBlock height={180} />}
     </>
   );
 }
@@ -63,7 +64,7 @@ export function TicketsByStatusWidget() {
   return (
     <>
       <h3 className="mt-0">Tickets by Status</h3>
-      {data ? <SimplePieChart data={data.ticketsByStatus} dataKey="count" nameKey="status" /> : <div className="spinner" />}
+      {data ? <SimplePieChart data={data.ticketsByStatus} dataKey="count" nameKey="status" /> : <SkeletonBlock height={180} />}
     </>
   );
 }

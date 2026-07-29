@@ -21,6 +21,7 @@ import { PermissionGate } from "../../auth/PermissionGate";
 import { AddNodeModal, NodeFormValues } from "./AddNodeModal";
 import { layoutGraph } from "./layout";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { SkeletonBlock } from "../../components/Skeleton";
 
 interface GraphNode {
   id: number;
@@ -345,7 +346,7 @@ function InnerTopologyGraph() {
 
         <div className={`nt-canvas-wrap ${isFullscreen ? "fullscreen" : ""}`} ref={wrapRef}>
           {isLoading ? (
-            <div className="ad-empty">Loading topology...</div>
+            <div style={{ padding: 16 }}><SkeletonBlock height={420} /></div>
           ) : allNodes.length === 0 ? (
             <div className="ad-empty">
               No devices or nodes yet. Run the Kynren agent on a machine, discover hosts with the IP Range Scanner, or add

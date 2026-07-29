@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
+import { Skeleton } from "../../components/Skeleton";
 
 interface PtzResult {
   ok: boolean;
@@ -66,7 +67,7 @@ export function PtzControlModal({ cameraId, cameraName, onClose }: { cameraId: n
       <div style={{ marginTop: 18 }}>
         <h4 style={{ margin: "0 0 8px" }}>Saved Presets</h4>
         {presetsLoading ? (
-          <p className="muted" style={{ fontSize: 12 }}>Loading presets...</p>
+          <div className="row gap-2"><Skeleton width={70} height={28} /><Skeleton width={70} height={28} /><Skeleton width={70} height={28} /></div>
         ) : presetsResult?.presets.length ? (
           <div className="row gap-2 flex-wrap">
             {presetsResult.presets.map((p) => (

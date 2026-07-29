@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { axiosClient } from "../api/axiosClient";
 import { Icon } from "../components/Icon";
 import { detectBrowser, detectOS } from "../lib/userAgent";
+import { useClientInfo } from "../hooks/useClientInfo";
 
 interface ClientInfoModalProps {
   onClose: () => void;
@@ -35,10 +34,7 @@ export function ClientInfoModal({ onClose }: ClientInfoModalProps) {
     };
   }, []);
 
-  const { data: serverInfo } = useQuery({
-    queryKey: ["client-info"],
-    queryFn: async () => (await axiosClient.get("/system/client-info")).data as { observedIp: string; protocol: string; host: string; appVersion: string },
-  });
+  const { data: serverInfo } = useClientInfo();
 
   const ua = navigator.userAgent;
   const dpr = window.devicePixelRatio || 1;

@@ -75,7 +75,7 @@ export function HarnessDetailPage({ asset, onUpdated }: { asset: AssetDetail; on
     <div className="ad-shell">
       <div className="ad-header">
         <div className="ad-header-left">
-          <button className="ad-back-btn" onClick={() => navigate("/assets")} title="Back to Asset Inventory">
+          <button className="ad-back-btn" onClick={() => navigate("/harness")} title="Back to Harness Register">
             <Icon name="arrowLeft" size={16} />
           </button>
           <div className="ad-title-block">
@@ -174,6 +174,7 @@ export function HarnessDetailPage({ asset, onUpdated }: { asset: AssetDetail; on
             gridPowered: asset.gridPowered,
             remoteManagementEnabled: asset.remoteManagementEnabled,
           }}
+          onlyCategoryNames={["Harness"]}
           onClose={() => setEditing(false)}
           onSubmit={(v) => updateMutation.mutate(v)}
           submitting={updateMutation.isPending}

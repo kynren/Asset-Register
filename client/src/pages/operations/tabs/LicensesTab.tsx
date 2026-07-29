@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { SkeletonText } from "../../../components/Skeleton";
 
 interface License {
   id: number;
@@ -103,7 +104,10 @@ export function LicensesTab() {
       </div>
 
       {isLoading ? (
-        <div className="ad-empty">Loading...</div>
+        <div className="stack gap-2">
+          <div className="ad-panel"><SkeletonText lines={2} /></div>
+          <div className="ad-panel"><SkeletonText lines={2} /></div>
+        </div>
       ) : licenses && licenses.length > 0 ? (
         <div className="stack gap-2">
           {licenses.map((l) => {

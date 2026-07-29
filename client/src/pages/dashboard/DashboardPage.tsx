@@ -7,6 +7,7 @@ import { Icon } from "../../components/Icon";
 import { SortableWidget } from "./SortableWidget";
 import { AddWidgetModal } from "./AddWidgetModal";
 import { DEFAULT_DASHBOARD_LAYOUT, WIDGET_CATALOG } from "./widgets";
+import { Skeleton } from "../../components/Skeleton";
 
 interface LayoutItem {
   id: string;
@@ -67,7 +68,16 @@ export function DashboardPage() {
   }
 
   if (!layout) {
-    return <div className="row" style={{ justifyContent: "center", padding: 60 }}><div className="spinner" /></div>;
+    return (
+      <div className="stack gap-3">
+        <div className="grid grid-cols-4" style={{ gap: 14 }}>
+          <Skeleton height={80} /><Skeleton height={80} /><Skeleton height={80} /><Skeleton height={80} />
+        </div>
+        <div className="grid grid-cols-2" style={{ gap: 14 }}>
+          <Skeleton height={220} /><Skeleton height={220} />
+        </div>
+      </div>
+    );
   }
 
   return (

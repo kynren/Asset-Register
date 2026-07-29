@@ -6,6 +6,7 @@ import { FilterBar } from "../../components/FilterBar";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { VaultEntry, VaultEntryRow } from "./VaultEntryRow";
 import { VaultEntryModal, VaultEntryFormValues } from "./VaultEntryModal";
+import { Skeleton } from "../../components/Skeleton";
 
 export function VaultTab() {
   const [search, setSearch] = useState("");
@@ -54,7 +55,13 @@ export function VaultTab() {
 
         <FilterBar search={search} onSearchChange={setSearch} searchPlaceholder="Search saved passwords..." />
 
-        {isLoading && <div className="row" style={{ justifyContent: "center", padding: 30 }}><div className="spinner" /></div>}
+        {isLoading && (
+          <div className="stack gap-2" style={{ marginTop: 10 }}>
+            <Skeleton height={48} />
+            <Skeleton height={48} />
+            <Skeleton height={48} />
+          </div>
+        )}
         {!isLoading && filtered.length === 0 && <div className="empty-state">No saved passwords yet. Add your first one to get started.</div>}
         {filtered.map((entry) => (
           <VaultEntryRow key={entry.id} entry={entry} onEdit={() => setEditing(entry)} onDelete={() => setDeleting(entry)} />

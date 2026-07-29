@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
+import { SkeletonText } from "../../components/Skeleton";
 
 interface Session {
   id: number;
@@ -48,7 +49,7 @@ export function SessionsCard() {
         </button>
       </div>
       {isLoading ? (
-        <div className="muted">Loading...</div>
+        <div className="stack gap-2" style={{ marginTop: 10 }}><SkeletonText lines={2} /></div>
       ) : sessions && sessions.length > 0 ? (
         <div className="stack gap-2">
           {sessions.map((s) => (
