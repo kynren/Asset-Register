@@ -57,11 +57,30 @@ def get_hostname() -> str:
     return socket.gethostname()
 
 
+def get_primary_ip() -> str | None:
+    """The IP the OS would actually use to reach the internet — found by asking the OS's own
+    routing table via a UDP socket, rather than guessing from interface names. No packet is
+    sent; UDP connect() just resolves which local interface the OS would route through."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except OSError:
+        return None
+
+
 def get_ip_addresses() -> list[str]:
+    # A machine often has several IPv4 addresses (VPN clients, Docker/Hyper-V virtual switches,
+    # WSL, etc.) alongside the real physical NIC. psutil.net_if_addrs() has no notion of which
+    # one is "real", so without this the first (often virtual) address in dict-iteration order
+    # could get reported as the device's primary IP. Put the OS-routing-table answer first.
     addresses: list[str] = []
+    primary = get_primary_ip()
+    if primary:
+        addresses.append(primary)
     for interface_addrs in psutil.net_if_addrs().values():
         for addr in interface_addrs:
-            if addr.family == socket.AF_INET and not addr.address.startswith("127."):
+            if addr.family == socket.AF_INET and not addr.address.startswith("127.") and addr.address not in addresses:
                 addresses.append(addr.address)
     return addresses
 
