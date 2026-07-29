@@ -13,3 +13,5 @@ server/generated/
 server/uploads/
 agent/agent.log
 agent/__pycache__/
+*.dump
+*.sql
