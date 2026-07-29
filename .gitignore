@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+client/.env
+server/.env
+agent/.env
+*.log
+.DS_Store
+server/prisma/dev.db
+server/generated/
+server/uploads/
+agent/agent.log
+agent/__pycache__/

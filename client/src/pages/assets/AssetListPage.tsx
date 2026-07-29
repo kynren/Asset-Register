@@ -1,0 +1,397 @@
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ColumnDef } from "@tanstack/react-table";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { axiosClient } from "../../api/axiosClient";
+import { DataTable } from "../../components/DataTable";
+import { StatusBadge } from "../../components/StatusBadge";
+import { Icon } from "../../components/Icon";
+import { CsvExportButton, CsvImportButton } from "../../components/CsvButtons";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { PermissionGate, usePermission } from "../../auth/PermissionGate";
+import { AssetFormModal, AssetFormValues } from "./AssetFormModal";
+import { AssetGridCard } from "./AssetGridCard";
+import { QrLabelModal } from "./QrLabelModal";
+import { QrScannerModal } from "./QrScannerModal";
+import { DiscoverDevicesModal } from "./DiscoverDevicesModal";
+
+interface Asset {
+  id: number;
+  assetTag: string;
+  name: string;
+  status: string;
+  signOffStatus: string;
+  categoryId: number | null;
+  category: { name: string } | null;
+  locationId: number | null;
+  location: { name: string } | null;
+  assignedToId: number | null;
+  assignedTo: { id: number; firstName: string; lastName: string } | null;
+  manufacturer: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  nextServiceDate: string | null;
+  notes: string | null;
+  device: { lastSeen: string } | null;
+}
+
+const STATUS_OPTIONS = ["IN_USE", "IN_STORAGE", "IN_REPAIR", "RETIRED", "LOST"];
+
+export function AssetListPage() {
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get("search") ?? "");
+  const [status, setStatus] = useState(searchParams.get("status") ?? "");
+  const [categoryId, setCategoryId] = useState<number | null>(searchParams.get("categoryId") ? Number(searchParams.get("categoryId")) : null);
+  const [assignedToId, setAssignedToId] = useState(searchParams.get("assignedToId") ?? "");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkStatus, setBulkStatus] = useState("IN_STORAGE");
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Asset | null>(null);
+  const [deleting, setDeleting] = useState<Asset | null>(null);
+  const [qrAsset, setQrAsset] = useState<Asset | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
+  const [showDiscover, setShowDiscover] = useState(false);
+  const [importResult, setImportResult] = useState<{ created: number; errors: string[] } | null>(null);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const canEdit = usePermission("assets", "edit");
+
+  const filters = { search: search || undefined, status: status || undefined, categoryId: categoryId ?? undefined, assignedToId: assignedToId || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined };
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["assets", { ...filters, page }],
+    queryFn: async () => (await axiosClient.get("/assets", { params: { ...filters, page, pageSize: viewMode === "grid" ? 24 : 15 } })).data,
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ["asset-stats"],
+    queryFn: async () => (await axiosClient.get("/assets/stats")).data as { total: number; byCategory: { categoryId: number | null; name: string; count: number }[] },
+  });
+
+  const { data: categories } = useQuery({ queryKey: ["asset-categories"], queryFn: async () => (await axiosClient.get("/asset-categories")).data });
+  const { data: users } = useQuery({ queryKey: ["users-directory"], queryFn: async () => (await axiosClient.get("/users/directory")).data });
+  const { data: unregisteredData } = useQuery({
+    queryKey: ["devices-unregistered-count"],
+    queryFn: async () => (await axiosClient.get("/devices", { params: { unregistered: true, pageSize: 1 } })).data,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (values: AssetFormValues) => axiosClient.post("/assets", toPayload(values)),
+    onSuccess: () => { invalidateAll(); setShowForm(false); },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (values: AssetFormValues) => axiosClient.patch(`/assets/${editing!.id}`, toPayload(values)),
+    onSuccess: () => { invalidateAll(); setEditing(null); },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => axiosClient.delete(`/assets/${deleting!.id}`),
+    onSuccess: () => { invalidateAll(); setDeleting(null); },
+  });
+
+  const quickPatchMutation = useMutation({
+    mutationFn: (params: { id: number; data: Record<string, unknown> }) => axiosClient.patch(`/assets/${params.id}`, params.data),
+    onSuccess: () => invalidateAll(),
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/assets/${id}/duplicate`),
+    onSuccess: () => invalidateAll(),
+  });
+
+  const bulkMutation = useMutation({
+    mutationFn: () => Promise.all(selectedIds.map((id) => axiosClient.patch(`/assets/${id}`, { status: bulkStatus }))),
+    onSuccess: () => { invalidateAll(); setSelectedIds([]); },
+  });
+
+  function invalidateAll() {
+    queryClient.invalidateQueries({ queryKey: ["assets"] });
+    queryClient.invalidateQueries({ queryKey: ["asset-stats"] });
+  }
+
+  function toPayload(values: AssetFormValues) {
+    return { ...values, nextServiceDate: values.nextServiceDate ? new Date(values.nextServiceDate).toISOString() : null };
+  }
+
+  function toggleSelected(id: number) {
+    setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  function toggleSelectAll() {
+    const pageIds = (data?.items ?? []).map((a: Asset) => a.id);
+    setSelectedIds((ids) => (pageIds.every((id: number) => ids.includes(id)) ? ids.filter((id) => !pageIds.includes(id)) : [...new Set([...ids, ...pageIds])]));
+  }
+
+  async function copyShareLink(asset: Asset) {
+    await navigator.clipboard.writeText(`${window.location.origin}/assets/${asset.id}`);
+  }
+
+  async function downloadJson() {
+    const res = await axiosClient.get("/assets/export.json", { responseType: "blob" });
+    const url = window.URL.createObjectURL(res.data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "assets.json";
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  const columns: ColumnDef<Asset, any>[] = [
+    {
+      header: () => (
+        <input type="checkbox" checked={(data?.items ?? []).length > 0 && (data?.items ?? []).every((a: Asset) => selectedIds.includes(a.id))} onChange={toggleSelectAll} />
+      ),
+      id: "select",
+      cell: ({ row }) => (
+        <input type="checkbox" checked={selectedIds.includes(row.original.id)} onChange={(e) => { e.stopPropagation(); toggleSelected(row.original.id); }} onClick={(e) => e.stopPropagation()} />
+      ),
+    },
+    {
+      header: "Asset",
+      cell: ({ row }) => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{row.original.name}</div>
+          <div className="muted" style={{ fontSize: 11 }}>{row.original.assetTag}{row.original.serialNumber ? ` · SN ${row.original.serialNumber}` : ""}</div>
+        </div>
+      ),
+    },
+    { header: "Class", accessorFn: (r) => r.category?.name ?? "Uncategorized" },
+    {
+      header: "Status",
+      cell: ({ row }) =>
+        canEdit ? (
+          <select
+            className="select"
+            style={{ fontSize: 12, padding: "4px 6px" }}
+            value={row.original.status}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => quickPatchMutation.mutate({ id: row.original.id, data: { status: e.target.value } })}
+          >
+            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+          </select>
+        ) : (
+          <StatusBadge status={row.original.status} />
+        ),
+    },
+    { header: "Location", accessorFn: (r) => r.location?.name ?? "—" },
+    {
+      header: "Telemetry",
+      cell: ({ row }) => {
+        const device = row.original.device;
+        if (!device) return <span className="muted">—</span>;
+        const online = Date.now() - new Date(device.lastSeen).getTime() < 15 * 60 * 1000;
+        return (
+          <span className="row gap-1" style={{ fontSize: 12 }}>
+            <span className={`tag-dot ${online ? "online" : "offline"}`} /> {online ? "Online" : "Offline"}
+          </span>
+        );
+      },
+    },
+    {
+      header: "Custodian",
+      cell: ({ row }) =>
+        canEdit ? (
+          <select
+            className="select"
+            style={{ fontSize: 12, padding: "4px 6px" }}
+            value={row.original.assignedToId ?? ""}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => quickPatchMutation.mutate({ id: row.original.id, data: { assignedToId: e.target.value ? Number(e.target.value) : null } })}
+          >
+            <option value="">Unassigned</option>
+            {users?.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+          </select>
+        ) : (
+          <span>{row.original.assignedTo ? `${row.original.assignedTo.firstName} ${row.original.assignedTo.lastName}` : "Unassigned"}</span>
+        ),
+    },
+    {
+      header: "Sign-off",
+      cell: ({ row }) => (
+        <button
+          className={`badge ${row.original.signOffStatus === "CONFIRMED" ? "badge-success" : "badge-warning"}`}
+          style={{ border: "none", cursor: canEdit ? "pointer" : "default" }}
+          disabled={!canEdit}
+          onClick={(e) => {
+            e.stopPropagation();
+            quickPatchMutation.mutate({ id: row.original.id, data: { signOffStatus: row.original.signOffStatus === "CONFIRMED" ? "PENDING" : "CONFIRMED" } });
+          }}
+        >
+          {row.original.signOffStatus}
+        </button>
+      ),
+    },
+    {
+      header: "",
+      id: "actions",
+      cell: ({ row }) => (
+        <div className="row gap-1" onClick={(e) => e.stopPropagation()}>
+          <button className="btn btn-secondary btn-sm btn-icon" title="View" onClick={() => navigate(`/assets/${row.original.id}`)}><Icon name="search" size={12} /></button>
+          <PermissionGate module="assets" action="edit">
+            <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={() => setEditing(row.original)}><Icon name="edit" size={12} /></button>
+          </PermissionGate>
+          <button className="btn btn-secondary btn-sm btn-icon" title="Print QR label" onClick={() => setQrAsset(row.original)}><Icon name="grid" size={12} /></button>
+          <PermissionGate module="assets" action="create">
+            <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}><Icon name="paperclip" size={12} /></button>
+          </PermissionGate>
+          <button className="btn btn-secondary btn-sm btn-icon" title="Copy share link" onClick={() => copyShareLink(row.original)}><Icon name="chevronRight" size={12} /></button>
+          <PermissionGate module="assets" action="delete">
+            <button className="btn btn-danger btn-sm btn-icon" title="Delete" onClick={() => setDeleting(row.original)}><Icon name="trash" size={12} /></button>
+          </PermissionGate>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Asset Inventory</h1>
+          <p className="page-subtitle">Track and manage all Kynren IT and physical assets.</p>
+        </div>
+        <PermissionGate module="assets" action="create">
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" size={14} /> Add Hardware Asset</button>
+        </PermissionGate>
+      </div>
+
+      <div className="row gap-2 flex-wrap" style={{ marginBottom: 14 }}>
+        <button className={`btn btn-sm ${categoryId === null ? "btn-primary" : "btn-secondary"}`} onClick={() => { setCategoryId(null); setPage(1); }}>
+          All Assets <span className="badge badge-neutral" style={{ marginLeft: 6 }}>{stats?.total ?? 0}</span>
+        </button>
+        {categories?.map((c: any) => {
+          const count = stats?.byCategory.find((s) => s.categoryId === c.id)?.count ?? 0;
+          return (
+            <button key={c.id} className={`btn btn-sm ${categoryId === c.id ? "btn-primary" : "btn-secondary"}`} onClick={() => { setCategoryId(c.id); setPage(1); }}>
+              {c.name} <span className="badge badge-neutral" style={{ marginLeft: 6 }}>{count}</span>
+            </button>
+          );
+        })}
+        <PermissionGate module="admin" action="edit">
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate("/admin")}><Icon name="plus" size={12} /> Add Asset Type</button>
+        </PermissionGate>
+      </div>
+
+      <div className="filter-bar">
+        <div style={{ position: "relative" }}>
+          <span style={{ position: "absolute", left: 10, top: 9, color: "var(--color-text-muted)" }}><Icon name="search" size={14} /></span>
+          <input className="input" style={{ paddingLeft: 30, minWidth: 220 }} placeholder="Search by tag, name, or serial..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+        </div>
+        <select className="select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+          <option value="">All statuses</option>
+          {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+        </select>
+        <select className="select" value={assignedToId} onChange={(e) => { setAssignedToId(e.target.value); setPage(1); }}>
+          <option value="">Custody: All</option>
+          {users?.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+        </select>
+        <input className="input" type="date" style={{ width: "auto" }} value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} title="From date" />
+        <input className="input" type="date" style={{ width: "auto" }} value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} title="To date" />
+        <div className="flex-1" />
+        <button className="btn btn-secondary" onClick={() => window.print()}><Icon name="download" size={13} /> Print Inventory</button>
+        <button className="btn btn-secondary" onClick={downloadJson}><Icon name="download" size={13} /> Export JSON</button>
+        <button className="btn btn-secondary" onClick={() => setShowScanner(true)}><Icon name="grid" size={13} /> Scan QR Code</button>
+        <PermissionGate module="assets" action="create">
+          <button className="btn btn-secondary" onClick={() => setShowDiscover(true)}>
+            <Icon name="cpu" size={13} /> Discover Unregistered Assets
+            {Boolean(unregisteredData?.total) && <span className="badge badge-warning" style={{ marginLeft: 6 }}>{unregisteredData.total}</span>}
+          </button>
+        </PermissionGate>
+        <PermissionGate module="assets" action="export">
+          <CsvExportButton url="/assets/export" filename="assets.csv" />
+        </PermissionGate>
+        <PermissionGate module="assets" action="create">
+          <CsvImportButton url="/assets/import" onImported={(res) => { setImportResult(res); invalidateAll(); }} />
+        </PermissionGate>
+        <div className="row gap-1">
+          <button className={`btn btn-sm btn-icon ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("list")} title="List view"><Icon name="grid" size={13} /></button>
+          <button className={`btn btn-sm btn-icon ${viewMode === "grid" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("grid")} title="Grid view"><Icon name="camera" size={13} /></button>
+        </div>
+      </div>
+
+      {importResult && (
+        <div className={`alert ${importResult.errors.length ? "alert-warning" : "alert-success"}`}>
+          Imported {importResult.created} asset(s). {importResult.errors.length > 0 && `${importResult.errors.length} row(s) had errors.`}
+          <button className="modal-close" style={{ float: "right" }} onClick={() => setImportResult(null)}>×</button>
+        </div>
+      )}
+
+      {canEdit && selectedIds.length > 0 && (
+        <div className="alert alert-primary row gap-2" style={{ alignItems: "center", background: "var(--color-primary-soft)" }}>
+          <strong>{selectedIds.length} selected</strong>
+          <select className="select" style={{ width: "auto" }} value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
+            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+          </select>
+          <button className="btn btn-primary btn-sm" disabled={bulkMutation.isPending} onClick={() => bulkMutation.mutate()}>Apply Status</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setSelectedIds([])}>Clear</button>
+        </div>
+      )}
+
+      <div id="inventory-print-area">
+        {viewMode === "grid" ? (
+          <div className="grid grid-cols-4">
+            {(data?.items ?? []).map((a: Asset) => (
+              <AssetGridCard key={a.id} asset={a} onOpen={() => navigate(`/assets/${a.id}`)} />
+            ))}
+            {(data?.items ?? []).length === 0 && !isLoading && <div className="empty-state">No assets found.</div>}
+          </div>
+        ) : (
+          <div className="card">
+            <DataTable
+              columns={columns}
+              data={data?.items ?? []}
+              isLoading={isLoading}
+              page={data?.page}
+              totalPages={data?.totalPages}
+              onPageChange={setPage}
+              onRowClick={(row) => navigate(`/assets/${row.id}`)}
+              emptyMessage="No assets found. Add your first asset to get started."
+            />
+          </div>
+        )}
+      </div>
+
+      {showForm && (
+        <AssetFormModal onClose={() => setShowForm(false)} onSubmit={(v) => createMutation.mutate(v)} submitting={createMutation.isPending} />
+      )}
+      {editing && (
+        <AssetFormModal
+          initial={{
+            assetTag: editing.assetTag,
+            name: editing.name,
+            status: editing.status,
+            categoryId: editing.categoryId,
+            locationId: editing.locationId,
+            assignedToId: editing.assignedToId,
+            manufacturer: editing.manufacturer ?? "",
+            model: editing.model ?? "",
+            serialNumber: editing.serialNumber ?? "",
+            notes: editing.notes ?? "",
+            nextServiceDate: editing.nextServiceDate ? editing.nextServiceDate.slice(0, 10) : "",
+          }}
+          onClose={() => setEditing(null)}
+          onSubmit={(v) => updateMutation.mutate(v)}
+          submitting={updateMutation.isPending}
+        />
+      )}
+      {deleting && (
+        <ConfirmDialog
+          title="Delete asset"
+          message={`Are you sure you want to delete "${deleting.name}" (${deleting.assetTag})? This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate()}
+        />
+      )}
+      {qrAsset && <QrLabelModal assetTag={qrAsset.assetTag} name={qrAsset.name} onClose={() => setQrAsset(null)} />}
+      {showScanner && <QrScannerModal onClose={() => setShowScanner(false)} />}
+      {showDiscover && <DiscoverDevicesModal onClose={() => setShowDiscover(false)} />}
+    </div>
+  );
+}

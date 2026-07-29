@@ -1,0 +1,648 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Access control ─────────────────────────
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  description String?
+  isSystem    Boolean          @default(false)
+  permissions RolePermission[]
+  users       User[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model RolePermission {
+  id        Int     @id @default(autoincrement())
+  roleId    Int
+  role      Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  module    String
+  canView   Boolean @default(false)
+  canCreate Boolean @default(false)
+  canEdit   Boolean @default(false)
+  canDelete Boolean @default(false)
+  canExport Boolean @default(false)
+
+  @@unique([roleId, module])
+}
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  email              String    @unique
+  passwordHash       String
+  firstName          String
+  lastName           String
+  avatarUrl          String?
+  accentColor        String?
+  roleId             Int
+  role               Role      @relation(fields: [roleId], references: [id])
+  isActive           Boolean   @default(true)
+  mustChangePassword Boolean   @default(true)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  assetsAssigned    Asset[]            @relation("AssetAssignee")
+  ticketsRequested  Ticket[]           @relation("TicketRequester")
+  ticketsAssigned   Ticket[]           @relation("TicketAssignee")
+  ticketComments    TicketComment[]
+  ticketAttachments TicketAttachment[]
+  ticketWatching    TicketWatcher[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  stockTransactions StockTransaction[]
+  networkScans      NetworkScan[]
+  vaultEntries      VaultEntry[]
+  images            UserImage[]
+  dashboardLayout   DashboardLayout?
+
+  projectCardsAssigned ProjectCard[]      @relation("ProjectCardAssignee")
+  projectCardsCreated  ProjectCard[]      @relation("ProjectCardCreator")
+  knowledgeArticles    KnowledgeArticle[]
+  assetBookings        AssetBooking[]
+  savedQueries         SavedQuery[]
+  resourceSchedules    ResourceSchedule[]
+}
+
+model UserImage {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url       String
+  createdAt DateTime @default(now())
+}
+
+model VaultEntry {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title             String
+  websiteUrl        String?
+  username          String?
+  encryptedPassword String
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model DashboardLayout {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  layoutJson Json
+  updatedAt  DateTime @updatedAt
+}
+
+// ───────────────────────── Assets ─────────────────────────
+
+model AssetCategory {
+  id     Int     @id @default(autoincrement())
+  name   String  @unique
+  assets Asset[]
+}
+
+model Location {
+  id      Int     @id @default(autoincrement())
+  name    String  @unique
+  address String?
+  assets  Asset[]
+}
+
+enum AssetStatus {
+  IN_USE
+  IN_STORAGE
+  IN_REPAIR
+  RETIRED
+  LOST
+}
+
+enum SignOffStatus {
+  PENDING
+  CONFIRMED
+}
+
+model Asset {
+  id                Int            @id @default(autoincrement())
+  assetTag          String         @unique
+  name              String
+  categoryId        Int?
+  category          AssetCategory? @relation(fields: [categoryId], references: [id])
+  locationId        Int?
+  location          Location?      @relation(fields: [locationId], references: [id])
+  assignedToId      Int?
+  assignedTo        User?          @relation("AssetAssignee", fields: [assignedToId], references: [id])
+  status            AssetStatus    @default(IN_USE)
+  manufacturer      String?
+  model             String?
+  serialNumber      String?
+  purchaseDate      DateTime?
+  purchaseCost      Decimal?       @db.Decimal(12, 2)
+  warrantyExpiresAt DateTime?
+  nextServiceDate   DateTime?
+  notes             String?
+  signOffStatus     SignOffStatus  @default(PENDING)
+  deviceId          Int?           @unique
+  device            Device?        @relation(fields: [deviceId], references: [id])
+  tickets           Ticket[]
+
+  featuredImageUrl  String?
+  gridPowered       Boolean        @default(true)
+
+  remoteManagementEnabled  Boolean  @default(false)
+  remoteManagementProtocol String?
+  remoteManagementUrl      String?
+
+  isVirtual  Boolean @default(false)
+  hypervisor String?
+  vmHost     String?
+
+  antivirusProduct    String?
+  antivirusStatus     String?
+  antivirusLastScanAt DateTime?
+
+  photos       AssetPhoto[]
+  components   AssetComponent[]
+  volumes      AssetVolume[]
+  connections  AssetConnection[]
+  networkPorts AssetNetworkPort[]
+  sockets      AssetSocket[]
+  contracts    AssetContract[]
+  documents    AssetDocument[]
+  bookings     AssetBooking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AssetPhoto {
+  id        Int      @id @default(autoincrement())
+  assetId   Int
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  url       String
+  createdAt DateTime @default(now())
+}
+
+model AssetComponent {
+  id        Int      @id @default(autoincrement())
+  assetId   Int
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  type      String
+  name      String
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+model AssetVolume {
+  id         Int      @id @default(autoincrement())
+  assetId    Int
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  label      String
+  totalGb    Float?
+  freeGb     Float?
+  fileSystem String?
+  createdAt  DateTime @default(now())
+}
+
+model AssetConnection {
+  id        Int      @id @default(autoincrement())
+  assetId   Int
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  label     String
+  type      String?
+  target    String?
+  createdAt DateTime @default(now())
+}
+
+model AssetNetworkPort {
+  id          Int      @id @default(autoincrement())
+  assetId     Int
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  portNumber  Int
+  protocol    String?
+  serviceName String?
+  status      String?
+  createdAt   DateTime @default(now())
+}
+
+model AssetSocket {
+  id        Int      @id @default(autoincrement())
+  assetId   Int
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  label     String
+  type      String?
+  location  String?
+  createdAt DateTime @default(now())
+}
+
+model AssetContract {
+  id             Int       @id @default(autoincrement())
+  assetId        Int
+  asset          Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  vendor         String
+  contractNumber String?
+  startDate      DateTime?
+  endDate        DateTime?
+  fileUrl        String?
+  notes          String?
+  createdAt      DateTime  @default(now())
+}
+
+model AssetDocument {
+  id        Int      @id @default(autoincrement())
+  assetId   Int
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  name      String
+  fileUrl   String
+  sizeBytes Int?
+  createdAt DateTime @default(now())
+}
+
+// ───────────────────────── Devices (agent-reported) ─────────────────────────
+
+model Device {
+  id                 Int       @id @default(autoincrement())
+  hostname           String
+  macAddress         String    @unique
+  ipAddresses        String[]
+  os                 String?
+  osVersion          String?
+  cpu                String?
+  ramGb              Float?
+  diskInfo           String?
+  manufacturer       String?
+  model              String?
+  serialNumber       String?
+  agentVersion       String?
+  loggedInUser       String?
+  lastLoginAt        DateTime?
+  installedSoftware  Json?
+  lastSeen           DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+
+  asset       Asset?
+  networkNode NetworkNode?
+}
+
+// ───────────────────────── Network topology ─────────────────────────
+
+enum NodeType {
+  DEVICE
+  ROUTER
+  SWITCH
+  NVR
+  OTHER
+}
+
+model NetworkNode {
+  id         Int      @id @default(autoincrement())
+  type       NodeType
+  label      String
+  ipAddress  String?
+  subnet     String?
+  vendor     String?
+  deviceType String?
+  deviceId   Int?     @unique
+  device     Device?  @relation(fields: [deviceId], references: [id])
+  posX       Float?
+  posY       Float?
+  createdAt  DateTime @default(now())
+
+  edgesFrom NetworkEdge[] @relation("EdgeSource")
+  edgesTo   NetworkEdge[] @relation("EdgeTarget")
+}
+
+model NetworkEdge {
+  id       Int         @id @default(autoincrement())
+  sourceId Int
+  source   NetworkNode @relation("EdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId Int
+  target   NetworkNode @relation("EdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  label    String?
+}
+
+enum ScanStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model NetworkScan {
+  id          Int                 @id @default(autoincrement())
+  startIp     String
+  endIp       String
+  status      ScanStatus          @default(RUNNING)
+  totalHosts  Int
+  aliveHosts  Int                 @default(0)
+  scannedHosts Int                @default(0)
+  startedById Int
+  startedBy   User                @relation(fields: [startedById], references: [id])
+  startedAt   DateTime            @default(now())
+  completedAt DateTime?
+  results     NetworkScanResult[]
+}
+
+model NetworkScanResult {
+  id             Int         @id @default(autoincrement())
+  scanId         Int
+  scan           NetworkScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  ipAddress      String
+  alive          Boolean
+  hostname       String?
+  macAddress     String?
+  vendor         String?
+  deviceType     String?
+  responseTimeMs Int?
+  openPorts      Int[]
+  discoveredAt   DateTime    @default(now())
+}
+
+// ───────────────────────── Stock ─────────────────────────
+
+enum StockTxType {
+  IN
+  OUT
+}
+
+model StockItem {
+  id             Int                @id @default(autoincrement())
+  sku            String             @unique
+  name           String
+  category       String?
+  unit           String             @default("pcs")
+  quantityOnHand Int                @default(0)
+  reorderLevel   Int                @default(0)
+  unitCost       Decimal?           @db.Decimal(12, 2)
+  transactions   StockTransaction[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model StockTransaction {
+  id            Int         @id @default(autoincrement())
+  stockItemId   Int
+  stockItem     StockItem   @relation(fields: [stockItemId], references: [id])
+  type          StockTxType
+  quantity      Int
+  reason        String?
+  performedById Int
+  performedBy   User        @relation(fields: [performedById], references: [id])
+  createdAt     DateTime    @default(now())
+}
+
+// ───────────────────────── Helpdesk ─────────────────────────
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model TicketCategory {
+  id      Int      @id @default(autoincrement())
+  name    String   @unique
+  tickets Ticket[]
+}
+
+model Ticket {
+  id                   Int                @id @default(autoincrement())
+  ticketNumber         String             @unique
+  title                String
+  description          String
+  status               TicketStatus       @default(OPEN)
+  priority             TicketPriority     @default(MEDIUM)
+  categoryId           Int?
+  category             TicketCategory?    @relation(fields: [categoryId], references: [id])
+  assetId              Int?
+  asset                Asset?             @relation(fields: [assetId], references: [id])
+  requesterId          Int
+  requester            User               @relation("TicketRequester", fields: [requesterId], references: [id])
+  assigneeId           Int?
+  assignee             User?              @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  dueAt                DateTime?
+  satisfactionRating   Int?
+  satisfactionComment  String?
+  comments             TicketComment[]
+  attachments          TicketAttachment[]
+  watchers             TicketWatcher[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  resolvedAt           DateTime?
+}
+
+model TicketComment {
+  id         Int      @id @default(autoincrement())
+  ticketId   Int
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   Int
+  author     User     @relation(fields: [authorId], references: [id])
+  body       String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model TicketAttachment {
+  id           Int      @id @default(autoincrement())
+  ticketId     Int
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  filename     String
+  storedPath   String
+  sizeBytes    Int
+  uploadedById Int
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model TicketWatcher {
+  id       Int    @id @default(autoincrement())
+  ticketId Int
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId   Int
+  user     User   @relation(fields: [userId], references: [id])
+
+  @@unique([ticketId, userId])
+}
+
+// ───────────────────────── NVR / Cameras ─────────────────────────
+
+enum CameraStatus {
+  ONLINE
+  OFFLINE
+  UNKNOWN
+}
+
+model Nvr {
+  id                Int          @id @default(autoincrement())
+  name              String
+  ipAddress         String?
+  port              Int?
+  protocol          String?      @default("RTSP")
+  username          String?
+  encryptedPassword String?
+  location          String?
+  model             String?
+  notes             String?
+  status            CameraStatus @default(UNKNOWN)
+  lastCheckedAt     DateTime?
+  cameras           Camera[]
+  events            CameraEvent[]
+  createdAt         DateTime     @default(now())
+}
+
+model Camera {
+  id                Int           @id @default(autoincrement())
+  nvrId             Int
+  nvr               Nvr           @relation(fields: [nvrId], references: [id], onDelete: Cascade)
+  name              String
+  channel           Int?
+  location          String?
+  ipAddress         String?
+  port              Int?
+  username          String?
+  encryptedPassword String?
+  streamUrl         String?
+  ptzEnabled        Boolean       @default(false)
+  status            CameraStatus  @default(UNKNOWN)
+  lastCheckedAt     DateTime?
+  events            CameraEvent[]
+}
+
+model CameraEvent {
+  id        Int      @id @default(autoincrement())
+  nvrId     Int?
+  nvr       Nvr?     @relation(fields: [nvrId], references: [id], onDelete: Cascade)
+  cameraId  Int?
+  camera    Camera?  @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  type      String
+  message   String?
+  createdAt DateTime @default(now())
+}
+
+// ───────────────────────── Cross-cutting ─────────────────────────
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entityType String?
+  entityId   Int?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  message   String
+  isRead    Boolean  @default(false)
+  linkUrl   String?
+  createdAt DateTime @default(now())
+}
+
+model SystemSetting {
+  key   String @id
+  value String
+}
+
+model AgentApiKey {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  label     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+// ───────────────────────── Operations Tools ─────────────────────────
+
+enum ProjectCardStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+model ProjectCard {
+  id          Int               @id @default(autoincrement())
+  title       String
+  description String?
+  status      ProjectCardStatus @default(TODO)
+  assigneeId  Int?
+  assignee    User?             @relation("ProjectCardAssignee", fields: [assigneeId], references: [id])
+  dueDate     DateTime?
+  order       Int               @default(0)
+  createdById Int
+  createdBy   User              @relation("ProjectCardCreator", fields: [createdById], references: [id])
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model RssFeedSource {
+  id        Int      @id @default(autoincrement())
+  name      String
+  url       String
+  createdAt DateTime @default(now())
+}
+
+model KnowledgeArticle {
+  id          Int      @id @default(autoincrement())
+  title       String
+  content     String
+  category    String?
+  createdById Int
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AssetBooking {
+  id         Int      @id @default(autoincrement())
+  assetId    Int
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  bookedById Int
+  bookedBy   User     @relation(fields: [bookedById], references: [id])
+  startAt    DateTime
+  endAt      DateTime
+  purpose    String?
+  createdAt  DateTime @default(now())
+}
+
+model SavedQuery {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label       String
+  module      String
+  queryString String
+  createdAt   DateTime @default(now())
+}
+
+model ResourceSchedule {
+  id            Int      @id @default(autoincrement())
+  resourceName  String
+  scheduledById Int
+  scheduledBy   User     @relation(fields: [scheduledById], references: [id])
+  startAt       DateTime
+  endAt         DateTime
+  notes         String?
+  createdAt     DateTime @default(now())
+}

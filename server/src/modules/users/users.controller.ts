@@ -1,0 +1,109 @@
+import bcrypt from "bcryptjs";
+import { Request, Response } from "express";
+import { prisma } from "../../config/prisma";
+import { ApiError } from "../../middleware/errorHandler";
+import { logAudit } from "../../lib/auditLogger";
+import { generateTempPassword } from "../../lib/passwords";
+import { getPagination, paginatedResponse } from "../../lib/pagination";
+
+const userSelect = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  avatarUrl: true,
+  isActive: true,
+  mustChangePassword: true,
+  lastLoginAt: true,
+  createdAt: true,
+  roleId: true,
+  role: { select: { id: true, name: true } },
+};
+
+export async function directory(_req: Request, res: Response) {
+  const users = await prisma.user.findMany({
+    where: { isActive: true },
+    select: { id: true, firstName: true, lastName: true, email: true },
+    orderBy: { firstName: "asc" },
+  });
+  res.json(users);
+}
+
+export async function list(req: Request, res: Response) {
+  const { page, pageSize, skip, take } = getPagination(req);
+  const search = (req.query.search as string) || undefined;
+
+  const where = search
+    ? {
+        OR: [
+          { email: { contains: search, mode: "insensitive" as const } },
+          { firstName: { contains: search, mode: "insensitive" as const } },
+          { lastName: { contains: search, mode: "insensitive" as const } },
+        ],
+      }
+    : {};
+
+  const [items, total] = await Promise.all([
+    prisma.user.findMany({ where, select: userSelect, skip, take, orderBy: { createdAt: "desc" } }),
+    prisma.user.count({ where }),
+  ]);
+
+  res.json(paginatedResponse(items, total, page, pageSize));
+}
+
+export async function getOne(req: Request, res: Response) {
+  const user = await prisma.user.findUnique({ where: { id: Number(req.params.id) }, select: userSelect });
+  if (!user) throw new ApiError(404, "User not found");
+  res.json(user);
+}
+
+export async function devices(req: Request, res: Response) {
+  const userId = Number(req.params.id);
+  const assets = await prisma.asset.findMany({
+    where: { assignedToId: userId },
+    include: { device: true, category: true, location: true },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json(assets);
+}
+
+export async function create(req: Request, res: Response) {
+  const { email, firstName, lastName, roleId, password } = req.body;
+  const tempPassword = password || generateTempPassword();
+  const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+  const user = await prisma.user.create({
+    data: { email: email.toLowerCase(), firstName, lastName, roleId, passwordHash, mustChangePassword: true },
+    select: userSelect,
+  });
+
+  await logAudit({ userId: req.user!.id, action: "user.create", entityType: "User", entityId: user.id });
+  res.status(201).json({ user, tempPassword });
+}
+
+export async function update(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  if (id === req.user!.id && req.body.isActive === false) {
+    throw new ApiError(400, "You cannot deactivate your own account");
+  }
+  const user = await prisma.user.update({ where: { id }, data: req.body, select: userSelect });
+  await logAudit({ userId: req.user!.id, action: "user.update", entityType: "User", entityId: id, metadata: req.body });
+  res.json(user);
+}
+
+export async function resetPassword(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const newPassword = req.body.newPassword || generateTempPassword();
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await prisma.user.update({ where: { id }, data: { passwordHash, mustChangePassword: true } });
+  await logAudit({ userId: req.user!.id, action: "user.reset_password", entityType: "User", entityId: id });
+  res.json({ ok: true, tempPassword: newPassword });
+}
+
+export async function remove(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  if (id === req.user!.id) throw new ApiError(400, "You cannot delete your own account");
+  await prisma.user.update({ where: { id }, data: { isActive: false } });
+  await logAudit({ userId: req.user!.id, action: "user.deactivate", entityType: "User", entityId: id });
+  res.json({ ok: true });
+}
