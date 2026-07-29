@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { PermissionGate } from "../../../auth/PermissionGate";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 interface RssSource { id: number; name: string; url: string; createdAt: string; }
 interface FeedItem { title: string; link: string | null; pubDate: string | null; sourceName: string; }
@@ -12,6 +13,7 @@ export function RssFeedTab() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
+  const [deleting, setDeleting] = useState<RssSource | null>(null);
 
   const { data: sources } = useQuery({
     queryKey: ["op-rss-sources"],
@@ -38,6 +40,7 @@ export function RssFeedTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["op-rss-sources"] });
       queryClient.invalidateQueries({ queryKey: ["op-rss-items"] });
+      setDeleting(null);
     },
   });
 
@@ -71,7 +74,7 @@ export function RssFeedTab() {
                     <div className="ad-row-label" style={{ textTransform: "none" }}>{s.url}</div>
                   </div>
                   <PermissionGate module="operations" action="edit">
-                    <button className="ad-btn ad-btn-danger" onClick={() => removeSourceMutation.mutate(s.id)}><Icon name="trash" size={12} /></button>
+                    <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(s)}><Icon name="trash" size={12} /></button>
                   </PermissionGate>
                 </div>
               ))}
@@ -108,6 +111,17 @@ export function RssFeedTab() {
           )}
         </div>
       </div>
+
+      {deleting && (
+        <ConfirmDialog
+          title="Remove feed source"
+          message={`Are you sure you want to remove "${deleting.name}"? This cannot be undone.`}
+          danger
+          loading={removeSourceMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => removeSourceMutation.mutate(deleting.id)}
+        />
+      )}
     </div>
   );
 }

@@ -24,6 +24,22 @@ type PermAction = "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport
 const ACTIONS: PermAction[] = ["canView", "canCreate", "canEdit", "canDelete", "canExport"];
 const ACTION_LABELS: Record<string, string> = { canView: "View", canCreate: "Create", canEdit: "Edit", canDelete: "Delete", canExport: "Export" };
 
+// Every feature area gated behind each module, kept in sync as new functionality lands —
+// several modules cover more than their name implies since newer features (Licenses,
+// Suppliers & POs, PTZ/Recording/Motion Detection, Form Templates) were added under an
+// existing module rather than a brand-new one.
+const MODULE_INFO: Record<ModuleName, { label: string; description: string }> = {
+  dashboard: { label: "Dashboard", description: "KPI widgets, charts, and recent activity feed." },
+  assets: { label: "Asset Inventory", description: "Asset CRUD, check-in/check-out, CSV/QR import-export, asset detail (Profile, Reports, Logs, sub-resources)." },
+  network: { label: "Network Topology Map", description: "Topology graph, ICMP ping console, IP range scanner, agent-reported client devices." },
+  stock: { label: "Stock Register & Analytics", description: "Stock items, multi-location stock levels & transfers, analytics — and Suppliers & Purchase Orders." },
+  helpdesk: { label: "Helpdesk & Ticketing", description: "Ticket CRUD, comments, status workflow." },
+  operations: { label: "Operations Tools", description: "IT Projects Kanban, Knowledge Base, Asset Bookings, Saved Queries, Resource Scheduling, Bulk & Reports — and Software Licenses." },
+  nvr: { label: "NVRs & Cameras", description: "Device management, live view, event log, ONVIF PTZ control, recording & retention, motion detection alerts." },
+  "virtual-assistant": { label: "Virtual Assistant", description: "In-app assistant chat and quick actions." },
+  admin: { label: "Admin & Setup", description: "Users, Roles & Permissions, Categories & Locations, Asset Form Templates, System Settings, Audit Log." },
+};
+
 export function RolesTab() {
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -108,9 +124,13 @@ export function RolesTab() {
               <tbody>
                 {MODULES.map((module) => {
                   const perm = matrix.find((p) => p.module === module)!;
+                  const info = MODULE_INFO[module];
                   return (
                     <tr key={module}>
-                      <td style={{ textTransform: "capitalize" }}>{module.replace("-", " ")}</td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{info.label}</div>
+                        <div className="muted" style={{ fontSize: 11, marginTop: 2, maxWidth: 360 }}>{info.description}</div>
+                      </td>
                       {ACTIONS.map((a) => (
                         <td key={a} style={{ textAlign: "center" }}>
                           <input type="checkbox" checked={perm[a]} onChange={() => toggle(module, a)} />

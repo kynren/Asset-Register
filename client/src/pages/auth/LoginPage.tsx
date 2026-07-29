@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { useBranding } from "../../theme/BrandingContext";
+import { PasswordInput } from "../../components/PasswordInput";
 
 export function LoginPage() {
   const { user, login } = useAuth();
@@ -59,7 +60,7 @@ export function LoginPage() {
             </div>
             <div className="field">
               <label>Password</label>
-              <input className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <div className="row" style={{ justifyContent: "flex-end", marginTop: -8, marginBottom: 4 }}>
               <Link to="/forgot-password" className="muted" style={{ fontSize: 12 }}>Forgot password?</Link>

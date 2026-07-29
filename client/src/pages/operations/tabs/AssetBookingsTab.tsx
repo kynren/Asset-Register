@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { PermissionGate } from "../../../auth/PermissionGate";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 interface Booking {
   id: number;
@@ -23,6 +24,7 @@ export function AssetBookingsTab() {
   const [endAt, setEndAt] = useState("");
   const [purpose, setPurpose] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Booking | null>(null);
 
   const { data: assets } = useQuery({
     queryKey: ["assets-for-booking"],
@@ -55,7 +57,7 @@ export function AssetBookingsTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/operations/bookings/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["op-bookings"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["op-bookings"] }); setDeleting(null); },
   });
 
   const upcoming = bookings?.filter((b) => new Date(b.endAt) >= new Date()) ?? [];
@@ -104,7 +106,7 @@ export function AssetBookingsTab() {
                     </div>
                   </div>
                   <PermissionGate module="operations" action="delete">
-                    <button className="ad-btn ad-btn-danger" onClick={() => deleteMutation.mutate(b.id)}><Icon name="trash" size={12} /></button>
+                    <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(b)}><Icon name="trash" size={12} /></button>
                   </PermissionGate>
                 </div>
               ))}
@@ -134,6 +136,17 @@ export function AssetBookingsTab() {
           )}
         </div>
       </div>
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete booking"
+          message={`Are you sure you want to delete the booking for "${deleting.asset.name}" (${deleting.asset.assetTag})? This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate(deleting.id)}
+        />
+      )}
     </div>
   );
 }

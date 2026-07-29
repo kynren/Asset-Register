@@ -5,6 +5,7 @@ import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { FormModal } from "../../../components/FormModal";
 import { PermissionGate } from "../../../auth/PermissionGate";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 interface Article {
   id: number;
@@ -24,6 +25,7 @@ export function KnowledgeBaseTab() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("");
+  const [deleting, setDeleting] = useState<Article | null>(null);
 
   const { data: articles, isLoading } = useQuery({
     queryKey: ["op-knowledge", search],
@@ -43,7 +45,7 @@ export function KnowledgeBaseTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/operations/knowledge/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["op-knowledge"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["op-knowledge"] }); setDeleting(null); },
   });
 
   return (
@@ -70,7 +72,7 @@ export function KnowledgeBaseTab() {
                   </div>
                 </div>
                 <PermissionGate module="operations" action="delete">
-                  <button className="ad-btn ad-btn-danger" onClick={() => deleteMutation.mutate(a.id)}><Icon name="trash" size={12} /></button>
+                  <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(a)}><Icon name="trash" size={12} /></button>
                 </PermissionGate>
               </div>
               {expanded === a.id && <div className="ot-item-body">{a.content}</div>}
@@ -87,6 +89,17 @@ export function KnowledgeBaseTab() {
           <div className="field"><label>Category</label><input className="input" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Networking" /></div>
           <div className="field"><label>Content *</label><textarea className="input" rows={8} value={content} onChange={(e) => setContent(e.target.value)} /></div>
         </FormModal>
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete article"
+          message={`Are you sure you want to delete "${deleting.title}"? This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate(deleting.id)}
+        />
       )}
     </div>
   );

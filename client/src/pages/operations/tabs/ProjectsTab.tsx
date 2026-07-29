@@ -5,6 +5,7 @@ import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { FormModal } from "../../../components/FormModal";
 import { PermissionGate } from "../../../auth/PermissionGate";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 interface ProjectCard {
   id: number;
@@ -31,6 +32,7 @@ export function ProjectsTab() {
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [deleting, setDeleting] = useState<ProjectCard | null>(null);
 
   const { data: cards, isLoading } = useQuery({
     queryKey: ["op-projects"],
@@ -63,7 +65,7 @@ export function ProjectsTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/operations/projects/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["op-projects"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["op-projects"] }); setDeleting(null); },
   });
 
   function cardsFor(status: ProjectCard["status"]) {
@@ -123,7 +125,7 @@ export function ProjectsTab() {
                           <Icon name="chevronRight" size={13} />
                         </button>
                         <PermissionGate module="operations" action="delete">
-                          <button className="ot-card-delete-btn" title="Delete card" onClick={() => deleteMutation.mutate(card.id)}>
+                          <button className="ot-card-delete-btn" title="Delete card" onClick={() => setDeleting(card)}>
                             <Icon name="trash" size={13} />
                           </button>
                         </PermissionGate>
@@ -155,6 +157,17 @@ export function ProjectsTab() {
           </div>
           <div className="field"><label>Due Date</label><input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
         </FormModal>
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete project card"
+          message={`Are you sure you want to delete "${deleting.title}"? This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate(deleting.id)}
+        />
       )}
     </div>
   );

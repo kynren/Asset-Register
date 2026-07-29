@@ -23,8 +23,13 @@ interface StreamSession {
 
 const sessions = new Map<string, StreamSession>();
 
+// A live view is meant to run continuously for as long as it's actually being watched —
+// IDLE_TIMEOUT_MS (reset on every playlist/segment/status request) is what reaps a session
+// once the viewer navigates away. MAX_SESSION_AGE_MS is only a backstop against a runaway
+// ffmpeg process outliving a session nobody is polling anymore; it's generous on purpose so
+// it never interrupts an actively-watched stream.
 const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
-const MAX_SESSION_AGE_MS = 15 * 60 * 1000;
+const MAX_SESSION_AGE_MS = 12 * 60 * 60 * 1000;
 
 function sweepIdleSessions() {
   const now = Date.now();

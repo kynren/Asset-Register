@@ -66,7 +66,21 @@ export const importCamerasSchema = z.object({
         name: z.string().min(1),
         streamUri: z.string().nullable().optional(),
         snapshotUri: z.string().nullable().optional(),
+        channel: z.number().int().nullable().optional(),
+        // Present when importing ISAPI channels — the proxied channel is reachable via the
+        // parent NVR's own ISAPI host/credentials, so those are persisted on the Camera row.
+        ipAddress: z.string().nullable().optional(),
+        port: z.number().int().nullable().optional(),
+        username: z.string().nullable().optional(),
+        password: z.string().nullable().optional(),
       })
     )
     .min(1),
+});
+
+export const isapiConnectionSchema = z.object({
+  ipAddress: z.string().min(1),
+  port: z.number().int().nullable().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
 });

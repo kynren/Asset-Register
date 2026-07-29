@@ -4,6 +4,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { VaultTab } from "./VaultTab";
 import { MfaCard } from "./MfaCard";
 import { SessionsCard } from "./SessionsCard";
+import { PasswordInput } from "../../components/PasswordInput";
 
 function AccountSecurityTab() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -44,9 +45,9 @@ function AccountSecurityTab() {
       {error && <div className="alert alert-danger">{error}</div>}
       {success && <div className="alert alert-success">Password changed successfully.</div>}
       <form onSubmit={handleSubmit}>
-        <div className="field"><label>Current Password</label><input className="input" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required /></div>
-        <div className="field"><label>New Password</label><input className="input" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required /></div>
-        <div className="field"><label>Confirm New Password</label><input className="input" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required /></div>
+        <div className="field"><label>Current Password</label><PasswordInput value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required /></div>
+        <div className="field"><label>New Password</label><PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required /></div>
+        <div className="field"><label>Confirm New Password</label><PasswordInput value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required /></div>
         <button className="btn btn-primary" type="submit" disabled={mutation.isPending}>{mutation.isPending ? "Saving..." : "Change Password"}</button>
       </form>
     </div>

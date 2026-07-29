@@ -6,6 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 const FIELD_TYPES = [
   { value: "TEXT", label: "Text" },
@@ -74,6 +75,7 @@ export function FormTemplateBuilderModal({ templateId, templateName, onClose }: 
 
   const [editingField, setEditingField] = useState<TemplateField | null>(null);
   const [showFieldForm, setShowFieldForm] = useState(false);
+  const [deletingField, setDeletingField] = useState<TemplateField | null>(null);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["asset-form-template", templateId] });
@@ -87,7 +89,7 @@ export function FormTemplateBuilderModal({ templateId, templateName, onClose }: 
 
   const deleteFieldMutation = useMutation({
     mutationFn: (fieldId: number) => axiosClient.delete(`/asset-form-templates/${templateId}/fields/${fieldId}`),
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); setDeletingField(null); },
   });
 
   function handleDragEnd(event: DragEndEvent) {
@@ -115,7 +117,7 @@ export function FormTemplateBuilderModal({ templateId, templateName, onClose }: 
                   key={f.id}
                   field={f}
                   onEdit={() => { setEditingField(f); setShowFieldForm(true); }}
-                  onDelete={() => deleteFieldMutation.mutate(f.id)}
+                  onDelete={() => setDeletingField(f)}
                 />
               ))}
             </div>
@@ -141,6 +143,17 @@ export function FormTemplateBuilderModal({ templateId, templateName, onClose }: 
       <div className="modal-footer">
         <button className="btn btn-secondary" onClick={onClose}>Close</button>
       </div>
+
+      {deletingField && (
+        <ConfirmDialog
+          title="Delete field"
+          message={`Are you sure you want to delete the "${deletingField.label}" field? Any values already saved on assets for this field will be lost. This cannot be undone.`}
+          danger
+          loading={deleteFieldMutation.isPending}
+          onCancel={() => setDeletingField(null)}
+          onConfirm={() => deleteFieldMutation.mutate(deletingField.id)}
+        />
+      )}
     </FormModal>
   );
 }

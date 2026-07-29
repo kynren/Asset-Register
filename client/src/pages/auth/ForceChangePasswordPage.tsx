@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
+import { PasswordInput } from "../../components/PasswordInput";
 
 export function ForceChangePasswordPage() {
   const { refreshSession, logout } = useAuth();
@@ -45,15 +46,15 @@ export function ForceChangePasswordPage() {
 
         <div className="field">
           <label>Current (temporary) password</label>
-          <input className="input" type="password" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+          <PasswordInput required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
         </div>
         <div className="field">
           <label>New password</label>
-          <input className="input" type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+          <PasswordInput required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
         </div>
         <div className="field">
           <label>Confirm new password</label>
-          <input className="input" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+          <PasswordInput required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
         </div>
         <div className="row" style={{ justifyContent: "space-between", marginTop: 4 }}>
           <button type="button" className="btn btn-secondary" onClick={() => logout()}>Log out</button>

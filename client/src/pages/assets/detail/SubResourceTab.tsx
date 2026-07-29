@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 interface Column {
   key: string;
@@ -30,6 +31,7 @@ interface SubResourceTabProps {
 export function SubResourceTab({ assetId, resource, title, subtitle, addLabel, columns, fields, extraInfo }: SubResourceTabProps) {
   const queryClient = useQueryClient();
   const [values, setValues] = useState<Record<string, string>>({});
+  const [deleting, setDeleting] = useState<Record<string, any> | null>(null);
   const queryKey = ["asset-resource", assetId, resource];
 
   const { data: items, isLoading } = useQuery({
@@ -47,7 +49,7 @@ export function SubResourceTab({ assetId, resource, title, subtitle, addLabel, c
 
   const deleteMutation = useMutation({
     mutationFn: (itemId: number) => axiosClient.delete(`/asset-resources/${assetId}/${resource}/${itemId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey }); setDeleting(null); },
   });
 
   function handleSubmit() {
@@ -105,7 +107,7 @@ export function SubResourceTab({ assetId, resource, title, subtitle, addLabel, c
                 <tr key={item.id}>
                   {columns.map((c) => <td key={c.key}>{item[c.key] ?? "—"}</td>)}
                   <td>
-                    <button className="ad-btn ad-btn-danger" onClick={() => deleteMutation.mutate(item.id)} disabled={deleteMutation.isPending}>
+                    <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(item)} disabled={deleteMutation.isPending}>
                       <Icon name="trash" size={12} />
                     </button>
                   </td>
@@ -117,6 +119,17 @@ export function SubResourceTab({ assetId, resource, title, subtitle, addLabel, c
           <div className="ad-empty">No {title.toLowerCase()} recorded for this asset yet.</div>
         )}
       </div>
+
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete ${title.toLowerCase().replace(/s$/, "")}`}
+          message={`Are you sure you want to delete "${deleting[columns[0]?.key] ?? "this item"}"? This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate(deleting.id)}
+        />
+      )}
     </div>
   );
 }

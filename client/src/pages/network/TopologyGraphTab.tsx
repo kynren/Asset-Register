@@ -20,6 +20,7 @@ import { Icon } from "../../components/Icon";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { AddNodeModal, NodeFormValues } from "./AddNodeModal";
 import { layoutGraph } from "./layout";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 interface GraphNode {
   id: number;
@@ -83,6 +84,8 @@ function InnerTopologyGraph() {
   const [showMinimap, setShowMinimap] = useState(true);
   const [heatmapOn, setHeatmapOn] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [deletingEdgeId, setDeletingEdgeId] = useState<number | null>(null);
+  const [confirmingNodeDelete, setConfirmingNodeDelete] = useState(false);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["network-graph"],
@@ -102,12 +105,12 @@ function InnerTopologyGraph() {
 
   const deleteEdgeMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/network/edges/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["network-graph"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["network-graph"] }); setDeletingEdgeId(null); },
   });
 
   const deleteNodeMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/network/nodes/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["network-graph"] }); setSelectedNodeId(null); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["network-graph"] }); setSelectedNodeId(null); setConfirmingNodeDelete(false); },
   });
 
   const allNodes = useMemo(() => data?.nodes ?? [], [data]);
@@ -250,7 +253,7 @@ function InnerTopologyGraph() {
 
   function handleEdgeClick(_: unknown, edge: Edge) {
     if (pathTracerActive) return;
-    if (window.confirm("Remove this link?")) deleteEdgeMutation.mutate(Number(edge.id));
+    setDeletingEdgeId(Number(edge.id));
   }
 
   function togglePathTracer() {
@@ -422,7 +425,7 @@ function InnerTopologyGraph() {
               )}
 
               <PermissionGate module="network" action="delete">
-                <button className="ad-btn ad-btn-danger" style={{ width: "100%", marginTop: 8 }} onClick={() => deleteNodeMutation.mutate(selectedNode.id)}>
+                <button className="ad-btn ad-btn-danger" style={{ width: "100%", marginTop: 8 }} onClick={() => setConfirmingNodeDelete(true)}>
                   <Icon name="trash" size={12} /> Remove Node
                 </button>
               </PermissionGate>
@@ -449,6 +452,28 @@ function InnerTopologyGraph() {
 
       {showAddNode && (
         <AddNodeModal onClose={() => setShowAddNode(false)} onSubmit={(v) => addNodeMutation.mutate(v)} submitting={addNodeMutation.isPending} />
+      )}
+
+      {confirmingNodeDelete && selectedNode && (
+        <ConfirmDialog
+          title="Remove node"
+          message={`Are you sure you want to remove "${selectedNode.label}" from the topology map? This cannot be undone.`}
+          danger
+          loading={deleteNodeMutation.isPending}
+          onCancel={() => setConfirmingNodeDelete(false)}
+          onConfirm={() => deleteNodeMutation.mutate(selectedNode.id)}
+        />
+      )}
+
+      {deletingEdgeId !== null && (
+        <ConfirmDialog
+          title="Remove link"
+          message="Are you sure you want to remove this link between nodes? This cannot be undone."
+          danger
+          loading={deleteEdgeMutation.isPending}
+          onCancel={() => setDeletingEdgeId(null)}
+          onConfirm={() => deleteEdgeMutation.mutate(deletingEdgeId)}
+        />
       )}
     </div>
   );

@@ -5,9 +5,10 @@ import { Icon } from "../../components/Icon";
 
 interface DiscoveredChannel {
   name: string;
-  profileToken: string;
+  profileToken?: string;
   streamUri: string | null;
-  snapshotUri: string | null;
+  snapshotUri?: string | null;
+  channelNumber?: number;
 }
 
 export function DiscoverCamerasPanel({
@@ -16,6 +17,7 @@ export function DiscoverCamerasPanel({
   port,
   username,
   password,
+  protocol,
   onImported,
 }: {
   nvrId: number;
@@ -23,17 +25,34 @@ export function DiscoverCamerasPanel({
   port: number | null;
   username: string;
   password: string;
+  protocol?: string;
   onImported: () => void;
 }) {
+  const isIsapi = protocol === "ISAPI";
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const discoverMutation = useMutation({
-    mutationFn: () => axiosClient.post("/nvr/discover-cameras", { ipAddress, port, username: username || undefined, password: password || undefined }),
+    mutationFn: () =>
+      axiosClient.post(isIsapi ? "/nvr/isapi/channels" : "/nvr/discover-cameras", {
+        ipAddress,
+        port,
+        username: username || undefined,
+        password: password || undefined,
+      }),
     onSuccess: () => setSelected(new Set()),
   });
 
   const importMutation = useMutation({
-    mutationFn: (channels: DiscoveredChannel[]) => axiosClient.post(`/nvr/${nvrId}/import-cameras`, { channels }),
+    mutationFn: (channels: DiscoveredChannel[]) =>
+      axiosClient.post(`/nvr/${nvrId}/import-cameras`, {
+        channels: channels.map((ch) => ({
+          name: ch.name,
+          streamUri: ch.streamUri,
+          snapshotUri: ch.snapshotUri ?? null,
+          channel: ch.channelNumber ?? null,
+          ...(isIsapi ? { ipAddress, port, username: username || null, password: password || null } : {}),
+        })),
+      }),
     onSuccess: () => {
       discoverMutation.reset();
       setSelected(new Set());
@@ -55,9 +74,9 @@ export function DiscoverCamerasPanel({
 
   return (
     <div className="field">
-      <label>Discover &amp; Import Cameras (ONVIF)</label>
+      <label>Discover &amp; Import Cameras ({isIsapi ? "ISAPI" : "ONVIF"})</label>
       <button className="btn btn-secondary" type="button" disabled={!ipAddress || discoverMutation.isPending} onClick={() => discoverMutation.mutate()}>
-        <Icon name="search" size={13} /> {discoverMutation.isPending ? "Discovering..." : "Discover Cameras"}
+        <Icon name="search" size={13} /> {discoverMutation.isPending ? "Discovering..." : isIsapi ? "Get Channels" : "Discover Cameras"}
       </button>
 
       {discoveryMessage && (
@@ -73,7 +92,9 @@ export function DiscoverCamerasPanel({
               <label key={i} className="row gap-2" style={{ padding: "6px 8px", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer" }}>
                 <input type="checkbox" checked={selected.has(i)} onChange={() => toggle(i)} />
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{ch.name}</div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>
+                    {ch.channelNumber != null ? `Ch. ${ch.channelNumber} — ` : ""}{ch.name}
+                  </div>
                   <div className="muted" style={{ fontSize: 11 }}>{ch.streamUri ?? "No stream URI reported"}</div>
                 </div>
               </label>

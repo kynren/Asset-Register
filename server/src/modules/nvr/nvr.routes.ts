@@ -14,6 +14,7 @@ import { getSessionFilePath, getSessionStatus, startStreamSession, stopSession }
 import { gotoPtzPreset, listPtzPresets, sendPtzCommand } from "../../lib/ptzControl";
 import { RECORDING_ROOT, getActiveRecording, runRetentionSweep, startRecording, stopRecording } from "../../lib/recording";
 import { getMotionWatchStatus, startMotionWatch, stopMotionWatch } from "../../lib/motionWatch";
+import { buildIsapiRtspUrl, getDeviceInfo, getInputProxyChannels } from "../../lib/hikvisionIsapi";
 import {
   cameraEventSchema,
   createCameraSchema,
@@ -21,6 +22,7 @@ import {
   discoverCamerasSchema,
   gotoPresetSchema,
   importCamerasSchema,
+  isapiConnectionSchema,
   ptzCommandSchema,
   startStreamSchema,
   testConnectionSchema,
@@ -137,12 +139,26 @@ router.post("/:id/import-cameras", requirePermission("nvr", "create"), validateB
   if (!nvr) throw new ApiError(404, "NVR not found");
 
   const created = await prisma.$transaction(
-    req.body.channels.map((ch: { name: string; streamUri?: string | null; snapshotUri?: string | null }) =>
+    req.body.channels.map((ch: {
+      name: string;
+      streamUri?: string | null;
+      snapshotUri?: string | null;
+      channel?: number | null;
+      ipAddress?: string | null;
+      port?: number | null;
+      username?: string | null;
+      password?: string | null;
+    }) =>
       prisma.camera.create({
         data: {
           nvrId,
           name: ch.name,
           streamUrl: ch.streamUri ?? null,
+          channel: ch.channel ?? null,
+          ipAddress: ch.ipAddress ?? null,
+          port: ch.port ?? null,
+          username: ch.username ?? null,
+          encryptedPassword: ch.password ? encryptSecret(ch.password) : null,
           status: "UNKNOWN",
         },
       })
@@ -342,6 +358,29 @@ router.post("/cameras/:cameraId/motion-watch/stop", requirePermission("nvr", "ed
   const stopped = stopMotionWatch(Number(req.params.cameraId));
   await logAudit({ userId: req.user!.id, action: "camera.motion_watch_stop", entityType: "Camera", entityId: Number(req.params.cameraId), metadata: { stopped } });
   res.json({ stopped });
+});
+
+// ───────────────────────── Hikvision ISAPI (NVR-level discovery only) ─────────────────────────
+// Cameras themselves always connect over RTSP (see the live feed relay below); ISAPI here is
+// used only to test reachability of an NVR and to discover its managed camera channels
+// ("get groups") before importing them — mirrors the ONVIF discover-cameras/test-connection
+// routes above.
+
+router.post("/isapi/test-connection", requirePermission("nvr", "view"), validateBody(isapiConnectionSchema), async (req, res) => {
+  const { ipAddress, port, username, password } = req.body;
+  const result = await getDeviceInfo(ipAddress, port ?? undefined, username ?? "", password ?? "");
+  res.json(result);
+});
+
+// "Get groups" — the real list of camera channels an NVR/DVR manages via ISAPI.
+router.post("/isapi/channels", requirePermission("nvr", "view"), validateBody(isapiConnectionSchema), async (req, res) => {
+  const { ipAddress, port, username, password } = req.body;
+  const result = await getInputProxyChannels(ipAddress, port ?? undefined, username ?? "", password ?? "");
+  const channels = result.channels.map((ch) => ({
+    ...ch,
+    streamUri: buildIsapiRtspUrl(ipAddress, undefined, username ?? "", password ?? "", ch.channelNumber),
+  }));
+  res.json({ ...result, channels });
 });
 
 // ───────────────────────── Live feed relay (RTSP → HLS via ffmpeg) ─────────────────────────

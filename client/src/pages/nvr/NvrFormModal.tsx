@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FormModal } from "../../components/FormModal";
 import { TestConnectionButton } from "./TestConnectionButton";
 import { DiscoverCamerasPanel } from "./DiscoverCamerasPanel";
+import { PasswordInput } from "../../components/PasswordInput";
 
 export interface NvrFormValues {
   name: string;
@@ -14,7 +15,7 @@ export interface NvrFormValues {
   model: string;
 }
 
-const PROTOCOLS = ["RTSP", "HTTP", "ONVIF"];
+const PROTOCOLS = ["RTSP", "HTTP", "ONVIF", "ISAPI"];
 
 const emptyValues: NvrFormValues = {
   name: "",
@@ -70,12 +71,12 @@ export function NvrFormModal({
         <div className="field"><label>Username</label><input className="input" value={values.username} onChange={(e) => update("username", e.target.value)} autoComplete="off" /></div>
         <div className="field" style={{ gridColumn: "span 2" }}>
           <label>Password</label>
-          <input className="input" type="password" value={values.password} onChange={(e) => update("password", e.target.value)} autoComplete="new-password" placeholder={nvrId ? "Leave blank to keep current password" : ""} />
+          <PasswordInput value={values.password} onChange={(e) => update("password", e.target.value)} autoComplete="new-password" placeholder={nvrId ? "Leave blank to keep current password" : ""} />
         </div>
       </div>
       <p className="muted" style={{ fontSize: 12 }}>Credentials are encrypted at rest and never shown again after saving.</p>
 
-      <TestConnectionButton ipAddress={values.ipAddress} port={values.port} protocol={values.protocol} />
+      <TestConnectionButton ipAddress={values.ipAddress} port={values.port} protocol={values.protocol} username={values.username} password={values.password} />
 
       {nvrId ? (
         <DiscoverCamerasPanel
@@ -84,6 +85,7 @@ export function NvrFormModal({
           port={values.port}
           username={values.username}
           password={values.password}
+          protocol={values.protocol}
           onImported={() => onCamerasImported?.()}
         />
       ) : (

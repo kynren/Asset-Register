@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 interface SavedQuery {
   id: number;
@@ -26,6 +27,7 @@ export function SavedQueriesTab() {
   const [label, setLabel] = useState("");
   const [module, setModule] = useState("assets");
   const [queryString, setQueryString] = useState("");
+  const [deleting, setDeleting] = useState<SavedQuery | null>(null);
 
   const { data: queries, isLoading } = useQuery({
     queryKey: ["op-saved-queries"],
@@ -43,7 +45,7 @@ export function SavedQueriesTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/operations/saved-queries/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["op-saved-queries"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["op-saved-queries"] }); setDeleting(null); },
   });
 
   function apply(q: SavedQuery) {
@@ -89,7 +91,7 @@ export function SavedQueriesTab() {
                 </div>
                 <div className="row gap-1">
                   <button className="ad-btn ad-btn-primary" onClick={() => apply(q)}><Icon name="chevronRight" size={12} /> Apply</button>
-                  <button className="ad-btn ad-btn-danger" onClick={() => deleteMutation.mutate(q.id)}><Icon name="trash" size={12} /></button>
+                  <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(q)}><Icon name="trash" size={12} /></button>
                 </div>
               </div>
             ))}
@@ -98,6 +100,17 @@ export function SavedQueriesTab() {
           <div className="ad-empty">No saved queries yet. Save one above to quickly re-apply filters later.</div>
         )}
       </div>
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete saved query"
+          message={`Are you sure you want to delete "${deleting.label}"? This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate(deleting.id)}
+        />
+      )}
     </div>
   );
 }
