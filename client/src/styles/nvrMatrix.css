@@ -1,0 +1,298 @@
+@layer components {
+  .nvx-shell {
+    --nvx-cyan: #22d3ee;
+    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+
+  /* ── Top search + query status bar ───────────────────────────────── */
+  .nvx-topbar {
+    @apply flex items-center justify-between gap-3 px-4 py-3 border-b border-ad-border flex-wrap;
+  }
+  .nvx-search-box {
+    @apply flex items-center gap-2 flex-1 min-w-[260px] max-w-[560px] bg-ad-surface-2 border border-ad-border rounded-lg px-3 py-2 text-ad-text-muted;
+  }
+  .nvx-search-box input {
+    @apply bg-transparent border-none outline-none text-ad-text text-xs w-full font-sans;
+  }
+  .nvx-query-status {
+    @apply text-[10px] font-bold tracking-wide uppercase text-ad-text-muted flex items-center gap-2 whitespace-nowrap;
+  }
+  .nvx-query-status-pill {
+    @apply bg-[rgba(34,211,238,0.12)] text-nvx-cyan px-2.5 py-1 rounded;
+  }
+
+  /* ── Filter row ───────────────────────────────────────────────────── */
+  .nvx-filterbar {
+    @apply flex items-end gap-4 px-4 py-3 border-b border-ad-border flex-wrap;
+  }
+  .nvx-filter-field {
+    @apply flex flex-col gap-1;
+  }
+  .nvx-filter-field label {
+    @apply text-[10px] font-bold tracking-wide uppercase text-ad-text-muted;
+  }
+  .nvx-filter-field select {
+    @apply bg-ad-surface-2 border border-ad-border rounded-md px-2.5 py-1.5 text-xs text-ad-text min-w-[160px] font-sans;
+  }
+
+  /* ── Sub-tab bar ──────────────────────────────────────────────────── */
+  .nvx-tabbar {
+    @apply flex items-center gap-1 px-4 py-2.5 border-b border-ad-border overflow-x-auto;
+  }
+  .nvx-tab {
+    @apply flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-ad-text-muted cursor-pointer whitespace-nowrap border border-transparent bg-transparent;
+  }
+  .nvx-tab:hover {
+    @apply bg-ad-surface-2 text-ad-text;
+  }
+  .nvx-tab.active {
+    @apply bg-ad-accent text-white;
+  }
+
+  /* ── Body layout: sidebar | main | ptz panel ─────────────────────── */
+  .nvx-body {
+    @apply flex gap-3 p-3 items-stretch;
+  }
+  .nvx-sidebar {
+    @apply w-[270px] flex-shrink-0 flex flex-col gap-3 overflow-y-auto;
+  }
+  .nvx-main {
+    @apply flex-1 min-w-0 flex flex-col gap-3;
+  }
+  .nvx-ptz-col {
+    @apply w-[260px] flex-shrink-0;
+  }
+
+  /* ── Sidebar: Device Channel List ────────────────────────────────── */
+  .nvx-panel-title {
+    @apply flex items-center gap-2 text-[11px] font-bold tracking-wide uppercase text-ad-text pb-2.5 mb-3 border-b border-ad-border;
+  }
+  .nvx-scan-card {
+    @apply bg-ad-surface-2 border border-ad-border rounded-lg p-3 mb-3;
+  }
+  .nvx-scan-card-label {
+    @apply text-[9px] font-bold tracking-wide uppercase text-ad-text-muted mb-2;
+  }
+  .nvx-scan-row {
+    @apply flex items-center justify-between text-[11px] py-0.5;
+  }
+  .nvx-scan-row span:first-child {
+    @apply text-ad-text-muted;
+  }
+  .nvx-scan-row span:last-child {
+    @apply text-ad-success font-semibold;
+  }
+
+  .nvx-group-header {
+    @apply flex items-center gap-2 text-xs font-semibold text-ad-text mb-1.5;
+  }
+  .nvx-group-dot {
+    @apply w-[7px] h-[7px] rounded-full flex-shrink-0;
+  }
+  .nvx-group-dot.online {
+    @apply bg-ad-success;
+  }
+  .nvx-group-dot.offline {
+    @apply bg-ad-danger;
+  }
+  .nvx-group-dot.unknown {
+    @apply bg-ad-text-muted;
+  }
+
+  .nvx-channel-item {
+    @apply flex items-center justify-between gap-2 px-2.5 py-2 rounded-md text-xs text-ad-text-muted cursor-pointer mb-1 border border-transparent bg-transparent w-full text-left font-sans;
+  }
+  .nvx-channel-item:hover {
+    @apply bg-ad-surface-2 text-ad-text;
+  }
+  .nvx-channel-item.selected {
+    @apply bg-[rgba(34,211,238,0.08)] border-[rgba(34,211,238,0.35)] text-ad-text;
+  }
+  .nvx-channel-status {
+    @apply text-[9px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded flex-shrink-0;
+  }
+  .nvx-channel-status.live {
+    @apply bg-[rgba(52,211,153,0.15)] text-ad-success;
+  }
+  .nvx-channel-status.inact {
+    @apply bg-ad-border text-ad-text-muted;
+  }
+
+  .nvx-section-label {
+    @apply text-[9px] font-bold tracking-wide uppercase text-ad-text-muted mt-3 mb-1.5;
+  }
+
+  .nvx-matrix-controls {
+    @apply mt-auto pt-3 border-t border-ad-border;
+  }
+  .nvx-grid-size-row {
+    @apply flex gap-1.5 mb-2;
+  }
+  .nvx-grid-size-btn {
+    @apply flex-1 px-2 py-1.5 rounded-md text-[11px] font-semibold border border-ad-border bg-ad-surface-2 text-ad-text-muted cursor-pointer;
+  }
+  .nvx-grid-size-btn.active {
+    @apply bg-ad-accent border-ad-accent text-white;
+  }
+  .nvx-toggle-row {
+    @apply grid grid-cols-2 gap-1.5;
+  }
+  .nvx-toggle-btn {
+    @apply flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] font-semibold border border-ad-border bg-ad-surface-2 text-ad-text-muted cursor-pointer;
+  }
+  .nvx-toggle-btn.on {
+    @apply bg-[rgba(34,211,238,0.14)] border-[rgba(34,211,238,0.4)] text-nvx-cyan;
+  }
+  .nvx-expand-btn {
+    @apply w-full mt-2 px-2 py-2 rounded-md text-[11px] font-bold tracking-wide uppercase border border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.08)] text-ad-danger cursor-pointer flex items-center justify-center gap-1.5;
+  }
+
+  /* ── Video matrix grid ───────────────────────────────────────────── */
+  .nvx-grid {
+    @apply grid gap-2 bg-black rounded-lg p-2 border border-ad-border;
+  }
+  .nvx-tile {
+    @apply relative bg-black rounded overflow-hidden border border-ad-border flex items-center justify-center;
+    aspect-ratio: 16 / 10;
+  }
+  .nvx-tile.focused {
+    @apply border-ad-accent;
+  }
+  .nvx-tile-empty {
+    @apply text-ad-text-muted text-xs flex flex-col items-center gap-2;
+  }
+  .nvx-tile video,
+  .nvx-tile img {
+    @apply w-full h-full object-cover;
+  }
+  .nvx-tile-header {
+    @apply absolute top-0 left-0 right-0 flex items-center justify-between px-2 py-1.5 text-[11px] font-semibold text-white;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), transparent);
+  }
+  .nvx-tile-rec {
+    @apply flex items-center gap-1 text-[10px] font-bold text-ad-danger;
+  }
+  .nvx-tile-rec-dot {
+    @apply w-[7px] h-[7px] rounded-full bg-ad-danger;
+    animation: nvx-pulse 1.4s ease-in-out infinite;
+  }
+  .nvx-tile-actions {
+    @apply flex items-center gap-1;
+  }
+  .nvx-tile-icon-btn {
+    @apply w-5 h-5 flex items-center justify-center rounded bg-black/40 text-white cursor-pointer border-none;
+  }
+  .nvx-tile-icon-btn:hover {
+    @apply bg-black/70;
+  }
+  .nvx-tile-motion {
+    @apply absolute top-8 left-2 text-[10px] font-bold text-ad-warning px-1.5 py-0.5 rounded bg-black/60 flex items-center gap-1;
+  }
+  .nvx-tile-footer {
+    @apply absolute bottom-0 left-0 right-0 flex items-end justify-between px-2 py-1.5 text-[10px];
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  }
+  .nvx-tile-footer-left {
+    @apply flex flex-col gap-0.5;
+  }
+  .nvx-tile-ip {
+    @apply text-ad-success font-bold;
+  }
+  .nvx-tile-meta {
+    @apply text-white/70;
+  }
+  .nvx-tile-footer-right {
+    @apply flex flex-col items-end gap-0.5;
+  }
+  .nvx-tile-latency {
+    @apply font-bold;
+  }
+  .nvx-tile-status-msg {
+    @apply text-ad-text-muted text-[11px] text-center px-3;
+  }
+
+  @keyframes nvx-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
+
+  /* ── Bottom: Network Traffic Audit ───────────────────────────────── */
+  .nvx-audit-panel {
+    @apply flex items-start gap-2.5 bg-ad-surface border border-ad-border rounded-lg px-4 py-3 text-xs text-ad-text-muted;
+  }
+  .nvx-audit-panel strong {
+    @apply text-ad-text;
+  }
+  .nvx-audit-panel .nvx-audit-ip {
+    @apply text-nvx-cyan font-semibold;
+  }
+
+  /* ── PTZ Alignment Panel ──────────────────────────────────────────── */
+  .nvx-ptz-panel {
+    @apply bg-ad-surface border border-ad-border rounded-lg p-3.5 sticky top-3;
+  }
+  .nvx-ptz-info {
+    @apply bg-ad-surface-2 border border-ad-border rounded-md p-2.5 mb-3.5 text-[11px];
+  }
+  .nvx-ptz-info-row {
+    @apply flex items-center justify-between py-0.5;
+  }
+  .nvx-ptz-info-row span:first-child {
+    @apply text-ad-text-muted;
+  }
+  .nvx-ptz-info-row span:last-child {
+    @apply text-ad-text font-semibold;
+  }
+  .nvx-joystick {
+    @apply relative w-[150px] h-[150px] mx-auto rounded-full bg-ad-surface-2 border border-ad-border flex items-center justify-center mb-4;
+  }
+  .nvx-joystick-btn {
+    @apply absolute flex items-center justify-center bg-ad-surface-2 border border-ad-border rounded-md text-ad-text cursor-pointer w-9 h-9;
+  }
+  .nvx-joystick-btn:hover:not(:disabled) {
+    @apply bg-ad-border;
+  }
+  .nvx-joystick-btn:disabled {
+    @apply opacity-40 cursor-not-allowed;
+  }
+  .nvx-joystick-up { top: 4px; left: 50%; transform: translateX(-50%); }
+  .nvx-joystick-down { bottom: 4px; left: 50%; transform: translateX(-50%); }
+  .nvx-joystick-left { left: 4px; top: 50%; transform: translateY(-50%); }
+  .nvx-joystick-right { right: 4px; top: 50%; transform: translateY(-50%); }
+  .nvx-joystick-home {
+    @apply w-11 h-11 rounded-full bg-ad-accent text-white flex items-center justify-center text-[10px] font-bold cursor-pointer border-none;
+  }
+  .nvx-joystick-home:hover:not(:disabled) {
+    @apply bg-primary-hover;
+  }
+  .nvx-joystick-home:disabled {
+    @apply opacity-40 cursor-not-allowed;
+  }
+  .nvx-ptz-subgrid {
+    @apply grid grid-cols-2 gap-3 mb-1;
+  }
+  .nvx-ptz-sublabel {
+    @apply text-[9px] font-bold tracking-wide uppercase text-ad-text-muted mb-1.5;
+  }
+  .nvx-ptz-subrow {
+    @apply flex gap-1.5;
+  }
+  .nvx-ptz-subbtn {
+    @apply flex-1 px-1.5 py-1.5 rounded-md text-[10px] font-bold border border-ad-border bg-ad-surface-2 text-ad-text cursor-pointer;
+  }
+  .nvx-ptz-subbtn:hover:not(:disabled) {
+    @apply bg-ad-border;
+  }
+  .nvx-ptz-subbtn:disabled {
+    @apply opacity-40 cursor-not-allowed;
+  }
+  .nvx-ptz-speed-row {
+    @apply flex items-center justify-between text-[10px] font-bold tracking-wide uppercase text-ad-text-muted mt-3.5 mb-1.5;
+  }
+  .nvx-ptz-speed-row span:last-child {
+    @apply text-ad-text;
+  }
+  .nvx-ptz-empty {
+    @apply text-ad-text-muted text-xs text-center py-6;
+  }
+}

@@ -14,11 +14,20 @@ export interface PingResult {
   responseTimeMs: number | null;
 }
 
-export async function pingHost(ip: string, timeoutMs = 800): Promise<PingResult> {
-  if (!isValidIpv4(ip)) return { alive: false, responseTimeMs: null };
+// A conservative hostname pattern (RFC 952/1123-ish): alnum start/end, dots/hyphens/underscores
+// in between. Deliberately rejects anything starting with "-" so a target string can never be
+// mistaken for a flag by the ping binary when passed as an execFile argument.
+const HOSTNAME_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,253}[A-Za-z0-9])?$/;
+
+function isValidPingTarget(target: string): boolean {
+  return isValidIpv4(target) || HOSTNAME_PATTERN.test(target);
+}
+
+export async function pingHost(target: string, timeoutMs = 800): Promise<PingResult> {
+  if (!isValidPingTarget(target)) return { alive: false, responseTimeMs: null };
 
   try {
-    const args = IS_WINDOWS ? ["-n", "1", "-w", String(timeoutMs), ip] : ["-c", "1", "-W", String(Math.ceil(timeoutMs / 1000)), ip];
+    const args = IS_WINDOWS ? ["-n", "1", "-w", String(timeoutMs), target] : ["-c", "1", "-W", String(Math.ceil(timeoutMs / 1000)), target];
     const { stdout } = await execFileAsync("ping", args, { timeout: timeoutMs + 1000 });
 
     const timeMatch = stdout.match(/time[=<]([\d.]+)\s*ms/i);

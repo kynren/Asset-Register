@@ -40,6 +40,7 @@ export default {
         "ad-success": "var(--ad-success)",
         "ad-danger": "var(--ad-danger)",
         "ad-warning": "var(--ad-warning)",
+        "nvx-cyan": "var(--nvx-cyan)",
       },
       borderRadius: {
         DEFAULT: "var(--radius)",

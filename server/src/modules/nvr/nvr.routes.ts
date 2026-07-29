@@ -133,6 +133,31 @@ router.post("/discover-cameras", requirePermission("nvr", "view"), validateBody(
   res.json(result);
 });
 
+// Stateful discovery for an already-saved NVR — uses its own stored credentials (decrypted
+// server-side, same convention as cameraOnvifOptions()) so the Discovery Protocol tab doesn't
+// need the admin to re-type a password that was never sent back to the browser after saving.
+router.post("/:id/discover-channels", requirePermission("nvr", "view"), async (req, res) => {
+  const nvr = await prisma.nvr.findUnique({ where: { id: Number(req.params.id) } });
+  if (!nvr) throw new ApiError(404, "NVR not found");
+  if (!nvr.ipAddress) throw new ApiError(400, "This NVR has no IP address set.");
+
+  const username = nvr.username ?? "";
+  const password = nvr.encryptedPassword ? decryptSecret(nvr.encryptedPassword) : "";
+
+  if (nvr.protocol === "ISAPI") {
+    const result = await getInputProxyChannels(nvr.ipAddress, nvr.port ?? undefined, username, password);
+    const channels = result.channels.map((ch) => ({
+      ...ch,
+      streamUri: buildIsapiRtspUrl(nvr.ipAddress!, undefined, username, password, ch.channelNumber),
+    }));
+    res.json({ ...result, protocol: "ISAPI", channels });
+    return;
+  }
+
+  const result = await discoverOnvifChannels(nvr.ipAddress, nvr.port ?? undefined, username, password);
+  res.json({ ...result, protocol: "ONVIF" });
+});
+
 router.post("/:id/import-cameras", requirePermission("nvr", "create"), validateBody(importCamerasSchema), async (req, res) => {
   const nvrId = Number(req.params.id);
   const nvr = await prisma.nvr.findUnique({ where: { id: nvrId } });
@@ -210,6 +235,19 @@ router.post("/cameras/:cameraId/check-status", requirePermission("nvr", "edit"),
   res.json(updated);
 });
 
+// Lightweight ping for live UI displays (video matrix latency readout) — deliberately does
+// NOT persist status/lastCheckedAt or write a CameraEvent like check-status does, since this
+// gets polled every few seconds per visible tile and would otherwise spam the event log.
+router.get("/cameras/:cameraId/live-latency", requirePermission("nvr", "view"), async (req, res) => {
+  const camera = await prisma.camera.findUnique({ where: { id: Number(req.params.cameraId) }, select: { ipAddress: true } });
+  if (!camera) throw new ApiError(404, "Camera not found");
+  if (!camera.ipAddress) {
+    res.json({ alive: false, responseTimeMs: null });
+    return;
+  }
+  res.json(await pingHost(camera.ipAddress));
+});
+
 function cameraOnvifOptions(camera: { ipAddress: string | null; port: number | null; username: string | null; encryptedPassword: string | null }) {
   if (!camera.ipAddress) throw new ApiError(400, "This camera has no IP address set — required for ONVIF PTZ control.");
   return {
@@ -227,7 +265,7 @@ router.post("/cameras/:cameraId/ptz", requirePermission("nvr", "edit"), validate
   if (!camera) throw new ApiError(404, "Camera not found");
   if (!camera.ptzEnabled) throw new ApiError(400, "PTZ is not enabled for this camera");
 
-  const result = await sendPtzCommand(cameraOnvifOptions(camera), req.body.command);
+  const result = await sendPtzCommand(cameraOnvifOptions(camera), req.body.command, req.body.speed);
 
   await prisma.cameraEvent.create({
     data: { cameraId: camera.id, nvrId: camera.nvrId, type: result.ok ? "PTZ_COMMAND" : "PTZ_ERROR", message: `${req.body.command}: ${result.message}` },
@@ -284,6 +322,16 @@ router.get("/events", requirePermission("nvr", "view"), async (req, res) => {
 });
 
 // ───────────────────────── Recording + retention ─────────────────────────
+
+// Aggregate recordings across every camera, newest first — powers the NVR Playback Center.
+router.get("/recordings", requirePermission("nvr", "view"), async (_req, res) => {
+  const recordings = await prisma.cameraRecording.findMany({
+    orderBy: { startedAt: "desc" },
+    take: 200,
+    include: { camera: { select: { id: true, name: true, nvr: { select: { id: true, name: true } } } } },
+  });
+  res.json(recordings);
+});
 
 router.get("/cameras/:cameraId/recordings", requirePermission("nvr", "view"), async (req, res) => {
   const cameraId = Number(req.params.cameraId);

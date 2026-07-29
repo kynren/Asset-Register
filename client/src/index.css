@@ -4,6 +4,7 @@
 @import "./styles/operationsTools.css";
 @import "./styles/networkTopology.css";
 @import "./styles/formCard.css";
+@import "./styles/nvrMatrix.css";
 
 @tailwind base;
 @tailwind components;

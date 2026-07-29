@@ -1,25 +1,29 @@
 import { useState } from "react";
+import { LiveVideoMatrixTab } from "./LiveVideoMatrixTab";
+import { NvrPlaybackCenterTab } from "./NvrPlaybackCenterTab";
+import { DiscoveryProtocolTab } from "./DiscoveryProtocolTab";
 import { DeviceManagementTab } from "./DeviceManagementTab";
-import { LiveViewTab } from "./LiveViewTab";
 import { EventLogTab } from "./EventLogTab";
 
 const TABS = [
-  { key: "devices", label: "Device Management" },
-  { key: "live", label: "Live View" },
+  { key: "matrix", label: "Live Video Matrix" },
+  { key: "playback", label: "NVR Playback Center" },
+  { key: "discovery", label: "Discovery Protocol" },
+  { key: "config", label: "Config Server" },
   { key: "events", label: "Event Log" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
 
 export function NvrPage() {
-  const [tab, setTab] = useState<TabKey>("devices");
+  const [tab, setTab] = useState<TabKey>("matrix");
 
   return (
     <div className="stack gap-3">
       <div className="page-header">
         <div>
           <h1 className="page-title">NVRs & Cameras</h1>
-          <p className="page-subtitle">Device management, live view, and event log — modeled on Hikvision iVMS workflows.</p>
+          <p className="page-subtitle">Live video matrix, playback, discovery, and device configuration — modeled on Hikvision iVMS workflows.</p>
         </div>
       </div>
 
@@ -31,8 +35,10 @@ export function NvrPage() {
         ))}
       </div>
 
-      {tab === "devices" && <DeviceManagementTab />}
-      {tab === "live" && <LiveViewTab />}
+      {tab === "matrix" && <LiveVideoMatrixTab />}
+      {tab === "playback" && <NvrPlaybackCenterTab />}
+      {tab === "discovery" && <DiscoveryProtocolTab />}
+      {tab === "config" && <DeviceManagementTab />}
       {tab === "events" && <EventLogTab />}
     </div>
   );

@@ -1,10 +1,14 @@
+import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import PDFDocument from "pdfkit";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { getPagination, paginatedResponse } from "../../lib/pagination";
-import { parseCsvBuffer, toCsv } from "../../lib/csv";
+import { parseCsvRaw, toCsv } from "../../lib/csv";
+import { notifyUsers } from "../../lib/notify";
+import { generateTempPassword } from "../../lib/passwords";
+import { pingHost } from "../../lib/ping";
 
 const include = {
   category: true,
@@ -114,6 +118,19 @@ export async function listCheckouts(req: Request, res: Response) {
   res.json(checkouts);
 }
 
+// Active heartbeat: looks the asset up on the network by its own asset tag (real IT estates
+// commonly name machines after their asset tag) and pings it directly. No DB write here — this
+// is polled continuously from the inventory table, so persisting every sample would spam the
+// audit trail for no benefit; the frontend keeps its own rolling sample history for the sparkline.
+export async function pingAsset(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const asset = await prisma.asset.findUnique({ where: { id }, select: { assetTag: true } });
+  if (!asset) throw new ApiError(404, "Asset not found");
+
+  const result = await pingHost(asset.assetTag);
+  res.json({ ...result, target: asset.assetTag });
+}
+
 export async function checkoutAsset(req: Request, res: Response) {
   const assetId = Number(req.params.id);
   const { checkedOutToId, dueBackAt, notes } = req.body;
@@ -139,6 +156,13 @@ export async function checkoutAsset(req: Request, res: Response) {
   ]);
 
   await logAudit({ userId: req.user!.id, action: "asset.checkout", entityType: "Asset", entityId: assetId, metadata: { checkedOutToId, dueBackAt } });
+  await notifyUsers({
+    userIds: [checkedOutToId],
+    excludeUserId: req.user!.id,
+    type: "asset_assigned",
+    message: `Asset "${asset.name}" (${asset.assetTag}) was checked out to you`,
+    linkUrl: `/assets/${assetId}`,
+  });
   res.status(201).json(checkout);
 }
 
@@ -149,7 +173,7 @@ export async function checkinAsset(req: Request, res: Response) {
   const activeCheckout = await prisma.assetCheckout.findFirst({ where: { assetId, checkedInAt: null } });
   if (!activeCheckout) throw new ApiError(400, "This asset is not currently checked out.");
 
-  const [checkout] = await prisma.$transaction([
+  const [checkout, asset] = await prisma.$transaction([
     prisma.assetCheckout.update({
       where: { id: activeCheckout.id },
       data: { checkedInAt: new Date(), checkedInById: req.user!.id, notes: notes ?? activeCheckout.notes },
@@ -159,6 +183,13 @@ export async function checkinAsset(req: Request, res: Response) {
   ]);
 
   await logAudit({ userId: req.user!.id, action: "asset.checkin", entityType: "Asset", entityId: assetId });
+  await notifyUsers({
+    userIds: [activeCheckout.checkedOutToId],
+    excludeUserId: req.user!.id,
+    type: "asset_checkin",
+    message: `Asset "${asset.name}" (${asset.assetTag}) was checked back in`,
+    linkUrl: `/assets/${assetId}`,
+  });
   res.json(checkout);
 }
 
@@ -280,6 +311,75 @@ export async function reportPdf(req: Request, res: Response) {
   doc.end();
 }
 
+function statusLabel(dateStr: string | null | undefined): string {
+  if (!dateStr) return "No date on record";
+  const days = Math.round((new Date(dateStr).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+  if (Number.isNaN(days)) return "No date on record";
+  return days < 0 ? `OVERDUE by ${Math.abs(days)} day(s)` : `${days} day(s) remaining`;
+}
+
+// A purpose-built certification report for the Harness category — a clean identity + life span
+// + full test-cycle history layout for compliance/audit use, distinct from the generic asset
+// report (which flatly dumps every custom field and includes irrelevant sub-resource counts).
+export async function harnessReportPdf(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const asset = await prisma.asset.findUnique({ where: { id }, include });
+  if (!asset) throw new ApiError(404, "Asset not found");
+
+  const f = Object.fromEntries(asset.customFieldValues.map((v) => [v.field.fieldKey, v.value]));
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename=harness-${asset.assetTag}-certification.pdf`);
+  const doc = new PDFDocument({ margin: 40 });
+  doc.pipe(res);
+
+  doc.fontSize(18).text("Harness Certification Report", { align: "center" });
+  doc.fontSize(12).fillColor("gray").text(asset.name, { align: "center" });
+  doc.fillColor("black");
+  doc.moveDown(1.5);
+
+  doc.fontSize(12).text("Identity", { underline: true });
+  doc.fontSize(10);
+  doc.text(`Asset Tag: ${asset.assetTag}`);
+  doc.text(`Serial Number: ${asset.serialNumber ?? "—"}`);
+  doc.text(`ID/Batch Number: ${f.id_batch_number ?? "—"}`);
+  doc.text(`Test Cert No.: ${f.test_cert_no ?? "—"}`);
+  doc.text(`Tester: ${f.tester ?? "—"}`);
+  doc.text(`Purchased From: ${f.purchased_from ?? "—"}`);
+  doc.moveDown();
+
+  doc.fontSize(12).text("Life Span", { underline: true });
+  doc.fontSize(10);
+  doc.text(`Manufacture Date: ${f.manufacture_date ?? "—"}`);
+  doc.text(`Life Span Expiry Date: ${f.life_span_expiry_date ?? "—"}    (${statusLabel(f.life_span_expiry_date)})`);
+  doc.moveDown();
+
+  doc.fontSize(12).text("Test History", { underline: true });
+  doc.fontSize(10);
+  const cycles: [string, string | null, string | null][] = [
+    ["Test 1", f.test_1_test_date, f.test_1_expiry_date],
+    ["Test 2", f.test_2_test_date, f.test_2_expiry_date],
+    ["Test 3", f.test_3_test_date, f.test_3_expiry_date],
+  ];
+  let anyTests = false;
+  for (const [label, testDate, expiryDate] of cycles) {
+    if (!testDate && !expiryDate) continue;
+    anyTests = true;
+    doc.text(`${label}:  Tested ${testDate ?? "—"}  →  Expires ${expiryDate ?? "—"}   (${statusLabel(expiryDate)})`);
+  }
+  if (!anyTests) doc.text("No test cycles on record.");
+  doc.moveDown();
+
+  if (asset.notes) {
+    doc.fontSize(12).text("Notes", { underline: true });
+    doc.fontSize(10).text(asset.notes);
+    doc.moveDown();
+  }
+
+  doc.fontSize(8).fillColor("gray").text(`Generated ${new Date().toLocaleString()}`, { align: "right" });
+  doc.end();
+}
+
 export async function create(req: Request, res: Response) {
   const { customFieldValues, ...data } = req.body;
   const asset = await prisma.asset.create({ data, include });
@@ -287,17 +387,36 @@ export async function create(req: Request, res: Response) {
     await saveCustomFieldValues(asset.id, customFieldValues);
   }
   await logAudit({ userId: req.user!.id, action: "asset.create", entityType: "Asset", entityId: asset.id });
+  if (asset.assignedToId) {
+    await notifyUsers({
+      userIds: [asset.assignedToId],
+      excludeUserId: req.user!.id,
+      type: "asset_assigned",
+      message: `Asset "${asset.name}" (${asset.assetTag}) was assigned to you`,
+      linkUrl: `/assets/${asset.id}`,
+    });
+  }
   res.status(201).json(customFieldValues?.length ? await prisma.asset.findUnique({ where: { id: asset.id }, include }) : asset);
 }
 
 export async function update(req: Request, res: Response) {
   const id = Number(req.params.id);
+  const before = await prisma.asset.findUnique({ where: { id }, select: { assignedToId: true } });
   const { customFieldValues, ...data } = req.body;
   const asset = await prisma.asset.update({ where: { id }, data, include });
   if (customFieldValues?.length) {
     await saveCustomFieldValues(id, customFieldValues);
   }
   await logAudit({ userId: req.user!.id, action: "asset.update", entityType: "Asset", entityId: id, metadata: data });
+  if (asset.assignedToId && asset.assignedToId !== before?.assignedToId) {
+    await notifyUsers({
+      userIds: [asset.assignedToId],
+      excludeUserId: req.user!.id,
+      type: "asset_assigned",
+      message: `Asset "${asset.name}" (${asset.assetTag}) was assigned to you`,
+      linkUrl: `/assets/${id}`,
+    });
+  }
   res.json(customFieldValues?.length ? await prisma.asset.findUnique({ where: { id }, include }) : asset);
 }
 
@@ -376,42 +495,175 @@ export async function exportJson(_req: Request, res: Response) {
   res.send(JSON.stringify(assets, null, 2));
 }
 
+// Returns the first few raw rows (no header assumed) so the client can let the user pick
+// which row is actually the header before mapping columns.
+export async function importPreview(req: Request, res: Response) {
+  if (!req.file) throw new ApiError(400, "No file uploaded");
+  const rows = parseCsvRaw(req.file.buffer);
+  res.json({ rows: rows.slice(0, 15), totalRows: rows.length });
+}
+
+// Target fields an import column can be mapped to. Kept in sync with the frontend wizard's
+// field list (client/src/pages/assets/AssetImportWizardModal.tsx).
+interface ImportMapping {
+  assetTag?: string;
+  name?: string;
+  status?: string;
+  manufacturer?: string;
+  model?: string;
+  serialNumber?: string;
+  category?: string;
+  location?: string;
+  assignedToName?: string;
+  assignedToEmail?: string;
+}
+
+function splitFullName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/);
+  return { firstName: parts[0], lastName: parts.length > 1 ? parts.slice(1).join(" ") : parts[0] };
+}
+
+function namesFromEmail(email: string): { firstName: string; lastName: string } {
+  const local = email.split("@")[0] ?? email;
+  const parts = local.split(/[._-]+/).filter(Boolean);
+  return { firstName: parts[0] || local, lastName: parts.length > 1 ? parts.slice(1).join(" ") : parts[0] || local };
+}
+
+const ASSET_STATUS_VALUES = new Set(["IN_USE", "IN_STORAGE", "IN_REPAIR", "RETIRED", "LOST"]);
+
+// Accepts free-text phrasing from real-world spreadsheets ("In Use", "in-use", "In Storage")
+// and maps it onto the AssetStatus enum; unrecognized text falls back to IN_USE rather than
+// failing the whole row, matching how an unmatched category/location is left unset instead of erroring.
+function normalizeStatus(raw: string): string {
+  const normalized = raw.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  return ASSET_STATUS_VALUES.has(normalized) ? normalized : "IN_USE";
+}
+
 export async function importCsv(req: Request, res: Response) {
   if (!req.file) throw new ApiError(400, "No file uploaded");
-  const rows = parseCsvBuffer(req.file.buffer);
 
-  const categories = await prisma.assetCategory.findMany();
-  const locations = await prisma.location.findMany();
+  const headerRowIndex = Number(req.body.headerRowIndex ?? 0);
+  let mapping: ImportMapping;
+  try {
+    mapping = req.body.mapping ? JSON.parse(req.body.mapping) : {};
+  } catch {
+    throw new ApiError(400, "Invalid column mapping payload");
+  }
+  if (!mapping.assetTag || !mapping.name) {
+    throw new ApiError(400, "Asset Tag and Name must both be mapped to a column");
+  }
+
+  const rawRows = parseCsvRaw(req.file.buffer);
+  const headerRow = rawRows[headerRowIndex];
+  if (!headerRow) throw new ApiError(400, "Header row is out of range for this file");
+  const dataRows = rawRows.slice(headerRowIndex + 1);
+
+  const colIndex = (header?: string) => (header ? headerRow.indexOf(header) : -1);
+  const idx = {
+    assetTag: colIndex(mapping.assetTag),
+    name: colIndex(mapping.name),
+    status: colIndex(mapping.status),
+    manufacturer: colIndex(mapping.manufacturer),
+    model: colIndex(mapping.model),
+    serialNumber: colIndex(mapping.serialNumber),
+    category: colIndex(mapping.category),
+    location: colIndex(mapping.location),
+    assignedToName: colIndex(mapping.assignedToName),
+    assignedToEmail: colIndex(mapping.assignedToEmail),
+  };
+  const cell = (row: string[], i: number) => (i >= 0 ? (row[i] ?? "").trim() : "");
+
+  const [categories, locations, existingUsers, viewerRole] = await Promise.all([
+    prisma.assetCategory.findMany(),
+    prisma.location.findMany(),
+    prisma.user.findMany({ select: { id: true, email: true, firstName: true, lastName: true } }),
+    prisma.role.findFirst({ where: { name: "Viewer" } }),
+  ]);
   const categoryMap = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
   const locationMap = new Map(locations.map((l) => [l.name.toLowerCase(), l.id]));
+  const emailMap = new Map(existingUsers.map((u) => [u.email.toLowerCase(), u.id]));
+  const nameMap = new Map(existingUsers.map((u) => [`${u.firstName} ${u.lastName}`.toLowerCase(), u.id]));
+
+  const usersCreated: { id: number; email: string; firstName: string; lastName: string; tempPassword: string }[] = [];
+
+  async function resolveAssigneeId(email: string, fullName: string): Promise<number | undefined> {
+    if (!email && !fullName) return undefined;
+    if (email && emailMap.has(email)) return emailMap.get(email);
+    if (!email && fullName && nameMap.has(fullName.toLowerCase())) return nameMap.get(fullName.toLowerCase());
+
+    if (!email) {
+      throw new Error(`No existing user matches "${fullName}" and no email column was mapped to create one`);
+    }
+    if (!viewerRole) {
+      throw new Error("Cannot auto-create user: no Viewer role found to assign");
+    }
+
+    const { firstName, lastName } = fullName ? splitFullName(fullName) : namesFromEmail(email);
+    const tempPassword = generateTempPassword();
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+    const user = await prisma.user.create({
+      data: { email, firstName, lastName, roleId: viewerRole.id, passwordHash, mustChangePassword: true },
+      select: { id: true, email: true, firstName: true, lastName: true },
+    });
+    await logAudit({ userId: req.user!.id, action: "user.create", entityType: "User", entityId: user.id, metadata: { source: "asset.import" } });
+    emailMap.set(email, user.id);
+    nameMap.set(`${user.firstName} ${user.lastName}`.toLowerCase(), user.id);
+    usersCreated.push({ ...user, tempPassword });
+    return user.id;
+  }
 
   let created = 0;
   const errors: string[] = [];
 
-  for (const [index, row] of rows.entries()) {
-    if (!row.assetTag || !row.name) {
-      errors.push(`Row ${index + 2}: assetTag and name are required`);
+  for (const [index, row] of dataRows.entries()) {
+    const rowNumber = headerRowIndex + index + 2;
+    const assetTag = cell(row, idx.assetTag);
+    const name = cell(row, idx.name);
+    if (!assetTag || !name) {
+      errors.push(`Row ${rowNumber}: Asset Tag and Name are required`);
       continue;
     }
+
+    const email = cell(row, idx.assignedToEmail).toLowerCase();
+    const fullName = cell(row, idx.assignedToName);
+    let assignedToId: number | undefined;
+    if (email || fullName) {
+      try {
+        assignedToId = await resolveAssigneeId(email, fullName);
+      } catch (err) {
+        errors.push(`Row ${rowNumber}: ${(err as Error).message}`);
+      }
+    }
+
     try {
-      await prisma.asset.create({
+      const asset = await prisma.asset.create({
         data: {
-          assetTag: row.assetTag,
-          name: row.name,
-          status: (row.status as never) || "IN_USE",
-          manufacturer: row.manufacturer || undefined,
-          model: row.model || undefined,
-          serialNumber: row.serialNumber || undefined,
-          categoryId: row.category ? categoryMap.get(row.category.toLowerCase()) : undefined,
-          locationId: row.location ? locationMap.get(row.location.toLowerCase()) : undefined,
+          assetTag,
+          name,
+          status: normalizeStatus(cell(row, idx.status)) as never,
+          manufacturer: cell(row, idx.manufacturer) || undefined,
+          model: cell(row, idx.model) || undefined,
+          serialNumber: cell(row, idx.serialNumber) || undefined,
+          categoryId: idx.category >= 0 ? categoryMap.get(cell(row, idx.category).toLowerCase()) : undefined,
+          locationId: idx.location >= 0 ? locationMap.get(cell(row, idx.location).toLowerCase()) : undefined,
+          assignedToId,
         },
       });
       created += 1;
+      if (assignedToId) {
+        await notifyUsers({
+          userIds: [assignedToId],
+          excludeUserId: req.user!.id,
+          type: "asset_assigned",
+          message: `Asset "${asset.name}" (${asset.assetTag}) was assigned to you`,
+          linkUrl: `/assets/${asset.id}`,
+        });
+      }
     } catch (err) {
-      errors.push(`Row ${index + 2}: ${(err as Error).message}`);
+      errors.push(`Row ${rowNumber}: ${(err as Error).message}`);
     }
   }
 
-  await logAudit({ userId: req.user!.id, action: "asset.import", metadata: { created, errorCount: errors.length } });
-  res.json({ created, errors });
+  await logAudit({ userId: req.user!.id, action: "asset.import", metadata: { created, errorCount: errors.length, usersCreated: usersCreated.length } });
+  res.json({ created, errors, usersCreated: usersCreated.map(({ id, email, firstName, lastName, tempPassword }) => ({ id, email, firstName, lastName, tempPassword })) });
 }

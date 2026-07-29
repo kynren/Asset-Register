@@ -19,11 +19,14 @@ router.get("/export.json", requirePermission("assets", "export"), controller.exp
 router.get("/:id/history", requirePermission("assets", "view"), controller.history);
 router.get("/:id/report", requirePermission("assets", "view"), controller.report);
 router.get("/:id/report/pdf", requirePermission("assets", "export"), controller.reportPdf);
+router.get("/:id/harness-report/pdf", requirePermission("assets", "export"), controller.harnessReportPdf);
 router.get("/:id/checkouts", requirePermission("assets", "view"), controller.listCheckouts);
+router.get("/:id/ping", requirePermission("assets", "view"), controller.pingAsset);
 router.post("/:id/checkout", requirePermission("assets", "edit"), validateBody(checkoutSchema), controller.checkoutAsset);
 router.post("/:id/checkin", requirePermission("assets", "edit"), validateBody(checkinSchema), controller.checkinAsset);
 router.get("/:id", requirePermission("assets", "view"), controller.getOne);
 router.post("/", requirePermission("assets", "create"), validateBody(createAssetSchema), controller.create);
+router.post("/import/preview", requirePermission("assets", "create"), upload.single("file"), controller.importPreview);
 router.post("/import", requirePermission("assets", "create"), upload.single("file"), controller.importCsv);
 router.post("/:id/duplicate", requirePermission("assets", "create"), controller.duplicate);
 router.patch("/:id", requirePermission("assets", "edit"), validateBody(updateAssetSchema), controller.update);

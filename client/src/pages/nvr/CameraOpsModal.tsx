@@ -31,6 +31,18 @@ function formatBytes(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// The download route requires the app's Bearer token, which a plain <a href> can't attach —
+// fetch it as an authenticated blob instead, same pattern used for asset report/PDF downloads.
+async function downloadRecording(id: number, cameraName: string, startedAt: string) {
+  const res = await axiosClient.get(`/nvr/recordings/${id}/download`, { responseType: "blob" });
+  const url = window.URL.createObjectURL(res.data);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${cameraName}-${dayjs(startedAt).format("YYYYMMDD-HHmmss")}.mp4`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+
 export function CameraOpsModal({ cameraId, cameraName, onClose }: { cameraId: number; cameraName: string; onClose: () => void }) {
   const queryClient = useQueryClient();
 
@@ -107,9 +119,9 @@ export function CameraOpsModal({ cameraId, cameraName, onClose }: { cameraId: nu
                     <td>{r.trigger}</td>
                     <td>
                       {r.endedAt && (
-                        <a className="btn btn-secondary btn-sm" href={`/api/nvr/recordings/${r.id}/download`} target="_blank" rel="noreferrer">
+                        <button className="btn btn-secondary btn-sm" onClick={() => downloadRecording(r.id, cameraName, r.startedAt)}>
                           <Icon name="download" size={12} />
-                        </a>
+                        </button>
                       )}
                     </td>
                   </tr>

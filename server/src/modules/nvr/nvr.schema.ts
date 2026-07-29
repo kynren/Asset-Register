@@ -31,6 +31,7 @@ export const updateCameraSchema = createCameraSchema.partial();
 
 export const ptzCommandSchema = z.object({
   command: z.enum(["UP", "DOWN", "LEFT", "RIGHT", "ZOOM_IN", "ZOOM_OUT", "HOME"]),
+  speed: z.number().int().min(1).max(10).optional(),
 });
 
 export const gotoPresetSchema = z.object({

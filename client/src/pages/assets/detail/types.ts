@@ -46,7 +46,7 @@ export interface AssetDetail {
     id: number;
     fieldId: number;
     value: string | null;
-    field: { id: number; label: string; fieldType: string };
+    field: { id: number; label: string; fieldKey: string; fieldType: string };
   }[];
 
   featuredImageUrl: string | null;

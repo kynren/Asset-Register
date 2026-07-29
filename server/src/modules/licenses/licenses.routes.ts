@@ -6,6 +6,7 @@ import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
+import { notifyUsers } from "../../lib/notify";
 
 const router = Router();
 router.use(verifyJwt);
@@ -97,6 +98,15 @@ router.post("/:id/assignments", requirePermission("operations", "edit"), validat
     select: assignmentSelect,
   });
   await logAudit({ userId: req.user!.id, action: "license.assign", entityType: "License", entityId: licenseId, metadata: req.body });
+  if (req.body.userId) {
+    await notifyUsers({
+      userIds: [req.body.userId],
+      excludeUserId: req.user!.id,
+      type: "license_assigned",
+      message: `License "${license.name}" was assigned to you`,
+      linkUrl: `/operations`,
+    });
+  }
   res.status(201).json(assignment);
 });
 
