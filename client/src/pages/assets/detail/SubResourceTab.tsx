@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { SkeletonTableRows } from "../../../components/Skeleton";
 
 interface Column {
   key: string;
@@ -93,7 +94,17 @@ export function SubResourceTab({ assetId, resource, title, subtitle, addLabel, c
         </div>
 
         {isLoading ? (
-          <div className="ad-empty">Loading...</div>
+          <table className="ad-table">
+            <thead>
+              <tr>
+                {columns.map((c) => <th key={c.key}>{c.label}</th>)}
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              <SkeletonTableRows columns={columns.length + 1} rows={3} />
+            </tbody>
+          </table>
         ) : items && items.length > 0 ? (
           <table className="ad-table">
             <thead>

@@ -5,6 +5,7 @@ import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { PermissionGate } from "../../../auth/PermissionGate";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { SkeletonText } from "../../../components/Skeleton";
 
 interface RssSource { id: number; name: string; url: string; createdAt: string; }
 interface FeedItem { title: string; link: string | null; pubDate: string | null; sourceName: string; }
@@ -89,7 +90,7 @@ export function RssFeedTab() {
           {!sources?.length ? (
             <div className="ad-empty">Add a feed source to see live headlines here.</div>
           ) : isLoading ? (
-            <div className="ad-empty">Loading feed...</div>
+            <div className="stack gap-2"><SkeletonText lines={5} /></div>
           ) : feed && feed.items.length > 0 ? (
             <div className="stack gap-2" style={{ maxHeight: 480, overflowY: "auto" }}>
               {feed.items.map((item, i) => (

@@ -6,6 +6,7 @@ import { Icon } from "../../../components/Icon";
 import { FormModal } from "../../../components/FormModal";
 import { PermissionGate } from "../../../auth/PermissionGate";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { SkeletonText } from "../../../components/Skeleton";
 
 interface Article {
   id: number;
@@ -58,7 +59,7 @@ export function KnowledgeBaseTab() {
       </div>
 
       {isLoading ? (
-        <div className="ad-empty">Loading...</div>
+        <div className="stack gap-2"><SkeletonText lines={4} /></div>
       ) : articles && articles.length > 0 ? (
         <div className="ot-list">
           {articles.map((a) => (

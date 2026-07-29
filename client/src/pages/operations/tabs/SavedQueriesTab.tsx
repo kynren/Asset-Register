@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { SkeletonText } from "../../../components/Skeleton";
 
 interface SavedQuery {
   id: number;
@@ -78,7 +79,7 @@ export function SavedQueriesTab() {
       <div className="ad-panel">
         <div className="ad-panel-title">Saved Queries</div>
         {isLoading ? (
-          <div className="ad-empty">Loading...</div>
+          <div className="stack gap-2"><SkeletonText lines={3} /></div>
         ) : queries && queries.length > 0 ? (
           <div className="stack gap-2">
             {queries.map((q) => (

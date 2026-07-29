@@ -5,6 +5,7 @@ import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { FieldConfig } from "./SubResourceTab";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { SkeletonText } from "../../../components/Skeleton";
 
 interface FileResourceTabProps {
   assetId: number;
@@ -89,7 +90,7 @@ export function FileResourceTab({ assetId, resource, title, subtitle, addLabel, 
         </div>
 
         {isLoading ? (
-          <div className="ad-empty">Loading...</div>
+          <div className="stack gap-2"><SkeletonText lines={3} /></div>
         ) : items && items.length > 0 ? (
           <div className="stack gap-2">
             {items.map((item) => (

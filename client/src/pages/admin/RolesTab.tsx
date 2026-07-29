@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { MODULES, ModuleName } from "../../lib/permissions";
+import { Skeleton } from "../../components/Skeleton";
 
 interface RolePermission {
   module: string;
@@ -71,7 +72,14 @@ export function RolesTab() {
     setDraft(updated);
   }
 
-  if (isLoading || !roles) return <div className="row" style={{ justifyContent: "center", padding: 40 }}><div className="spinner" /></div>;
+  if (isLoading || !roles) {
+    return (
+      <div className="grid" style={{ gridTemplateColumns: "220px 1fr", gap: 16 }}>
+        <Skeleton height={280} />
+        <Skeleton height={280} />
+      </div>
+    );
+  }
 
   const matrix = buildFullMatrix(activePermissions);
 

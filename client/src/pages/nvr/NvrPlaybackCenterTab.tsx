@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
+import { SkeletonTableRows } from "../../components/Skeleton";
 
 interface Recording {
   id: number;
@@ -48,7 +49,22 @@ export function NvrPlaybackCenterTab() {
 
       <div className="ad-panel">
         {isLoading ? (
-          <div className="ad-empty">Loading recordings...</div>
+          <table className="ad-table">
+            <thead>
+              <tr>
+                <th>Camera</th>
+                <th>NVR</th>
+                <th>Started</th>
+                <th>Ended</th>
+                <th>Size</th>
+                <th>Trigger</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              <SkeletonTableRows columns={7} />
+            </tbody>
+          </table>
         ) : recordings && recordings.length > 0 ? (
           <table className="ad-table">
             <thead>

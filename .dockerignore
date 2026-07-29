@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.git
+**/.env
+**/.env.local
+server/uploads
+agent
+.claude
+scratchpad*
+*.log

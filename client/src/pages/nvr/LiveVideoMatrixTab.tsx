@@ -4,6 +4,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { MatrixTile } from "./MatrixTile";
 import { PtzAlignmentPanel } from "./PtzAlignmentPanel";
+import { useClientInfo } from "../../hooks/useClientInfo";
 
 interface Camera {
   id: number;
@@ -24,11 +25,6 @@ interface Nvr {
   status: string;
   cameras: Camera[];
 }
-interface ClientInfo {
-  observedIp: string;
-  host: string;
-}
-
 const GRID_SIZES = [
   { key: 1 as const, label: "1x1" },
   { key: 4 as const, label: "2x2" },
@@ -47,10 +43,7 @@ export function LiveVideoMatrixTab() {
     queryKey: ["nvrs"],
     queryFn: async () => (await axiosClient.get("/nvr")).data as Nvr[],
   });
-  const { data: clientInfo } = useQuery({
-    queryKey: ["system-client-info-matrix"],
-    queryFn: async () => (await axiosClient.get("/system/client-info")).data as ClientInfo,
-  });
+  const { data: clientInfo } = useClientInfo();
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "PTZ" | "FIXED">("ALL");

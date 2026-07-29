@@ -16,7 +16,7 @@ import { QrScannerModal } from "./QrScannerModal";
 import { DiscoverDevicesModal } from "./DiscoverDevicesModal";
 import { AssetImportWizardModal } from "./AssetImportWizardModal";
 import { AssetTelemetryCell } from "./AssetTelemetryCell";
-import { HarnessRegisterView } from "./HarnessRegisterView";
+import { Skeleton } from "../../components/Skeleton";
 
 export interface Asset {
   id: number;
@@ -78,9 +78,9 @@ export function AssetListPage() {
     queryFn: async () => (await axiosClient.get("/assets/stats")).data as { total: number; byCategory: { categoryId: number | null; name: string; count: number }[] },
   });
 
-  const { data: categories } = useQuery({ queryKey: ["asset-categories"], queryFn: async () => (await axiosClient.get("/asset-categories")).data });
-  const selectedCategory = categories?.find((c: any) => c.id === categoryId);
-  const isHarnessView = selectedCategory?.name === "Harness";
+  const { data: allCategories } = useQuery({ queryKey: ["asset-categories"], queryFn: async () => (await axiosClient.get("/asset-categories")).data });
+  // Harness has its own dedicated view (/harness) — not selectable as an Asset Type here.
+  const categories = allCategories?.filter((c: any) => c.name !== "Harness");
   const { data: users } = useQuery({ queryKey: ["users-directory"], queryFn: async () => (await axiosClient.get("/users/directory")).data });
   const { data: unregisteredData } = useQuery({
     queryKey: ["devices-unregistered-count"],
@@ -309,12 +309,10 @@ export function AssetListPage() {
             <Icon name="upload" size={14} /> Import CSV
           </button>
         </PermissionGate>
-        {!isHarnessView && (
-          <div className="row gap-1">
-            <button className={`btn btn-sm btn-icon ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("list")} title="List view"><Icon name="grid" size={13} /></button>
-            <button className={`btn btn-sm btn-icon ${viewMode === "grid" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("grid")} title="Grid view"><Icon name="camera" size={13} /></button>
-          </div>
-        )}
+        <div className="row gap-1">
+          <button className={`btn btn-sm btn-icon ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("list")} title="List view"><Icon name="grid" size={13} /></button>
+          <button className={`btn btn-sm btn-icon ${viewMode === "grid" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("grid")} title="Grid view"><Icon name="camera" size={13} /></button>
+        </div>
       </div>
 
       {showImportWizard && (
@@ -333,11 +331,10 @@ export function AssetListPage() {
       )}
 
       <div id="inventory-print-area">
-        {isHarnessView ? (
-          <HarnessRegisterView categoryId={categoryId!} onEdit={setEditing} />
-        ) : viewMode === "grid" ? (
+        {viewMode === "grid" ? (
           <div className="grid grid-cols-4">
-            {(data?.items ?? []).map((a: Asset) => (
+            {isLoading && Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} height={140} />)}
+            {!isLoading && (data?.items ?? []).map((a: Asset) => (
               <AssetGridCard key={a.id} asset={a} onOpen={() => navigate(`/assets/${a.id}`)} />
             ))}
             {(data?.items ?? []).length === 0 && !isLoading && <div className="empty-state">No assets found.</div>}
@@ -359,7 +356,7 @@ export function AssetListPage() {
       </div>
 
       {showForm && (
-        <AssetFormModal onClose={() => setShowForm(false)} onSubmit={(v) => createMutation.mutate(v)} submitting={createMutation.isPending} />
+        <AssetFormModal excludeCategoryNames={["Harness"]} onClose={() => setShowForm(false)} onSubmit={(v) => createMutation.mutate(v)} submitting={createMutation.isPending} />
       )}
       {editing && (
         <AssetFormModal
@@ -380,6 +377,7 @@ export function AssetListPage() {
             gridPowered: editing.gridPowered,
             remoteManagementEnabled: editing.remoteManagementEnabled,
           }}
+          excludeCategoryNames={["Harness"]}
           onClose={() => setEditing(null)}
           onSubmit={(v) => updateMutation.mutate(v)}
           submitting={updateMutation.isPending}

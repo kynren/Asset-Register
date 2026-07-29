@@ -6,6 +6,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { StatusBadge } from "../../components/StatusBadge";
 import { FormModal } from "../../components/FormModal";
+import { Skeleton, SkeletonText } from "../../components/Skeleton";
 
 interface UserDetail {
   id: number;
@@ -80,7 +81,22 @@ export function UserDetailPage() {
   });
 
   if (isLoading || !user) {
-    return <div className="row" style={{ justifyContent: "center", padding: 60 }}><div className="spinner" /></div>;
+    return (
+      <div className="stack gap-3">
+        <div className="row gap-3">
+          <Skeleton width={52} height={52} className="rounded-full" />
+          <div className="stack gap-1">
+            <Skeleton width={180} height={20} />
+            <Skeleton width={120} height={14} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2">
+          <div className="card"><SkeletonText lines={5} /></div>
+          <div className="card"><SkeletonText lines={4} /></div>
+        </div>
+        <div className="card"><SkeletonText lines={3} /></div>
+      </div>
+    );
   }
 
   return (

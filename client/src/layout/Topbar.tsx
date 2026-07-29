@@ -1,6 +1,5 @@
 import { KeyboardEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
 import { usePermission } from "../auth/PermissionGate";
 import { useTheme } from "../theme/ThemeContext";
@@ -9,6 +8,7 @@ import { axiosClient } from "../api/axiosClient";
 import { Icon } from "../components/Icon";
 import { NotificationBell } from "./NotificationBell";
 import { ClientInfoModal } from "./ClientInfoModal";
+import { useClientInfo } from "../hooks/useClientInfo";
 
 function initials(firstName: string, lastName: string) {
   return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
@@ -53,11 +53,7 @@ export function Topbar({ title }: { title: string }) {
   const canAdmin = usePermission("admin", "view");
   const latency = useLatency();
 
-  const { data: clientInfo } = useQuery({
-    queryKey: ["client-info"],
-    queryFn: async () => (await axiosClient.get("/system/client-info")).data as { observedIp: string },
-    staleTime: 5 * 60_000,
-  });
+  const { data: clientInfo } = useClientInfo();
 
   async function handleLogout() {
     await logout();

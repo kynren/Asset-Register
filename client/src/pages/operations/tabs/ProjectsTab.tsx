@@ -6,6 +6,7 @@ import { Icon } from "../../../components/Icon";
 import { FormModal } from "../../../components/FormModal";
 import { PermissionGate } from "../../../auth/PermissionGate";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { Skeleton } from "../../../components/Skeleton";
 
 interface ProjectCard {
   id: number;
@@ -92,7 +93,12 @@ export function ProjectsTab() {
                 {col.label.toUpperCase()}
                 <span className="ot-column-count">{isLoading ? "—" : colCards.length}</span>
               </div>
-              {colCards.length === 0 ? (
+              {isLoading ? (
+                <div className="stack gap-2">
+                  <Skeleton height={64} />
+                  <Skeleton height={64} />
+                </div>
+              ) : colCards.length === 0 ? (
                 <div className="ot-column-empty">No cards</div>
               ) : (
                 colCards.map((card) => (

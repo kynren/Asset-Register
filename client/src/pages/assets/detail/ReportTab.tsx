@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { AssetDetail } from "./types";
+import { SkeletonText } from "../../../components/Skeleton";
 
 interface ReportCheckout {
   id: number;
@@ -66,7 +67,15 @@ export function ReportTab({ asset }: { asset: AssetDetail }) {
   }
 
   if (isLoading || !data) {
-    return <div className="ad-empty">Loading report...</div>;
+    return (
+      <div className="ad-grid">
+        {[5, 3, 4].map((lines, i) => (
+          <div className="ad-panel" key={i}>
+            <SkeletonText lines={lines} />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   const { asset: full, recentActivity } = data;

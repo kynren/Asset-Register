@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ColumnDef, SortingState, flexRender, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
 import { Icon } from "./Icon";
+import { SkeletonTableRows } from "./Skeleton";
 
 interface DataTableProps<T> {
   columns: ColumnDef<T, any>[];
@@ -83,13 +84,7 @@ export function DataTable<T>({
             ))}
           </thead>
           <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={columns.length} style={{ textAlign: "center", padding: 32 }}>
-                  <div className="spinner" style={{ margin: "0 auto" }} />
-                </td>
-              </tr>
-            )}
+            {isLoading && <SkeletonTableRows columns={columns.length} />}
             {!isLoading && data.length === 0 && (
               <tr>
                 <td colSpan={columns.length}>

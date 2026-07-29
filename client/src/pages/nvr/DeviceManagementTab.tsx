@@ -12,6 +12,7 @@ import { PtzControlModal } from "./PtzControlModal";
 import { CameraOpsModal } from "./CameraOpsModal";
 import { LiveFeedPreview } from "./LiveFeedPreview";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { Skeleton } from "../../components/Skeleton";
 
 interface Camera {
   id: number;
@@ -115,7 +116,12 @@ export function DeviceManagementTab() {
         </PermissionGate>
       </div>
 
-      {isLoading && <div className="row" style={{ justifyContent: "center", padding: 60 }}><div className="spinner" /></div>}
+      {isLoading && (
+        <div className="stack gap-3">
+          <Skeleton height={90} />
+          <Skeleton height={90} />
+        </div>
+      )}
       {!isLoading && nvrs?.length === 0 && <div className="empty-state card">No NVRs registered yet.</div>}
 
       {nvrs?.map((nvr) => (

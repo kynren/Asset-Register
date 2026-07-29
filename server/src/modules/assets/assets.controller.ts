@@ -44,6 +44,7 @@ export async function list(req: Request, res: Response) {
   }
   if (status) where.status = status;
   if (categoryId) where.categoryId = Number(categoryId);
+  else where.NOT = { category: { name: "Harness" } }; // Harness has its own dedicated view, not part of general browsing
   if (locationId) where.locationId = Number(locationId);
   if (assignedToId) where.assignedToId = Number(assignedToId);
   if (dateFrom || dateTo) {
@@ -68,9 +69,10 @@ export async function getByTag(req: Request, res: Response) {
 }
 
 export async function stats(_req: Request, res: Response) {
+  const excludeHarness = { NOT: { category: { name: "Harness" } } };
   const [total, byCategory, categories] = await Promise.all([
-    prisma.asset.count(),
-    prisma.asset.groupBy({ by: ["categoryId"], _count: { _all: true } }),
+    prisma.asset.count({ where: excludeHarness }),
+    prisma.asset.groupBy({ by: ["categoryId"], where: excludeHarness, _count: { _all: true } }),
     prisma.assetCategory.findMany(),
   ]);
 

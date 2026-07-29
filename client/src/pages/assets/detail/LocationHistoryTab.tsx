@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { AssetDetail, AuditLogEntry } from "./types";
+import { SkeletonText } from "../../../components/Skeleton";
 
 function summarizeMetadata(metadata: Record<string, unknown> | null): string {
   if (!metadata) return "Updated";
@@ -66,7 +67,7 @@ export function LocationHistoryTab({ asset }: { asset: AssetDetail }) {
         <div className="ad-panel">
           <div className="ad-panel-title">Change History</div>
           {isLoading ? (
-            <div className="ad-empty">Loading...</div>
+            <SkeletonText lines={3} />
           ) : history && history.length > 0 ? (
             <div className="stack gap-2">
               {history.map((h) => (

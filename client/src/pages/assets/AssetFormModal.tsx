@@ -67,6 +67,8 @@ export function AssetFormModal({
   onClose,
   onSubmit,
   submitting,
+  excludeCategoryNames,
+  onlyCategoryNames,
 }: {
   assetId?: number;
   initial?: Partial<AssetFormValues>;
@@ -75,6 +77,10 @@ export function AssetFormModal({
   onClose: () => void;
   onSubmit: (values: AssetFormValues) => void;
   submitting?: boolean;
+  /** Hide these categories from the picker (e.g. categories with their own dedicated view/workflow). */
+  excludeCategoryNames?: string[];
+  /** Restrict the picker to only these categories. */
+  onlyCategoryNames?: string[];
 }) {
   const [values, setValues] = useState<AssetFormValues>({ ...emptyValues, ...initial });
   const queryClient = useQueryClient();
@@ -87,6 +93,11 @@ export function AssetFormModal({
   }, [initial]);
 
   const { data: categories } = useQuery({ queryKey: ["asset-categories"], queryFn: async () => (await axiosClient.get("/asset-categories")).data });
+  const visibleCategories = categories?.filter((c: any) => {
+    if (onlyCategoryNames) return onlyCategoryNames.includes(c.name);
+    if (excludeCategoryNames) return !excludeCategoryNames.includes(c.name);
+    return true;
+  });
   const { data: locations } = useQuery({ queryKey: ["locations"], queryFn: async () => (await axiosClient.get("/locations")).data });
   const { data: users } = useQuery({ queryKey: ["users-directory"], queryFn: async () => (await axiosClient.get("/users/directory")).data });
   const { data: photos } = useQuery({
@@ -176,7 +187,7 @@ export function AssetFormModal({
           <input className="input" value={values.assetTag} onChange={(e) => update("assetTag", e.target.value)} required placeholder="e.g. KYN-0001" />
         </div>
 
-        <QuickAddSelect label="Category" value={values.categoryId} onChange={(id) => update("categoryId", id)} options={categories} createUrl="/asset-categories" queryKey="asset-categories" />
+        <QuickAddSelect label="Category" value={values.categoryId} onChange={(id) => update("categoryId", id)} options={visibleCategories} createUrl="/asset-categories" queryKey="asset-categories" />
         <div className="field">
           <label>Status</label>
           <select className="select" value={values.status} onChange={(e) => update("status", e.target.value)}>

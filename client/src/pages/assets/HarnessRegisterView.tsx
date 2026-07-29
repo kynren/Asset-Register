@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { Asset } from "./AssetListPage";
+import { SkeletonTableRows } from "../../components/Skeleton";
 
 interface CustomFieldValue {
   value: string | null;
@@ -76,10 +77,11 @@ export function HarnessRegisterView({ categoryId, onEdit }: { categoryId: number
           </tr>
         </thead>
         <tbody>
+          {isLoading && <SkeletonTableRows columns={13} />}
           {data?.map((asset) => {
             const f = fieldMap(asset);
             return (
-              <tr key={asset.id} style={{ cursor: "pointer" }} onClick={() => navigate(`/assets/${asset.id}`)}>
+              <tr key={asset.id} style={{ cursor: "pointer" }} onClick={() => navigate(`/harness/${asset.id}`)}>
                 <td>
                   <div style={{ fontWeight: 600 }}>{asset.name}</div>
                   <div className="muted" style={{ fontSize: 11 }}>{asset.assetTag}</div>
