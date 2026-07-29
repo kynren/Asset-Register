@@ -7,6 +7,7 @@ import { Icon } from "../../components/Icon";
 import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/FormModal";
 import { FormTemplateBuilderModal } from "./FormTemplateBuilderModal";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 interface FormTemplate {
   id: number;
@@ -22,6 +23,7 @@ export function FormTemplatesSection() {
   const [showCreate, setShowCreate] = useState(false);
   const [renaming, setRenaming] = useState<FormTemplate | null>(null);
   const [managingFields, setManagingFields] = useState<FormTemplate | null>(null);
+  const [deleting, setDeleting] = useState<FormTemplate | null>(null);
   const queryClient = useQueryClient();
 
   const { data: templates, isLoading } = useQuery({
@@ -34,6 +36,7 @@ export function FormTemplatesSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["asset-form-templates"] });
       queryClient.invalidateQueries({ queryKey: ["asset-categories"] });
+      setDeleting(null);
     },
   });
 
@@ -65,7 +68,7 @@ export function FormTemplatesSection() {
           <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setRenaming(row.original)} title="Rename">
             <Icon name="edit" size={12} />
           </button>
-          <button className="btn btn-danger btn-sm btn-icon" onClick={() => deleteMutation.mutate(row.original.id)}>
+          <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
             <Icon name="trash" size={13} />
           </button>
         </div>
@@ -105,6 +108,17 @@ export function FormTemplatesSection() {
           templateId={managingFields.id}
           templateName={managingFields.name}
           onClose={() => setManagingFields(null)}
+        />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete form template"
+          message={`Are you sure you want to delete "${deleting.name}"? Categories linked to it will lose their custom fields. This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate(deleting.id)}
         />
       )}
     </div>

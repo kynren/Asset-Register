@@ -6,7 +6,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { DataTable } from "../../components/DataTable";
 import { StatusBadge } from "../../components/StatusBadge";
 import { Icon } from "../../components/Icon";
-import { CsvExportButton, CsvImportButton } from "../../components/CsvButtons";
+import { CsvExportButton } from "../../components/CsvButtons";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { PermissionGate, usePermission } from "../../auth/PermissionGate";
 import { AssetFormModal, AssetFormValues } from "./AssetFormModal";
@@ -14,8 +14,11 @@ import { AssetGridCard } from "./AssetGridCard";
 import { QrLabelModal } from "./QrLabelModal";
 import { QrScannerModal } from "./QrScannerModal";
 import { DiscoverDevicesModal } from "./DiscoverDevicesModal";
+import { AssetImportWizardModal } from "./AssetImportWizardModal";
+import { AssetTelemetryCell } from "./AssetTelemetryCell";
+import { HarnessRegisterView } from "./HarnessRegisterView";
 
-interface Asset {
+export interface Asset {
   id: number;
   assetTag: string;
   name: string;
@@ -58,7 +61,7 @@ export function AssetListPage() {
   const [qrAsset, setQrAsset] = useState<Asset | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [showDiscover, setShowDiscover] = useState(false);
-  const [importResult, setImportResult] = useState<{ created: number; errors: string[] } | null>(null);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const canEdit = usePermission("assets", "edit");
@@ -76,6 +79,8 @@ export function AssetListPage() {
   });
 
   const { data: categories } = useQuery({ queryKey: ["asset-categories"], queryFn: async () => (await axiosClient.get("/asset-categories")).data });
+  const selectedCategory = categories?.find((c: any) => c.id === categoryId);
+  const isHarnessView = selectedCategory?.name === "Harness";
   const { data: users } = useQuery({ queryKey: ["users-directory"], queryFn: async () => (await axiosClient.get("/users/directory")).data });
   const { data: unregisteredData } = useQuery({
     queryKey: ["devices-unregistered-count"],
@@ -184,16 +189,7 @@ export function AssetListPage() {
     { header: "Location", accessorFn: (r) => r.location?.name ?? "—" },
     {
       header: "Telemetry",
-      cell: ({ row }) => {
-        const device = row.original.device;
-        if (!device) return <span className="muted">—</span>;
-        const online = Date.now() - new Date(device.lastSeen).getTime() < 15 * 60 * 1000;
-        return (
-          <span className="row gap-1" style={{ fontSize: 12 }}>
-            <span className={`tag-dot ${online ? "online" : "offline"}`} /> {online ? "Online" : "Offline"}
-          </span>
-        );
-      },
+      cell: ({ row }) => <AssetTelemetryCell assetId={row.original.id} />,
     },
     {
       header: "Custodian",
@@ -309,19 +305,20 @@ export function AssetListPage() {
           <CsvExportButton url="/assets/export" filename="assets.csv" />
         </PermissionGate>
         <PermissionGate module="assets" action="create">
-          <CsvImportButton url="/assets/import" onImported={(res) => { setImportResult(res); invalidateAll(); }} />
+          <button className="btn btn-secondary" onClick={() => setShowImportWizard(true)}>
+            <Icon name="upload" size={14} /> Import CSV
+          </button>
         </PermissionGate>
-        <div className="row gap-1">
-          <button className={`btn btn-sm btn-icon ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("list")} title="List view"><Icon name="grid" size={13} /></button>
-          <button className={`btn btn-sm btn-icon ${viewMode === "grid" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("grid")} title="Grid view"><Icon name="camera" size={13} /></button>
-        </div>
+        {!isHarnessView && (
+          <div className="row gap-1">
+            <button className={`btn btn-sm btn-icon ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("list")} title="List view"><Icon name="grid" size={13} /></button>
+            <button className={`btn btn-sm btn-icon ${viewMode === "grid" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("grid")} title="Grid view"><Icon name="camera" size={13} /></button>
+          </div>
+        )}
       </div>
 
-      {importResult && (
-        <div className={`alert ${importResult.errors.length ? "alert-warning" : "alert-success"}`}>
-          Imported {importResult.created} asset(s). {importResult.errors.length > 0 && `${importResult.errors.length} row(s) had errors.`}
-          <button className="modal-close" style={{ float: "right" }} onClick={() => setImportResult(null)}>×</button>
-        </div>
+      {showImportWizard && (
+        <AssetImportWizardModal onClose={() => setShowImportWizard(false)} onImported={invalidateAll} />
       )}
 
       {canEdit && selectedIds.length > 0 && (
@@ -336,7 +333,9 @@ export function AssetListPage() {
       )}
 
       <div id="inventory-print-area">
-        {viewMode === "grid" ? (
+        {isHarnessView ? (
+          <HarnessRegisterView categoryId={categoryId!} onEdit={setEditing} />
+        ) : viewMode === "grid" ? (
           <div className="grid grid-cols-4">
             {(data?.items ?? []).map((a: Asset) => (
               <AssetGridCard key={a.id} asset={a} onOpen={() => navigate(`/assets/${a.id}`)} />

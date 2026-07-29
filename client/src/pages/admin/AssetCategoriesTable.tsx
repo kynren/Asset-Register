@@ -5,6 +5,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/FormModal";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 interface FormTemplateRef {
   id: number;
@@ -22,6 +23,7 @@ interface AssetCategory {
 export function AssetCategoriesTable() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<AssetCategory | null>(null);
+  const [deleting, setDeleting] = useState<AssetCategory | null>(null);
   const queryClient = useQueryClient();
 
   const { data: categories, isLoading } = useQuery({
@@ -35,7 +37,7 @@ export function AssetCategoriesTable() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/asset-categories/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["asset-categories"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["asset-categories"] }); setDeleting(null); },
   });
 
   const columns: ColumnDef<AssetCategory, any>[] = [
@@ -67,7 +69,7 @@ export function AssetCategoriesTable() {
           <button className="btn btn-secondary btn-sm" onClick={() => setEditing(row.original)}>
             <Icon name="edit" size={12} /> Edit
           </button>
-          <button className="btn btn-danger btn-sm btn-icon" onClick={() => deleteMutation.mutate(row.original.id)}>
+          <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
             <Icon name="trash" size={13} />
           </button>
         </div>
@@ -96,6 +98,17 @@ export function AssetCategoriesTable() {
           templates={templates ?? []}
           initial={editing}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete asset category"
+          message={`Are you sure you want to delete "${deleting.name}"? This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate(deleting.id)}
         />
       )}
     </div>

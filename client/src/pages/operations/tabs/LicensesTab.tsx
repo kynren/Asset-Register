@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 interface License {
   id: number;
@@ -32,6 +33,8 @@ export function LicensesTab() {
   const [expiresAt, setExpiresAt] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
   const [assignUserId, setAssignUserId] = useState("");
+  const [deletingLicense, setDeletingLicense] = useState<License | null>(null);
+  const [unassigning, setUnassigning] = useState<{ licenseId: number; assignmentId: number; label: string } | null>(null);
 
   const { data: licenses, isLoading } = useQuery({
     queryKey: ["op-licenses"],
@@ -63,7 +66,7 @@ export function LicensesTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/licenses/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["op-licenses"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["op-licenses"] }); setDeletingLicense(null); },
   });
 
   const assignMutation = useMutation({
@@ -80,6 +83,7 @@ export function LicensesTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["op-licenses"] });
       queryClient.invalidateQueries({ queryKey: ["op-license-assignments", expanded] });
+      setUnassigning(null);
     },
   });
 
@@ -120,7 +124,7 @@ export function LicensesTab() {
                     <button className="ad-btn" onClick={() => setExpanded(expanded === l.id ? null : l.id)}>
                       {expanded === l.id ? "Hide" : "Manage"} Assignments
                     </button>
-                    <button className="ad-btn ad-btn-danger" onClick={() => deleteMutation.mutate(l.id)}><Icon name="trash" size={12} /></button>
+                    <button className="ad-btn ad-btn-danger" onClick={() => setDeletingLicense(l)}><Icon name="trash" size={12} /></button>
                   </div>
                 </div>
 
@@ -142,7 +146,16 @@ export function LicensesTab() {
                             <div className="ad-row-value">
                               {a.user ? `${a.user.firstName} ${a.user.lastName}` : a.asset ? `${a.asset.name} (${a.asset.assetTag})` : "Unknown"}
                             </div>
-                            <button className="ad-btn ad-btn-danger" onClick={() => unassignMutation.mutate({ licenseId: l.id, assignmentId: a.id })}>
+                            <button
+                              className="ad-btn ad-btn-danger"
+                              onClick={() =>
+                                setUnassigning({
+                                  licenseId: l.id,
+                                  assignmentId: a.id,
+                                  label: a.user ? `${a.user.firstName} ${a.user.lastName}` : a.asset ? `${a.asset.name} (${a.asset.assetTag})` : "this assignment",
+                                })
+                              }
+                            >
                               <Icon name="trash" size={12} />
                             </button>
                           </div>
@@ -159,6 +172,28 @@ export function LicensesTab() {
         </div>
       ) : (
         <div className="ad-empty">No software licenses tracked yet.</div>
+      )}
+
+      {deletingLicense && (
+        <ConfirmDialog
+          title="Delete license"
+          message={`Are you sure you want to delete "${deletingLicense.name}"? This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeletingLicense(null)}
+          onConfirm={() => deleteMutation.mutate(deletingLicense.id)}
+        />
+      )}
+
+      {unassigning && (
+        <ConfirmDialog
+          title="Unassign license"
+          message={`Are you sure you want to unassign this license from "${unassigning.label}"?`}
+          danger
+          loading={unassignMutation.isPending}
+          onCancel={() => setUnassigning(null)}
+          onConfirm={() => unassignMutation.mutate({ licenseId: unassigning.licenseId, assignmentId: unassigning.assignmentId })}
+        />
       )}
     </div>
   );

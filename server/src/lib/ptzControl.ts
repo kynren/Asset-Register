@@ -35,8 +35,10 @@ const MOVE_VECTORS: Record<string, { x: number; y: number; zoom: number }> = {
  * infrequent and cameras can drop idle SOAP sessions), issues a bounded ContinuousMove, then
  * stops the movement after a short burst — mirrors how iVMS/Blue Iris "nudge" controls behave.
  * Honestly reports connection/command failure rather than pretending the move happened.
+ * `speed` (1-10, default 5) scales the ContinuousMove vector magnitude — a real drive-speed
+ * control, not cosmetic, since a higher value genuinely moves the head faster per nudge.
  */
-export async function sendPtzCommand(options: CamOptions, command: string): Promise<PtzResult> {
+export async function sendPtzCommand(options: CamOptions, command: string, speed = 5): Promise<PtzResult> {
   let cam: Cam;
   try {
     cam = await connectCam(options);
@@ -54,9 +56,10 @@ export async function sendPtzCommand(options: CamOptions, command: string): Prom
 
   const vector = MOVE_VECTORS[command];
   if (!vector) return { ok: false, message: `Unknown PTZ command: ${command}` };
+  const scale = Math.max(0.1, Math.min(1, speed / 10)) * 2;
 
   return new Promise((resolve) => {
-    cam.continuousMove({ x: vector.x, y: vector.y, zoom: vector.zoom, timeout: 800 }, (err: Error | null) => {
+    cam.continuousMove({ x: vector.x * scale, y: vector.y * scale, zoom: vector.zoom * scale, timeout: 800 }, (err: Error | null) => {
       if (err) {
         resolve({ ok: false, message: `ONVIF PTZ command failed: ${err.message}` });
         return;

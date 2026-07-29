@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { AssetDetail, AssetPhoto } from "./types";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 interface Checkout {
   id: number;
@@ -36,6 +37,7 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
   const [checkoutToId, setCheckoutToId] = useState("");
   const [dueBackAt, setDueBackAt] = useState("");
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [deletingPhoto, setDeletingPhoto] = useState<AssetPhoto | null>(null);
 
   const featuredMutation = useMutation({
     mutationFn: (file: File) => {
@@ -57,7 +59,7 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
 
   const galleryDeleteMutation = useMutation({
     mutationFn: (photoId: number) => axiosClient.delete(`/asset-resources/${asset.id}/photos/${photoId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["asset-photos", asset.id] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["asset-photos", asset.id] }); setDeletingPhoto(null); },
   });
 
   const checkoutMutation = useMutation({
@@ -147,7 +149,7 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
               {photos.map((p) => (
                 <div key={p.id} className="ad-gallery-item">
                   <img src={p.url} alt="" />
-                  <button onClick={() => galleryDeleteMutation.mutate(p.id)} title="Remove photo"><Icon name="close" size={12} /></button>
+                  <button onClick={() => setDeletingPhoto(p)} title="Remove photo"><Icon name="close" size={12} /></button>
                 </div>
               ))}
             </div>
@@ -241,6 +243,17 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
           )}
         </div>
       </div>
+
+      {deletingPhoto && (
+        <ConfirmDialog
+          title="Delete photo"
+          message="Are you sure you want to remove this photo from the asset's gallery? This cannot be undone."
+          danger
+          loading={galleryDeleteMutation.isPending}
+          onCancel={() => setDeletingPhoto(null)}
+          onConfirm={() => galleryDeleteMutation.mutate(deletingPhoto.id)}
+        />
+      )}
     </div>
   );
 }

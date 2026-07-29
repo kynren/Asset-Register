@@ -80,7 +80,7 @@ export function VaultEntryRow({ entry, onEdit, onDelete }: { entry: VaultEntry; 
           {display}
         </span>
         <button className="btn btn-secondary btn-sm btn-icon" onClick={handleToggleReveal} disabled={loading} title={phase === "revealed" ? "Hide password" : "Decrypt and view password"}>
-          <Icon name={phase === "revealed" ? "zoomOut" : "zoomIn"} size={13} />
+          <Icon name={phase === "revealed" ? "eyeOff" : "eye"} size={13} />
         </button>
         <button className="btn btn-secondary btn-sm btn-icon" onClick={handleCopy} disabled={loading} title="Copy password">
           <Icon name={copied ? "check" : "paperclip"} size={13} />

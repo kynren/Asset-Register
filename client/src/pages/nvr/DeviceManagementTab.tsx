@@ -11,6 +11,7 @@ import { CameraFormModal, CameraFormValues } from "./CameraFormModal";
 import { PtzControlModal } from "./PtzControlModal";
 import { CameraOpsModal } from "./CameraOpsModal";
 import { LiveFeedPreview } from "./LiveFeedPreview";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 interface Camera {
   id: number;
@@ -48,6 +49,8 @@ export function DeviceManagementTab() {
   const [liveFeedCamera, setLiveFeedCamera] = useState<Camera | null>(null);
   const [ptzCamera, setPtzCamera] = useState<Camera | null>(null);
   const [opsCamera, setOpsCamera] = useState<Camera | null>(null);
+  const [deletingNvr, setDeletingNvr] = useState<Nvr | null>(null);
+  const [deletingCamera, setDeletingCamera] = useState<Camera | null>(null);
   const queryClient = useQueryClient();
 
   const { data: nvrs, isLoading } = useQuery({
@@ -91,12 +94,12 @@ export function DeviceManagementTab() {
 
   const deleteNvrMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/nvr/${id}`),
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); setDeletingNvr(null); },
   });
 
   const deleteCameraMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/nvr/cameras/${id}`),
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); setDeletingCamera(null); },
   });
 
   function stripBlankPassword<T extends { password: string }>(values: T) {
@@ -142,7 +145,7 @@ export function DeviceManagementTab() {
                 <button className="btn btn-secondary btn-sm" onClick={() => setCameraNvrId(nvr.id)}><Icon name="plus" size={12} /> Add Camera</button>
               </PermissionGate>
               <PermissionGate module="nvr" action="delete">
-                <button className="btn btn-danger btn-sm btn-icon" onClick={() => deleteNvrMutation.mutate(nvr.id)}><Icon name="trash" size={13} /></button>
+                <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeletingNvr(nvr)}><Icon name="trash" size={13} /></button>
               </PermissionGate>
             </div>
           </div>
@@ -178,7 +181,7 @@ export function DeviceManagementTab() {
                           )}
                         </PermissionGate>
                         <PermissionGate module="nvr" action="delete">
-                          <button className="btn btn-danger btn-sm btn-icon" onClick={() => deleteCameraMutation.mutate(cam.id)} title="Delete camera">
+                          <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeletingCamera(cam)} title="Delete camera">
                             <Icon name="trash" size={12} />
                           </button>
                         </PermissionGate>
@@ -247,6 +250,28 @@ export function DeviceManagementTab() {
       )}
       {ptzCamera && <PtzControlModal cameraId={ptzCamera.id} cameraName={ptzCamera.name} onClose={() => setPtzCamera(null)} />}
       {opsCamera && <CameraOpsModal cameraId={opsCamera.id} cameraName={opsCamera.name} onClose={() => setOpsCamera(null)} />}
+
+      {deletingNvr && (
+        <ConfirmDialog
+          title="Delete NVR"
+          message={`Are you sure you want to delete "${deletingNvr.name}" and all its cameras? This cannot be undone.`}
+          danger
+          loading={deleteNvrMutation.isPending}
+          onCancel={() => setDeletingNvr(null)}
+          onConfirm={() => deleteNvrMutation.mutate(deletingNvr.id)}
+        />
+      )}
+
+      {deletingCamera && (
+        <ConfirmDialog
+          title="Delete camera"
+          message={`Are you sure you want to delete "${deletingCamera.name}"? This cannot be undone.`}
+          danger
+          loading={deleteCameraMutation.isPending}
+          onCancel={() => setDeletingCamera(null)}
+          onConfirm={() => deleteCameraMutation.mutate(deletingCamera.id)}
+        />
+      )}
     </div>
   );
 }

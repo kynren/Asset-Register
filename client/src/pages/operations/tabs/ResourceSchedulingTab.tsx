@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { PermissionGate } from "../../../auth/PermissionGate";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 interface Schedule {
   id: number;
@@ -22,6 +23,7 @@ export function ResourceSchedulingTab() {
   const [endAt, setEndAt] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Schedule | null>(null);
 
   const { data: schedules, isLoading } = useQuery({
     queryKey: ["op-scheduling"],
@@ -49,7 +51,7 @@ export function ResourceSchedulingTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/operations/scheduling/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["op-scheduling"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["op-scheduling"] }); setDeleting(null); },
   });
 
   const upcoming = schedules?.filter((s) => new Date(s.endAt) >= new Date()) ?? [];
@@ -93,7 +95,7 @@ export function ResourceSchedulingTab() {
                   </div>
                 </div>
                 <PermissionGate module="operations" action="delete">
-                  <button className="ad-btn ad-btn-danger" onClick={() => deleteMutation.mutate(s.id)}><Icon name="trash" size={12} /></button>
+                  <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(s)}><Icon name="trash" size={12} /></button>
                 </PermissionGate>
               </div>
             ))}
@@ -102,6 +104,17 @@ export function ResourceSchedulingTab() {
           <div className="ad-empty">No upcoming resource schedules.</div>
         )}
       </div>
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete schedule"
+          message={`Are you sure you want to delete the schedule for "${deleting.resourceName}"? This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate(deleting.id)}
+        />
+      )}
     </div>
   );
 }

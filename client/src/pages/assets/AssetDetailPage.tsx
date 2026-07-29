@@ -19,6 +19,7 @@ import { SubResourceTab } from "./detail/SubResourceTab";
 import { FileResourceTab } from "./detail/FileResourceTab";
 import { ReportTab } from "./detail/ReportTab";
 import { ActivityLogTab } from "./detail/ActivityLogTab";
+import { HarnessDetailPage } from "./HarnessDetailPage";
 
 type TabKey =
   | "profile" | "impact" | "location" | "os" | "components" | "volumes" | "software"
@@ -95,6 +96,10 @@ export function AssetDetailPage() {
 
   if (isLoading || !asset) {
     return <div className="row" style={{ justifyContent: "center", padding: 60 }}><div className="spinner" /></div>;
+  }
+
+  if (asset.category?.name === "Harness") {
+    return <HarnessDetailPage asset={asset} onUpdated={invalidate} />;
   }
 
   const isOnline = asset.device ? Date.now() - new Date(asset.device.lastSeen).getTime() < 15 * 60 * 1000 : null;

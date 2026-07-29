@@ -4,12 +4,29 @@ import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { MODULES } from "../../constants/modules";
 
+// Pads a role's `permissions` with an all-false row for any module in MODULES that has
+// no RolePermission row yet — e.g. right after a new module is added to the constant,
+// before every existing role has been re-saved or reseeded. Without this, the API would
+// silently omit newly-added modules from a role's permission list.
+function padPermissions<T extends { permissions: { module: string }[] }>(role: T): T {
+  const have = new Set(role.permissions.map((p) => p.module));
+  const missing = MODULES.filter((m) => !have.has(m)).map((module) => ({
+    module,
+    canView: false,
+    canCreate: false,
+    canEdit: false,
+    canDelete: false,
+    canExport: false,
+  }));
+  return { ...role, permissions: [...role.permissions, ...missing] };
+}
+
 export async function list(_req: Request, res: Response) {
   const roles = await prisma.role.findMany({
     include: { permissions: true, _count: { select: { users: true } } },
     orderBy: { id: "asc" },
   });
-  res.json(roles);
+  res.json(roles.map(padPermissions));
 }
 
 export async function getOne(req: Request, res: Response) {
@@ -18,7 +35,7 @@ export async function getOne(req: Request, res: Response) {
     include: { permissions: true },
   });
   if (!role) throw new ApiError(404, "Role not found");
-  res.json(role);
+  res.json(padPermissions(role));
 }
 
 export async function create(req: Request, res: Response) {
@@ -62,7 +79,8 @@ export async function updatePermissions(req: Request, res: Response) {
 
   await logAudit({ userId: req.user!.id, action: "role.update_permissions", entityType: "Role", entityId: id });
   const role = await prisma.role.findUnique({ where: { id }, include: { permissions: true } });
-  res.json(role);
+  if (!role) throw new ApiError(404, "Role not found");
+  res.json(padPermissions(role));
 }
 
 export async function remove(req: Request, res: Response) {

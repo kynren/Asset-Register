@@ -4,6 +4,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { QuickAddSelect } from "../../components/QuickAddSelect";
 import { Icon } from "../../components/Icon";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 export interface AssetFormValues {
   assetTag: string;
@@ -108,6 +109,7 @@ export function AssetFormModal({
   });
 
   const [customFieldInputs, setCustomFieldInputs] = useState<Record<number, string>>({});
+  const [deletingPhoto, setDeletingPhoto] = useState<AssetPhoto | null>(null);
   useEffect(() => {
     if (existingAsset?.customFieldValues) {
       const seeded: Record<number, string> = {};
@@ -140,7 +142,7 @@ export function AssetFormModal({
   });
   const galleryDeleteMutation = useMutation({
     mutationFn: (photoId: number) => axiosClient.delete(`/asset-resources/${assetId}/photos/${photoId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["asset-photos", assetId] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["asset-photos", assetId] }); setDeletingPhoto(null); },
   });
 
   function update<K extends keyof AssetFormValues>(key: K, value: AssetFormValues[K]) {
@@ -317,7 +319,7 @@ export function AssetFormModal({
                     <img src={p.url} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 4 }} />
                     <button
                       type="button"
-                      onClick={() => galleryDeleteMutation.mutate(p.id)}
+                      onClick={() => setDeletingPhoto(p)}
                       style={{ position: "absolute", top: -4, right: -4, background: "var(--color-danger)", color: "#fff", border: "none", borderRadius: "50%", width: 16, height: 16, fontSize: 10, lineHeight: "16px", cursor: "pointer", padding: 0 }}
                     >
                       ×
@@ -330,6 +332,17 @@ export function AssetFormModal({
         </div>
       ) : (
         <p className="muted" style={{ fontSize: 12 }}>Save this asset first to upload a featured image and photo gallery.</p>
+      )}
+
+      {deletingPhoto && (
+        <ConfirmDialog
+          title="Delete photo"
+          message="Are you sure you want to remove this photo from the gallery? This cannot be undone."
+          danger
+          loading={galleryDeleteMutation.isPending}
+          onCancel={() => setDeletingPhoto(null)}
+          onConfirm={() => galleryDeleteMutation.mutate(deletingPhoto.id)}
+        />
       )}
     </FormModal>
   );

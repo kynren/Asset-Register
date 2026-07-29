@@ -1,7 +1,8 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 interface UserImage {
   id: number;
@@ -11,6 +12,7 @@ interface UserImage {
 
 export function AvatarGallery({ currentAvatarUrl, onSelect }: { currentAvatarUrl: string | null; onSelect: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [deleting, setDeleting] = useState<UserImage | null>(null);
   const queryClient = useQueryClient();
 
   const { data: images } = useQuery({
@@ -32,7 +34,7 @@ export function AvatarGallery({ currentAvatarUrl, onSelect }: { currentAvatarUrl
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/profile/images/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile-images"] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["profile-images"] }); setDeleting(null); },
   });
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -60,7 +62,7 @@ export function AvatarGallery({ currentAvatarUrl, onSelect }: { currentAvatarUrl
           >
             <img src={img.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             <button
-              onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(img.id); }}
+              onClick={(e) => { e.stopPropagation(); setDeleting(img); }}
               style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", border: "none", borderRadius: 4, color: "#fff", cursor: "pointer", padding: 2 }}
             >
               <Icon name="close" size={10} />
@@ -78,6 +80,17 @@ export function AvatarGallery({ currentAvatarUrl, onSelect }: { currentAvatarUrl
         <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleChange} />
       </div>
       <p className="muted" style={{ fontSize: 11 }}>Upload photos and click one to set it as your profile picture.</p>
+
+      {deleting && (
+        <ConfirmDialog
+          title="Delete photo"
+          message="Are you sure you want to delete this photo? This cannot be undone."
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate(deleting.id)}
+        />
+      )}
     </div>
   );
 }

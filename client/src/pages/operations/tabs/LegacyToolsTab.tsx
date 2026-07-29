@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
-import { CsvImportButton } from "../../../components/CsvButtons";
 import { PermissionGate } from "../../../auth/PermissionGate";
+import { AssetImportWizardModal } from "../../assets/AssetImportWizardModal";
 
 const STATUS_OPTIONS = ["IN_USE", "IN_STORAGE", "IN_REPAIR", "RETIRED", "LOST"];
 const REPORTS = [
@@ -16,7 +16,7 @@ const REPORTS = [
 export function LegacyToolsTab() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkStatus, setBulkStatus] = useState("IN_STORAGE");
-  const [importResult, setImportResult] = useState<{ created: number; errors: string[] } | null>(null);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: assets } = useQuery({
@@ -79,12 +79,15 @@ export function LegacyToolsTab() {
             <button className="ad-btn ad-btn-primary" disabled={selectedIds.length === 0 || bulkMutation.isPending} onClick={() => bulkMutation.mutate()}>
               Apply to {selectedIds.length} selected
             </button>
-            <CsvImportButton url="/assets/import" onImported={(res) => { setImportResult(res); queryClient.invalidateQueries({ queryKey: ["assets-for-bulk"] }); }} />
+            <button className="ad-btn" onClick={() => setShowImportWizard(true)}>
+              <Icon name="upload" size={13} /> Import CSV
+            </button>
           </div>
-          {importResult && (
-            <div className={`ad-badge ${importResult.errors.length ? "ad-badge-warning" : "ad-badge-success"}`} style={{ display: "block", width: "fit-content", marginBottom: 12 }}>
-              Imported {importResult.created} asset(s). {importResult.errors.length > 0 && `${importResult.errors.length} row(s) had errors.`}
-            </div>
+          {showImportWizard && (
+            <AssetImportWizardModal
+              onClose={() => setShowImportWizard(false)}
+              onImported={() => queryClient.invalidateQueries({ queryKey: ["assets-for-bulk"] })}
+            />
           )}
           <div style={{ maxHeight: 260, overflowY: "auto" }}>
             <table className="ad-table">

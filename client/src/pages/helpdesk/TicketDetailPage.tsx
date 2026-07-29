@@ -7,6 +7,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { Icon } from "../../components/Icon";
 import { PermissionGate, usePermission } from "../../auth/PermissionGate";
 import { useAuth } from "../../auth/AuthContext";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 const STATUS_FLOW = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 
@@ -27,6 +28,7 @@ export function TicketDetailPage() {
   const [ratingValue, setRatingValue] = useState(5);
   const [ratingComment, setRatingComment] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deletingAttachment, setDeletingAttachment] = useState<{ id: number; filename: string } | null>(null);
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ["ticket", id],
@@ -70,7 +72,7 @@ export function TicketDetailPage() {
 
   const deleteAttachmentMutation = useMutation({
     mutationFn: (attachmentId: number) => axiosClient.delete(`/tickets/${id}/attachments/${attachmentId}`),
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); setDeletingAttachment(null); },
   });
 
   function handleAddComment(e: FormEvent) {
@@ -199,7 +201,7 @@ export function TicketDetailPage() {
                   <Icon name="paperclip" size={13} /> {a.filename} <span className="muted">({formatBytes(a.sizeBytes)})</span>
                 </span>
                 <PermissionGate module="helpdesk" action="edit">
-                  <button className="btn btn-danger btn-sm btn-icon" onClick={() => deleteAttachmentMutation.mutate(a.id)}><Icon name="trash" size={12} /></button>
+                  <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeletingAttachment({ id: a.id, filename: a.filename })}><Icon name="trash" size={12} /></button>
                 </PermissionGate>
               </div>
             ))}
@@ -248,6 +250,17 @@ export function TicketDetailPage() {
           </form>
         </PermissionGate>
       </div>
+
+      {deletingAttachment && (
+        <ConfirmDialog
+          title="Delete attachment"
+          message={`Are you sure you want to delete "${deletingAttachment.filename}"? This cannot be undone.`}
+          danger
+          loading={deleteAttachmentMutation.isPending}
+          onCancel={() => setDeletingAttachment(null)}
+          onConfirm={() => deleteAttachmentMutation.mutate(deletingAttachment.id)}
+        />
+      )}
     </div>
   );
 }

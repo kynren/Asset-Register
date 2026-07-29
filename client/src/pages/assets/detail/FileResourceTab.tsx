@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { FieldConfig } from "./SubResourceTab";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 interface FileResourceTabProps {
   assetId: number;
@@ -21,6 +22,7 @@ export function FileResourceTab({ assetId, resource, title, subtitle, addLabel, 
   const [values, setValues] = useState<Record<string, string>>({});
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleting, setDeleting] = useState<Record<string, any> | null>(null);
   const queryKey = ["asset-resource", assetId, resource];
 
   const { data: items, isLoading } = useQuery({
@@ -40,7 +42,7 @@ export function FileResourceTab({ assetId, resource, title, subtitle, addLabel, 
 
   const deleteMutation = useMutation({
     mutationFn: (itemId: number) => axiosClient.delete(`/asset-resources/${assetId}/${resource}/${itemId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey }); setDeleting(null); },
   });
 
   function handleSubmit() {
@@ -109,7 +111,7 @@ export function FileResourceTab({ assetId, resource, title, subtitle, addLabel, 
                       <Icon name="download" size={12} /> Open
                     </a>
                   )}
-                  <button className="ad-btn ad-btn-danger" onClick={() => deleteMutation.mutate(item.id)} disabled={deleteMutation.isPending}>
+                  <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(item)} disabled={deleteMutation.isPending}>
                     <Icon name="trash" size={12} />
                   </button>
                 </div>
@@ -120,6 +122,17 @@ export function FileResourceTab({ assetId, resource, title, subtitle, addLabel, 
           <div className="ad-empty">No {title.toLowerCase()} attached to this asset yet.</div>
         )}
       </div>
+
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete ${title.toLowerCase().replace(/s$/, "")}`}
+          message={`Are you sure you want to delete "${deleting[primaryField]}"? This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate(deleting.id)}
+        />
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { axiosClient } from "../../api/axiosClient";
 import { useBranding } from "../../theme/BrandingContext";
+import { PasswordInput } from "../../components/PasswordInput";
 
 export function ResetPasswordPage() {
   const { token } = useParams();
@@ -50,11 +51,11 @@ export function ResetPasswordPage() {
           <>
             <div className="field">
               <label>New Password</label>
-              <input className="input" type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoFocus />
+              <PasswordInput required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoFocus />
             </div>
             <div className="field">
               <label>Confirm New Password</label>
-              <input className="input" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              <PasswordInput required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </div>
             <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 4 }}>
               {loading ? "Resetting..." : "Reset Password"}

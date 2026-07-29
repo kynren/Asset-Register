@@ -6,6 +6,7 @@ import { Icon } from "../../components/Icon";
 import { DataTable } from "../../components/DataTable";
 import { AssetCategoriesTable } from "./AssetCategoriesTable";
 import { FormTemplatesSection } from "./FormTemplatesSection";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 interface ListItem {
   id: number;
@@ -16,6 +17,7 @@ interface ListItem {
 function SimpleListManager({ title, url, queryKey, extraField }: { title: string; url: string; queryKey: string; extraField?: string }) {
   const [name, setName] = useState("");
   const [extra, setExtra] = useState("");
+  const [deleting, setDeleting] = useState<ListItem | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({ queryKey: [queryKey], queryFn: async () => (await axiosClient.get(url)).data as ListItem[] });
@@ -27,7 +29,7 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`${url}/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [queryKey] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [queryKey] }); setDeleting(null); },
   });
 
   function handleSubmit(e: FormEvent) {
@@ -42,7 +44,7 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
       header: "",
       id: "actions",
       cell: ({ row }) => (
-        <button className="btn btn-danger btn-sm btn-icon" onClick={() => deleteMutation.mutate(row.original.id)}>
+        <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
           <Icon name="trash" size={13} />
         </button>
       ),
@@ -58,6 +60,17 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
         <button className="btn btn-primary btn-sm" type="submit" disabled={createMutation.isPending}><Icon name="plus" size={13} /> Add</button>
       </form>
       <DataTable columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={5} emptyMessage="None added yet." />
+
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete "${deleting.name}"`}
+          message={`Are you sure you want to delete "${deleting.name}"? This cannot be undone.`}
+          danger
+          loading={deleteMutation.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => deleteMutation.mutate(deleting.id)}
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { getPagination, paginatedResponse } from "../../lib/pagination";
+import { notifyUsers, getUserIdsWithPermission } from "../../lib/notify";
 
 export async function list(req: Request, res: Response) {
   const { page, pageSize, skip, take } = getPagination(req);
@@ -95,6 +96,19 @@ export async function addTransaction(req: Request, res: Response) {
   ]);
 
   await logAudit({ userId: req.user!.id, action: "stockTransaction.create", entityType: "StockItem", entityId: stockItemId, metadata: { type, quantity, locationId } });
+
+  const newQuantityOnHand = item.quantityOnHand + delta;
+  if (newQuantityOnHand <= item.reorderLevel && item.quantityOnHand > item.reorderLevel) {
+    const recipients = await getUserIdsWithPermission("stock", "canEdit");
+    await notifyUsers({
+      userIds: recipients,
+      excludeUserId: req.user!.id,
+      type: "stock_low",
+      message: `"${item.name}" has dropped to ${newQuantityOnHand} on hand (reorder level: ${item.reorderLevel})`,
+      linkUrl: `/stock`,
+    });
+  }
+
   res.status(201).json(transaction);
 }
 

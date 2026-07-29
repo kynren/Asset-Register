@@ -16,3 +16,13 @@ export async function notifyUsers({ userIds, excludeUserId, type, message, linkU
     data: recipients.map((userId) => ({ userId, type, message, linkUrl })),
   });
 }
+
+// Resolves the user IDs whose role grants a given module/action permission — used to notify
+// e.g. everyone who can edit stock, rather than a single fixed recipient.
+export async function getUserIdsWithPermission(module: string, action: "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport"): Promise<number[]> {
+  const users = await prisma.user.findMany({
+    where: { isActive: true, role: { permissions: { some: { module, [action]: true } } } },
+    select: { id: true },
+  });
+  return users.map((u) => u.id);
+}
