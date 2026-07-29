@@ -2,3 +2,9 @@
 @import "./styles/layout.css";
 @import "./styles/assetDetail.css";
 @import "./styles/operationsTools.css";
+@import "./styles/networkTopology.css";
+@import "./styles/formCard.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

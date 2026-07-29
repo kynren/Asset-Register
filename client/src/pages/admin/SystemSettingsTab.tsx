@@ -93,6 +93,26 @@ export function SystemSettingsTab() {
         <div className="field"><label>Company Name</label><input className="input" value={values.companyName ?? ""} onChange={(e) => setValues((v) => ({ ...v, companyName: e.target.value }))} /></div>
         <div className="field"><label>Minimum Password Length</label><input className="input" type="number" value={values.passwordMinLength ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordMinLength: e.target.value }))} /></div>
         <div className="field"><label>Device Offline Threshold (minutes)</label><input className="input" type="number" value={values.deviceOfflineThresholdMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, deviceOfflineThresholdMinutes: e.target.value }))} /></div>
+        <div className="field"><label>Camera Recording Retention (days)</label><input className="input" type="number" value={values.cameraRetentionDays ?? ""} onChange={(e) => setValues((v) => ({ ...v, cameraRetentionDays: e.target.value }))} /></div>
+        <button className="btn btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>Save</button>
+      </div>
+
+      <div className="card" style={{ maxWidth: 480 }}>
+        <h3 className="mt-0">Password &amp; Login Security Policy</h3>
+        <div className="field">
+          <label className="row gap-2" style={{ cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={values.passwordRequireComplexity === "true"}
+              onChange={(e) => setValues((v) => ({ ...v, passwordRequireComplexity: e.target.checked ? "true" : "false" }))}
+            />
+            Require uppercase, lowercase, number &amp; symbol
+          </label>
+        </div>
+        <div className="field"><label>Password Expiry (days, blank = never)</label><input className="input" type="number" value={values.passwordMaxAgeDays ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordMaxAgeDays: e.target.value }))} /></div>
+        <div className="field"><label>Prevent Reuse of Last N Passwords</label><input className="input" type="number" value={values.passwordHistoryCount ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordHistoryCount: e.target.value }))} /></div>
+        <div className="field"><label>Max Failed Login Attempts</label><input className="input" type="number" value={values.maxFailedLoginAttempts ?? ""} onChange={(e) => setValues((v) => ({ ...v, maxFailedLoginAttempts: e.target.value }))} /></div>
+        <div className="field"><label>Lockout Duration (minutes)</label><input className="input" type="number" value={values.lockoutDurationMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, lockoutDurationMinutes: e.target.value }))} /></div>
         <button className="btn btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>Save</button>
       </div>
 

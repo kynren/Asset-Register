@@ -1,145 +1,123 @@
-.ot-shell { display: flex; flex-direction: column; min-height: calc(100vh - 140px); }
+@layer components {
+  .ot-shell {
+    @apply flex flex-col;
+    min-height: calc(100vh - 140px);
+  }
 
-.ot-header {
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--ad-border);
-}
-.ot-header-top { display: flex; align-items: center; gap: 12px; }
-.ot-header-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: rgba(59, 130, 246, 0.16);
-  color: var(--ad-accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.ot-header-title { font-size: 18px; font-weight: 700; margin: 0; }
-.ot-header-subtitle { font-size: 12px; color: var(--ad-text-muted); margin: 3px 0 0; }
+  .ot-header {
+    @apply px-[22px] py-[18px] border-b border-ad-border;
+  }
+  .ot-header-top {
+    @apply flex items-center gap-3;
+  }
+  .ot-header-icon {
+    @apply w-[38px] h-[38px] rounded-[10px] bg-primary-soft text-ad-accent flex items-center justify-center flex-shrink-0;
+  }
+  .ot-header-title {
+    @apply text-lg font-bold m-0;
+  }
+  .ot-header-subtitle {
+    @apply text-xs text-ad-text-muted mt-[3px];
+  }
 
-.ot-tabs {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 16px;
-}
-.ot-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ad-text-muted);
-  background: none;
-  border: 1px solid transparent;
-  cursor: pointer;
-  font-family: inherit;
-  white-space: nowrap;
-}
-.ot-tab:hover { background: var(--ad-surface); color: var(--ad-text); }
-.ot-tab.active { background: var(--ad-accent); color: #fff; }
+  .ot-tabs {
+    @apply flex gap-1.5 flex-wrap mt-4;
+  }
+  .ot-tab {
+    @apply inline-flex items-center gap-[7px] px-3.5 py-2 rounded-lg text-xs font-semibold text-ad-text-muted bg-transparent border border-transparent cursor-pointer font-sans whitespace-nowrap;
+  }
+  .ot-tab:hover {
+    @apply bg-ad-surface text-ad-text;
+  }
+  .ot-tab.active {
+    @apply bg-ad-accent text-white;
+  }
 
-.ot-body { flex: 1; padding: 20px 22px; overflow-y: auto; }
-.ot-body-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: var(--ad-surface);
-  border: 1px solid var(--ad-border);
-  border-radius: 10px;
-  padding: 16px 18px;
-  margin-bottom: 18px;
-  flex-wrap: wrap;
-}
-.ot-body-header-text { font-size: 13px; color: var(--ad-text-muted); }
+  .ot-body {
+    @apply flex-1 px-[22px] py-5 overflow-y-auto;
+  }
+  .ot-body-header {
+    @apply flex items-center justify-between gap-3 bg-ad-surface border border-ad-border rounded-[10px] px-[18px] py-4 mb-[18px] flex-wrap;
+  }
+  .ot-body-header-text {
+    @apply text-[13px] text-ad-text-muted;
+  }
 
-.ot-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; align-items: start; }
-@media (max-width: 1100px) { .ot-board { grid-template-columns: repeat(2, 1fr); } }
+  .ot-board {
+    @apply grid grid-cols-4 gap-3.5 items-start;
+  }
+  @media (max-width: 1100px) {
+    .ot-board {
+      @apply grid-cols-2;
+    }
+  }
 
-.ot-column {
-  background: var(--ad-surface-2);
-  border: 1px solid var(--ad-border);
-  border-radius: 10px;
-  padding: 12px;
-  min-height: 120px;
-}
-.ot-column-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--ad-text-muted);
-  margin-bottom: 10px;
-  padding: 0 2px;
-}
-.ot-column-count {
-  background: var(--ad-border);
-  color: var(--ad-text);
-  border-radius: 6px;
-  font-size: 11px;
-  padding: 1px 7px;
-  font-weight: 700;
-}
+  .ot-column {
+    @apply bg-ad-surface-2 border border-ad-border rounded-[10px] p-3 min-h-[120px];
+  }
+  .ot-column-header {
+    @apply flex items-center justify-between text-[11px] font-bold tracking-wide text-ad-text-muted mb-2.5 px-0.5;
+  }
+  .ot-column-count {
+    @apply bg-ad-border text-ad-text rounded-md text-[11px] px-[7px] py-px font-bold;
+  }
 
-.ot-card {
-  background: var(--ad-surface);
-  border: 1px solid var(--ad-border);
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 10px;
-}
-.ot-card:last-child { margin-bottom: 0; }
-.ot-card-title { font-size: 13px; font-weight: 700; color: var(--ad-text); margin-bottom: 4px; }
-.ot-card-desc { font-size: 11px; color: var(--ad-text-muted); line-height: 1.5; margin-bottom: 10px; }
-.ot-card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--ad-text-muted);
-  padding-top: 8px;
-  border-top: 1px solid var(--ad-border);
-}
-.ot-card-assignee { display: flex; align-items: center; gap: 5px; }
-.ot-card-actions { display: flex; gap: 4px; margin-top: 8px; }
-.ot-card-move-btn {
-  width: 24px; height: 24px;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--ad-surface-2);
-  border: 1px solid var(--ad-border);
-  border-radius: 6px;
-  color: var(--ad-text);
-  cursor: pointer;
-}
-.ot-card-move-btn:hover:not(:disabled) { background: var(--ad-border); }
-.ot-card-move-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.ot-card-delete-btn {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: var(--ad-text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-}
-.ot-card-delete-btn:hover { color: var(--ad-danger); }
-.ot-column-empty { font-size: 11px; color: var(--ad-text-muted); text-align: center; padding: 16px 4px; }
+  .ot-card {
+    @apply bg-ad-surface border border-ad-border rounded-lg p-3 mb-2.5;
+  }
+  .ot-card:last-child {
+    @apply mb-0;
+  }
+  .ot-card-title {
+    @apply text-[13px] font-bold text-ad-text mb-1;
+  }
+  .ot-card-desc {
+    @apply text-[11px] text-ad-text-muted leading-relaxed mb-2.5;
+  }
+  .ot-card-footer {
+    @apply flex items-center justify-between text-[11px] text-ad-text-muted pt-2 border-t border-ad-border;
+  }
+  .ot-card-assignee {
+    @apply flex items-center gap-[5px];
+  }
+  .ot-card-actions {
+    @apply flex gap-1 mt-2;
+  }
+  .ot-card-move-btn {
+    @apply w-6 h-6 flex items-center justify-center bg-ad-surface-2 border border-ad-border rounded-md text-ad-text cursor-pointer;
+  }
+  .ot-card-move-btn:hover:not(:disabled) {
+    @apply bg-ad-border;
+  }
+  .ot-card-move-btn:disabled {
+    @apply opacity-30 cursor-not-allowed;
+  }
+  .ot-card-delete-btn {
+    @apply ml-auto bg-transparent border-none text-ad-text-muted cursor-pointer flex items-center;
+  }
+  .ot-card-delete-btn:hover {
+    @apply text-ad-danger;
+  }
+  .ot-column-empty {
+    @apply text-[11px] text-ad-text-muted text-center py-4 px-1;
+  }
 
-.ot-list { display: flex; flex-direction: column; gap: 10px; }
-.ot-item {
-  background: var(--ad-surface);
-  border: 1px solid var(--ad-border);
-  border-radius: 8px;
-  padding: 14px;
+  .ot-list {
+    @apply flex flex-col gap-2.5;
+  }
+  .ot-item {
+    @apply bg-ad-surface border border-ad-border rounded-lg p-3.5;
+  }
+  .ot-item-top {
+    @apply flex items-start justify-between gap-2.5;
+  }
+  .ot-item-title {
+    @apply text-[13px] font-bold;
+  }
+  .ot-item-meta {
+    @apply text-[11px] text-ad-text-muted mt-1;
+  }
+  .ot-item-body {
+    @apply text-xs text-ad-text-muted mt-2 leading-relaxed;
+  }
 }
-.ot-item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.ot-item-title { font-size: 13px; font-weight: 700; }
-.ot-item-meta { font-size: 11px; color: var(--ad-text-muted); margin-top: 4px; }
-.ot-item-body { font-size: 12px; color: var(--ad-text-muted); margin-top: 8px; line-height: 1.6; }

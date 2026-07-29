@@ -33,6 +33,10 @@ export const ptzCommandSchema = z.object({
   command: z.enum(["UP", "DOWN", "LEFT", "RIGHT", "ZOOM_IN", "ZOOM_OUT", "HOME"]),
 });
 
+export const gotoPresetSchema = z.object({
+  presetToken: z.string().min(1),
+});
+
 export const cameraEventSchema = z.object({
   type: z.string().min(1),
   message: z.string().optional(),

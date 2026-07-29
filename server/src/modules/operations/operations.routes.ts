@@ -7,6 +7,7 @@ import { validateBody } from "../../middleware/validate";
 import { logAudit } from "../../lib/auditLogger";
 import { toCsv } from "../../lib/csv";
 import { bulkStatusSchema } from "../assets/assets.schema";
+import { runMaintenanceAlertCheck } from "../../lib/maintenanceAlerts";
 import projectsRoutes from "./projects.routes";
 import rssRoutes from "./rss.routes";
 import knowledgeRoutes from "./knowledge.routes";
@@ -38,6 +39,23 @@ router.get("/maintenance-due", requirePermission("operations", "view"), async (_
     orderBy: { nextServiceDate: "asc" },
   });
   res.json(assets);
+});
+
+router.get("/warranty-expiring", requirePermission("operations", "view"), async (req, res) => {
+  const days = Number(req.query.days) || 30;
+  const horizon = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  const assets = await prisma.asset.findMany({
+    where: { warrantyExpiresAt: { gte: new Date(), lte: horizon } },
+    include: { category: true, location: true, assignedTo: { select: { firstName: true, lastName: true } } },
+    orderBy: { warrantyExpiresAt: "asc" },
+  });
+  res.json(assets);
+});
+
+router.post("/maintenance-alerts/run", requirePermission("operations", "edit"), async (req, res) => {
+  const result = await runMaintenanceAlertCheck();
+  await logAudit({ userId: req.user!.id, action: "operations.maintenance_alerts_run", metadata: result });
+  res.json(result);
 });
 
 router.get("/reports/:type", requirePermission("operations", "export"), async (req, res) => {

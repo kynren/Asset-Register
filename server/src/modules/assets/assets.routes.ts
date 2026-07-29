@@ -4,7 +4,7 @@ import { verifyJwt } from "../../middleware/auth";
 import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import * as controller from "./assets.controller";
-import { createAssetSchema, updateAssetSchema } from "./assets.schema";
+import { checkinSchema, checkoutSchema, createAssetSchema, updateAssetSchema } from "./assets.schema";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -17,6 +17,11 @@ router.get("/by-tag/:tag", requirePermission("assets", "view"), controller.getBy
 router.get("/export", requirePermission("assets", "export"), controller.exportCsv);
 router.get("/export.json", requirePermission("assets", "export"), controller.exportJson);
 router.get("/:id/history", requirePermission("assets", "view"), controller.history);
+router.get("/:id/report", requirePermission("assets", "view"), controller.report);
+router.get("/:id/report/pdf", requirePermission("assets", "export"), controller.reportPdf);
+router.get("/:id/checkouts", requirePermission("assets", "view"), controller.listCheckouts);
+router.post("/:id/checkout", requirePermission("assets", "edit"), validateBody(checkoutSchema), controller.checkoutAsset);
+router.post("/:id/checkin", requirePermission("assets", "edit"), validateBody(checkinSchema), controller.checkinAsset);
 router.get("/:id", requirePermission("assets", "view"), controller.getOne);
 router.post("/", requirePermission("assets", "create"), validateBody(createAssetSchema), controller.create);
 router.post("/import", requirePermission("assets", "create"), upload.single("file"), controller.importCsv);

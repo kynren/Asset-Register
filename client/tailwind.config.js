@@ -1,0 +1,67 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  darkMode: ["selector", '[data-theme="dark"]'],
+  theme: {
+    extend: {
+      colors: {
+        bg: "var(--color-bg)",
+        surface: "var(--color-surface)",
+        border: "var(--color-border)",
+        text: "var(--color-text)",
+        "text-muted": "var(--color-text-muted)",
+        primary: "var(--color-primary)",
+        "primary-hover": "var(--color-primary-hover)",
+        "primary-soft": "var(--color-primary-soft)",
+        success: "var(--color-success)",
+        "success-soft": "var(--color-success-soft)",
+        warning: "var(--color-warning)",
+        "warning-soft": "var(--color-warning-soft)",
+        danger: "var(--color-danger)",
+        "danger-soft": "var(--color-danger-soft)",
+        "sidebar-bg": "var(--color-sidebar-bg)",
+        "sidebar-text": "var(--color-sidebar-text)",
+        "sidebar-text-active": "var(--color-sidebar-text-active)",
+        "sidebar-hover": "var(--color-sidebar-hover)",
+        "tb-bg": "var(--tb-bg)",
+        "tb-border": "var(--tb-border)",
+        "tb-text": "var(--tb-text)",
+        "tb-muted": "var(--tb-muted)",
+        "tb-green": "var(--tb-green)",
+        "tb-cyan": "var(--tb-cyan)",
+        "tb-blue": "var(--tb-blue)",
+        "ad-bg": "var(--ad-bg)",
+        "ad-surface": "var(--ad-surface)",
+        "ad-surface-2": "var(--ad-surface-2)",
+        "ad-border": "var(--ad-border)",
+        "ad-text": "var(--ad-text)",
+        "ad-text-muted": "var(--ad-text-muted)",
+        "ad-accent": "var(--ad-accent)",
+        "ad-success": "var(--ad-success)",
+        "ad-danger": "var(--ad-danger)",
+        "ad-warning": "var(--ad-warning)",
+      },
+      borderRadius: {
+        DEFAULT: "var(--radius)",
+      },
+      boxShadow: {
+        sm: "var(--shadow-sm)",
+        md: "var(--shadow-md)",
+      },
+      spacing: {
+        "sidebar": "var(--sidebar-width)",
+        "sidebar-collapsed": "var(--sidebar-width-collapsed)",
+      },
+      keyframes: {
+        "topology-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.35" },
+        },
+      },
+      animation: {
+        "topology-pulse": "topology-pulse 1.2s ease-in-out infinite",
+      },
+    },
+  },
+  plugins: [],
+};

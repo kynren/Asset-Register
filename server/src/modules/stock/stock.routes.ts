@@ -3,7 +3,7 @@ import { verifyJwt } from "../../middleware/auth";
 import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import * as controller from "./stock.controller";
-import { createStockItemSchema, createTransactionSchema, updateStockItemSchema } from "./stock.schema";
+import { createStockItemSchema, createTransactionSchema, createTransferSchema, updateStockItemSchema } from "./stock.schema";
 
 const router = Router();
 router.use(verifyJwt);
@@ -16,5 +16,6 @@ router.post("/", requirePermission("stock", "create"), validateBody(createStockI
 router.patch("/:id", requirePermission("stock", "edit"), validateBody(updateStockItemSchema), controller.update);
 router.delete("/:id", requirePermission("stock", "delete"), controller.remove);
 router.post("/:id/transactions", requirePermission("stock", "edit"), validateBody(createTransactionSchema), controller.addTransaction);
+router.post("/:id/transfer", requirePermission("stock", "edit"), validateBody(createTransferSchema), controller.transferStock);
 
 export default router;

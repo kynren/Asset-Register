@@ -9,6 +9,7 @@ import { PermissionGate } from "../../auth/PermissionGate";
 import { NvrFormModal, NvrFormValues } from "./NvrFormModal";
 import { CameraFormModal, CameraFormValues } from "./CameraFormModal";
 import { PtzControlModal } from "./PtzControlModal";
+import { CameraOpsModal } from "./CameraOpsModal";
 import { LiveFeedPreview } from "./LiveFeedPreview";
 
 interface Camera {
@@ -46,6 +47,7 @@ export function DeviceManagementTab() {
   const [editingCamera, setEditingCamera] = useState<Camera | null>(null);
   const [liveFeedCamera, setLiveFeedCamera] = useState<Camera | null>(null);
   const [ptzCamera, setPtzCamera] = useState<Camera | null>(null);
+  const [opsCamera, setOpsCamera] = useState<Camera | null>(null);
   const queryClient = useQueryClient();
 
   const { data: nvrs, isLoading } = useQuery({
@@ -170,6 +172,7 @@ export function DeviceManagementTab() {
                           <button className="btn btn-secondary btn-sm" onClick={() => setEditingCamera(cam)} title="Edit camera">
                             <Icon name="edit" size={12} />
                           </button>
+                          <button className="btn btn-secondary btn-sm" onClick={() => setOpsCamera(cam)} title="Recording &amp; motion detection">Ops</button>
                           {cam.ptzEnabled && (
                             <button className="btn btn-secondary btn-sm" onClick={() => setPtzCamera(cam)}>PTZ</button>
                           )}
@@ -243,6 +246,7 @@ export function DeviceManagementTab() {
         </FormModal>
       )}
       {ptzCamera && <PtzControlModal cameraId={ptzCamera.id} cameraName={ptzCamera.name} onClose={() => setPtzCamera(null)} />}
+      {opsCamera && <CameraOpsModal cameraId={opsCamera.id} cameraName={opsCamera.name} onClose={() => setOpsCamera(null)} />}
     </div>
   );
 }

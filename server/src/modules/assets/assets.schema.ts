@@ -30,9 +30,20 @@ export const createAssetSchema = z.object({
   antivirusProduct: z.string().nullable().optional(),
   antivirusStatus: z.string().nullable().optional(),
   antivirusLastScanAt: z.string().datetime().nullable().optional(),
+  customFieldValues: z.array(z.object({ fieldId: z.number().int(), value: z.string().nullable() })).optional(),
 });
 
 export const updateAssetSchema = createAssetSchema.partial();
+
+export const checkoutSchema = z.object({
+  checkedOutToId: z.number().int(),
+  dueBackAt: z.string().datetime().nullable().optional(),
+  notes: z.string().optional(),
+});
+
+export const checkinSchema = z.object({
+  notes: z.string().optional(),
+});
 
 export const bulkStatusSchema = z.object({
   assetIds: z.array(z.number().int()).min(1),
