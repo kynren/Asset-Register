@@ -8,6 +8,7 @@ import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { isOnline } from "../../lib/network";
 import { pingHost } from "../../lib/ping";
+import { streamPing } from "../../lib/pingStream";
 import { createEdgeSchema, createNodeSchema, updateNodeSchema } from "./network.schema";
 import { startScan } from "./scan.service";
 
@@ -20,9 +21,22 @@ router.get("/graph", requirePermission("network", "view"), async (_req, res) => 
     prisma.networkEdge.findMany(),
   ]);
 
-  const shapedNodes = nodes.map((n) => ({
+  // Live-classify each node's status from a real ICMP probe of its IP (falling back to the
+  // linked device's most recently reported address), not a fabricated/static value.
+  const liveStatuses = await Promise.all(
+    nodes.map(async (n) => {
+      const ip = n.ipAddress ?? n.device?.ipAddresses?.[0] ?? null;
+      if (!ip) return { latencyMs: null as number | null, status: null as "ONLINE" | "DEGRADED" | "OFFLINE" | null };
+      const { alive, responseTimeMs } = await pingHost(ip, 800);
+      if (!alive) return { latencyMs: null, status: "OFFLINE" as const };
+      return { latencyMs: responseTimeMs, status: (responseTimeMs !== null && responseTimeMs > 50 ? "DEGRADED" : "ONLINE") as "DEGRADED" | "ONLINE" };
+    })
+  );
+
+  const shapedNodes = nodes.map((n, i) => ({
     id: n.id,
     type: n.type,
+    role: n.role,
     label: n.label,
     ipAddress: n.ipAddress,
     subnet: n.subnet,
@@ -33,6 +47,8 @@ router.get("/graph", requirePermission("network", "view"), async (_req, res) => 
     deviceId: n.deviceId,
     online: n.device ? isOnline(n.device.lastSeen) : null,
     lastSeen: n.device?.lastSeen ?? null,
+    latencyMs: liveStatuses[i].latencyMs,
+    liveStatus: liveStatuses[i].status,
   }));
 
   res.json({ nodes: shapedNodes, edges });
@@ -73,6 +89,24 @@ router.delete("/edges/:id", requirePermission("network", "delete"), async (req, 
 router.post("/ping", requirePermission("network", "view"), validateBody(z.object({ ipAddress: z.string().min(1) })), async (req, res) => {
   const result = await pingHost(req.body.ipAddress);
   res.json(result);
+});
+
+router.get("/ping-stream", requirePermission("network", "view"), (req, res) => {
+  const host = String(req.query.host ?? "");
+  if (!host || host.length > 253 || !/^[a-zA-Z0-9.:_-]+$/.test(host)) {
+    res.status(400).json({ error: "Invalid host" });
+    return;
+  }
+  const countParam = req.query.count;
+  const count = countParam === "continuous" ? ("continuous" as const) : Math.min(50, Math.max(1, Number(countParam) || 4));
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const proc = streamPing(host, count, res, () => res.end());
+  req.on("close", () => proc.kill());
 });
 
 router.post(

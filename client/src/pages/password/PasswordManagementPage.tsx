@@ -2,6 +2,8 @@ import { FormEvent, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { VaultTab } from "./VaultTab";
+import { MfaCard } from "./MfaCard";
+import { SessionsCard } from "./SessionsCard";
 
 function AccountSecurityTab() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -45,9 +47,18 @@ function AccountSecurityTab() {
         <div className="field"><label>Current Password</label><input className="input" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required /></div>
         <div className="field"><label>New Password</label><input className="input" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required /></div>
         <div className="field"><label>Confirm New Password</label><input className="input" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required /></div>
-        <p className="muted" style={{ fontSize: 12 }}>Minimum 10 characters.</p>
         <button className="btn btn-primary" type="submit" disabled={mutation.isPending}>{mutation.isPending ? "Saving..." : "Change Password"}</button>
       </form>
+    </div>
+  );
+}
+
+function AccountSecuritySection() {
+  return (
+    <div className="stack gap-3">
+      <AccountSecurityTab />
+      <MfaCard />
+      <SessionsCard />
     </div>
   );
 }
@@ -79,7 +90,7 @@ export function PasswordManagementPage() {
         ))}
       </div>
 
-      {tab === "vault" ? <VaultTab /> : <AccountSecurityTab />}
+      {tab === "vault" ? <VaultTab /> : <AccountSecuritySection />}
     </div>
   );
 }

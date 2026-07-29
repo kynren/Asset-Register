@@ -3,6 +3,8 @@ import { AppShell } from "./layout/AppShell";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { PermissionGate } from "./auth/PermissionGate";
 import { LoginPage } from "./pages/auth/LoginPage";
+import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
+import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { ForceChangePasswordPage } from "./pages/auth/ForceChangePasswordPage";
 import { DashboardPage } from "./pages/dashboard/DashboardPage";
 import { AssetListPage } from "./pages/assets/AssetListPage";
@@ -23,6 +25,8 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/force-change-password" element={<ForceChangePasswordPage />} />

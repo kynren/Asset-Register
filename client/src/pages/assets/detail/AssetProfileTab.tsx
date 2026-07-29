@@ -1,8 +1,20 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import dayjs from "dayjs";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { AssetDetail, AssetPhoto } from "./types";
+
+interface Checkout {
+  id: number;
+  checkedOutAt: string;
+  dueBackAt: string | null;
+  checkedInAt: string | null;
+  notes: string | null;
+  checkedOutTo: { id: number; firstName: string; lastName: string };
+  checkedOutBy: { id: number; firstName: string; lastName: string };
+  checkedInBy: { id: number; firstName: string; lastName: string } | null;
+}
 
 export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUpdated: () => void }) {
   const queryClient = useQueryClient();
@@ -15,6 +27,15 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
   });
 
   const { data: users } = useQuery({ queryKey: ["users-directory"], queryFn: async () => (await axiosClient.get("/users/directory")).data });
+  const { data: checkouts } = useQuery({
+    queryKey: ["asset-checkouts", asset.id],
+    queryFn: async () => (await axiosClient.get(`/assets/${asset.id}/checkouts`)).data as Checkout[],
+  });
+
+  const [showCheckoutForm, setShowCheckoutForm] = useState(false);
+  const [checkoutToId, setCheckoutToId] = useState("");
+  const [dueBackAt, setDueBackAt] = useState("");
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const featuredMutation = useMutation({
     mutationFn: (file: File) => {
@@ -39,9 +60,29 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["asset-photos", asset.id] }),
   });
 
-  const assignMutation = useMutation({
-    mutationFn: (assignedToId: number | null) => axiosClient.patch(`/assets/${asset.id}`, { assignedToId }),
-    onSuccess: onUpdated,
+  const checkoutMutation = useMutation({
+    mutationFn: () =>
+      axiosClient.post(`/assets/${asset.id}/checkout`, {
+        checkedOutToId: Number(checkoutToId),
+        dueBackAt: dueBackAt ? new Date(dueBackAt).toISOString() : null,
+      }),
+    onSuccess: () => {
+      onUpdated();
+      queryClient.invalidateQueries({ queryKey: ["asset-checkouts", asset.id] });
+      setShowCheckoutForm(false);
+      setCheckoutToId("");
+      setDueBackAt("");
+      setCheckoutError(null);
+    },
+    onError: (err: any) => setCheckoutError(err.response?.data?.error ?? "Could not check out this asset."),
+  });
+
+  const checkinMutation = useMutation({
+    mutationFn: () => axiosClient.post(`/assets/${asset.id}/checkin`, {}),
+    onSuccess: () => {
+      onUpdated();
+      queryClient.invalidateQueries({ queryKey: ["asset-checkouts", asset.id] });
+    },
   });
 
   const powerMutation = useMutation({
@@ -127,21 +168,35 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
               </div>
             </div>
             {asset.assignedTo ? (
-              <button className="ad-btn ad-btn-danger" onClick={() => assignMutation.mutate(null)} disabled={assignMutation.isPending}>
-                Un-assign Asset
+              <button className="ad-btn ad-btn-danger" onClick={() => checkinMutation.mutate()} disabled={checkinMutation.isPending}>
+                {checkinMutation.isPending ? "Checking in..." : "Check In"}
               </button>
             ) : (
-              <select
-                className="ad-select"
-                style={{ width: "auto" }}
-                value=""
-                onChange={(e) => e.target.value && assignMutation.mutate(Number(e.target.value))}
-              >
-                <option value="">Assign to...</option>
-                {users?.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-              </select>
+              <button className="ad-btn ad-btn-primary" onClick={() => setShowCheckoutForm((v) => !v)}>
+                Check Out
+              </button>
             )}
           </div>
+
+          {showCheckoutForm && !asset.assignedTo && (
+            <div className="ad-row-card" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+              {checkoutError && <div className="ad-badge ad-badge-danger" style={{ width: "fit-content" }}>{checkoutError}</div>}
+              <div className="ad-field">
+                <label>Check Out To</label>
+                <select className="ad-select" value={checkoutToId} onChange={(e) => setCheckoutToId(e.target.value)}>
+                  <option value="">Select user...</option>
+                  {users?.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+                </select>
+              </div>
+              <div className="ad-field">
+                <label>Due Back</label>
+                <input className="ad-input" type="date" value={dueBackAt} onChange={(e) => setDueBackAt(e.target.value)} />
+              </div>
+              <button className="ad-btn ad-btn-primary" disabled={!checkoutToId || checkoutMutation.isPending} onClick={() => checkoutMutation.mutate()}>
+                {checkoutMutation.isPending ? "Checking out..." : "Confirm Check Out"}
+              </button>
+            </div>
+          )}
 
           <div className="ad-row-card">
             <div className="row gap-2">
@@ -161,6 +216,29 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
               <span className="ad-toggle-slider" />
             </label>
           </div>
+
+          <div className="ad-panel-title" style={{ marginTop: 18 }}>Checkout History</div>
+          {checkouts && checkouts.length > 0 ? (
+            <div className="stack gap-2">
+              {checkouts.map((c) => (
+                <div key={c.id} className="ad-row-card">
+                  <div>
+                    <div className="ad-row-value">
+                      {c.checkedOutTo.firstName} {c.checkedOutTo.lastName}
+                      {!c.checkedInAt && <span className="ad-badge ad-badge-warning" style={{ marginLeft: 8 }}>Active</span>}
+                    </div>
+                    <div className="ad-row-label" style={{ textTransform: "none" }}>
+                      Out {dayjs(c.checkedOutAt).format("DD MMM YYYY")}
+                      {c.dueBackAt && ` · Due ${dayjs(c.dueBackAt).format("DD MMM YYYY")}`}
+                      {c.checkedInAt && ` · Returned ${dayjs(c.checkedInAt).format("DD MMM YYYY")}`}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="ad-empty">No checkout history for this asset yet.</div>
+          )}
         </div>
       </div>
     </div>

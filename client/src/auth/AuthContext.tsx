@@ -15,13 +15,14 @@ export interface AuthUser {
   roleName: string;
   mustChangePassword: boolean;
   lastLoginAt: string | null;
+  mfaEnabled: boolean;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   permissions: PermissionMap;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, mfaToken?: string) => Promise<{ mfaRequired: boolean }>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   hasPermission: (module: ModuleName, action: ActionName) => boolean;
@@ -71,11 +72,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     applyAccentColor(user?.accentColor ?? null);
   }, [user?.accentColor]);
 
-  async function login(email: string, password: string) {
-    const res = await axiosClient.post("/auth/login", { email, password });
+  async function login(email: string, password: string, mfaToken?: string) {
+    const res = await axiosClient.post("/auth/login", { email, password, mfaToken });
+    if (res.data.mfaRequired) return { mfaRequired: true };
     setAccessToken(res.data.accessToken);
     setUser(res.data.user);
     setPermissions(res.data.permissions);
+    return { mfaRequired: false };
   }
 
   async function logout() {

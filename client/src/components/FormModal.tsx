@@ -7,12 +7,13 @@ interface FormModalProps {
   onSubmit?: () => void;
   submitLabel?: string;
   submitting?: boolean;
+  submitDisabled?: boolean;
   children: ReactNode;
   hideFooter?: boolean;
   maxWidth?: number;
 }
 
-export function FormModal({ title, onClose, onSubmit, submitLabel = "Save", submitting, children, hideFooter, maxWidth }: FormModalProps) {
+export function FormModal({ title, onClose, onSubmit, submitLabel = "Save", submitting, submitDisabled, children, hideFooter, maxWidth }: FormModalProps) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={maxWidth ? { maxWidth } : undefined} onClick={(e) => e.stopPropagation()}>
@@ -27,7 +28,7 @@ export function FormModal({ title, onClose, onSubmit, submitLabel = "Save", subm
           <div className="modal-footer">
             <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
             {onSubmit && (
-              <button className="btn btn-primary" onClick={onSubmit} disabled={submitting}>
+              <button className="btn btn-primary" onClick={onSubmit} disabled={submitting || submitDisabled}>
                 {submitting ? "Saving..." : submitLabel}
               </button>
             )}

@@ -1,3 +1,4 @@
+import path from "path";
 import { Router } from "express";
 import { prisma } from "../../config/prisma";
 import { verifyJwt } from "../../middleware/auth";
@@ -5,16 +6,20 @@ import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
-import { encryptSecret } from "../../lib/crypto";
+import { decryptSecret, encryptSecret } from "../../lib/crypto";
 import { pingHost } from "../../lib/ping";
 import { testDeviceConnection } from "../../lib/deviceConnection";
 import { discoverOnvifChannels } from "../../lib/onvifDiscovery";
 import { getSessionFilePath, getSessionStatus, startStreamSession, stopSession } from "../../lib/streamRelay";
+import { gotoPtzPreset, listPtzPresets, sendPtzCommand } from "../../lib/ptzControl";
+import { RECORDING_ROOT, getActiveRecording, runRetentionSweep, startRecording, stopRecording } from "../../lib/recording";
+import { getMotionWatchStatus, startMotionWatch, stopMotionWatch } from "../../lib/motionWatch";
 import {
   cameraEventSchema,
   createCameraSchema,
   createNvrSchema,
   discoverCamerasSchema,
+  gotoPresetSchema,
   importCamerasSchema,
   ptzCommandSchema,
   startStreamSchema,
@@ -189,19 +194,55 @@ router.post("/cameras/:cameraId/check-status", requirePermission("nvr", "edit"),
   res.json(updated);
 });
 
-// PTZ control is a placeholder pending real ONVIF/vendor SDK integration with physical hardware —
-// it validates the command and logs it as a camera event so the UI/API contract is ready to wire up.
+function cameraOnvifOptions(camera: { ipAddress: string | null; port: number | null; username: string | null; encryptedPassword: string | null }) {
+  if (!camera.ipAddress) throw new ApiError(400, "This camera has no IP address set — required for ONVIF PTZ control.");
+  return {
+    hostname: camera.ipAddress,
+    port: camera.port ?? undefined,
+    username: camera.username ?? undefined,
+    password: camera.encryptedPassword ? decryptSecret(camera.encryptedPassword) : undefined,
+  };
+}
+
+// Sends a real ONVIF ContinuousMove/Stop (or GotoHomePosition) command to the camera and logs
+// the outcome — success or a real connection/protocol failure — as a CameraEvent.
 router.post("/cameras/:cameraId/ptz", requirePermission("nvr", "edit"), validateBody(ptzCommandSchema), async (req, res) => {
   const camera = await prisma.camera.findUnique({ where: { id: Number(req.params.cameraId) } });
   if (!camera) throw new ApiError(404, "Camera not found");
   if (!camera.ptzEnabled) throw new ApiError(400, "PTZ is not enabled for this camera");
 
-  await prisma.cameraEvent.create({
-    data: { cameraId: camera.id, nvrId: camera.nvrId, type: "PTZ_COMMAND", message: req.body.command },
-  });
-  await logAudit({ userId: req.user!.id, action: "camera.ptz_command", entityType: "Camera", entityId: camera.id, metadata: req.body });
+  const result = await sendPtzCommand(cameraOnvifOptions(camera), req.body.command);
 
-  res.json({ ok: true, command: req.body.command });
+  await prisma.cameraEvent.create({
+    data: { cameraId: camera.id, nvrId: camera.nvrId, type: result.ok ? "PTZ_COMMAND" : "PTZ_ERROR", message: `${req.body.command}: ${result.message}` },
+  });
+  await logAudit({ userId: req.user!.id, action: "camera.ptz_command", entityType: "Camera", entityId: camera.id, metadata: { ...req.body, ok: result.ok } });
+
+  res.json({ ok: result.ok, command: req.body.command, message: result.message });
+});
+
+router.get("/cameras/:cameraId/ptz/presets", requirePermission("nvr", "view"), async (req, res) => {
+  const camera = await prisma.camera.findUnique({ where: { id: Number(req.params.cameraId) } });
+  if (!camera) throw new ApiError(404, "Camera not found");
+  if (!camera.ptzEnabled) throw new ApiError(400, "PTZ is not enabled for this camera");
+
+  const result = await listPtzPresets(cameraOnvifOptions(camera));
+  res.json(result);
+});
+
+router.post("/cameras/:cameraId/ptz/goto-preset", requirePermission("nvr", "edit"), validateBody(gotoPresetSchema), async (req, res) => {
+  const camera = await prisma.camera.findUnique({ where: { id: Number(req.params.cameraId) } });
+  if (!camera) throw new ApiError(404, "Camera not found");
+  if (!camera.ptzEnabled) throw new ApiError(400, "PTZ is not enabled for this camera");
+
+  const result = await gotoPtzPreset(cameraOnvifOptions(camera), req.body.presetToken);
+
+  await prisma.cameraEvent.create({
+    data: { cameraId: camera.id, nvrId: camera.nvrId, type: result.ok ? "PTZ_PRESET" : "PTZ_ERROR", message: result.message },
+  });
+  await logAudit({ userId: req.user!.id, action: "camera.ptz_goto_preset", entityType: "Camera", entityId: camera.id, metadata: { ...req.body, ok: result.ok } });
+
+  res.json(result);
 });
 
 router.post("/cameras/:cameraId/events", requirePermission("nvr", "edit"), validateBody(cameraEventSchema), async (req, res) => {
@@ -224,6 +265,83 @@ router.get("/events", requirePermission("nvr", "view"), async (req, res) => {
     include: { camera: { select: { name: true } }, nvr: { select: { name: true } } },
   });
   res.json(events);
+});
+
+// ───────────────────────── Recording + retention ─────────────────────────
+
+router.get("/cameras/:cameraId/recordings", requirePermission("nvr", "view"), async (req, res) => {
+  const cameraId = Number(req.params.cameraId);
+  const recordings = await prisma.cameraRecording.findMany({ where: { cameraId }, orderBy: { startedAt: "desc" }, take: 100 });
+  const activeInfo = getActiveRecording(cameraId);
+  res.json({ recordings, active: activeInfo });
+});
+
+router.post("/cameras/:cameraId/recordings/start", requirePermission("nvr", "edit"), async (req, res) => {
+  const camera = await prisma.camera.findUnique({ where: { id: Number(req.params.cameraId) } });
+  if (!camera) throw new ApiError(404, "Camera not found");
+  if (!camera.streamUrl) throw new ApiError(400, "This camera has no stream URL set — required to start a recording.");
+
+  try {
+    const { recordingId } = await startRecording(camera.id, camera.streamUrl, req.body?.trigger ?? "MANUAL");
+    await prisma.cameraEvent.create({ data: { cameraId: camera.id, nvrId: camera.nvrId, type: "RECORDING_START", message: `Recording #${recordingId} started` } });
+    await logAudit({ userId: req.user!.id, action: "camera.recording_start", entityType: "Camera", entityId: camera.id, metadata: { recordingId } });
+    res.status(201).json({ recordingId });
+  } catch (err) {
+    throw new ApiError(400, (err as Error).message);
+  }
+});
+
+router.post("/cameras/:cameraId/recordings/stop", requirePermission("nvr", "edit"), async (req, res) => {
+  const camera = await prisma.camera.findUnique({ where: { id: Number(req.params.cameraId) } });
+  if (!camera) throw new ApiError(404, "Camera not found");
+
+  const result = await stopRecording(camera.id);
+  if (!result) throw new ApiError(400, "No recording is currently in progress for this camera.");
+
+  await prisma.cameraEvent.create({
+    data: { cameraId: camera.id, nvrId: camera.nvrId, type: result.failed ? "RECORDING_ERROR" : "RECORDING_STOP", message: result.failMessage ?? `Recording #${result.recordingId} stopped` },
+  });
+  await logAudit({ userId: req.user!.id, action: "camera.recording_stop", entityType: "Camera", entityId: camera.id, metadata: result });
+
+  res.json(result);
+});
+
+router.get("/recordings/:id/download", requirePermission("nvr", "view"), async (req, res) => {
+  const recording = await prisma.cameraRecording.findUnique({ where: { id: Number(req.params.id) } });
+  if (!recording) throw new ApiError(404, "Recording not found");
+
+  const absolutePath = path.join(RECORDING_ROOT, recording.filePath);
+  res.download(absolutePath, path.basename(recording.filePath), (err) => {
+    if (err) res.status(404).json({ error: "Recording file not found on disk (it may still be recording, or was removed by the retention sweep)." });
+  });
+});
+
+router.post("/retention/run", requirePermission("nvr", "edit"), async (req, res) => {
+  const result = await runRetentionSweep();
+  await logAudit({ userId: req.user!.id, action: "nvr.retention_run", metadata: result });
+  res.json(result);
+});
+
+// ───────────────────────── Motion detection (real ONVIF event subscription) ─────────────────────────
+
+router.get("/cameras/:cameraId/motion-watch", requirePermission("nvr", "view"), async (req, res) => {
+  const status = getMotionWatchStatus(Number(req.params.cameraId));
+  res.json(status ?? { status: "stopped", error: null, eventsSeen: 0 });
+});
+
+router.post("/cameras/:cameraId/motion-watch/start", requirePermission("nvr", "edit"), async (req, res) => {
+  const camera = await prisma.camera.findUnique({ where: { id: Number(req.params.cameraId) } });
+  if (!camera) throw new ApiError(404, "Camera not found");
+
+  const result = await startMotionWatch(camera.id, cameraOnvifOptions(camera));
+  await logAudit({ userId: req.user!.id, action: "camera.motion_watch_start", entityType: "Camera", entityId: camera.id, metadata: result });
+  res.json(result);
+});
+
+router.post("/cameras/:cameraId/motion-watch/stop", requirePermission("nvr", "edit"), async (req, res) => {
+  const stopped = stopMotionWatch(Number(req.params.cameraId));
+  await logAudit({ userId: req.user!.id, action: "camera.motion_watch_stop", entityType: "Camera", entityId: Number(req.params.cameraId), metadata: { stopped } });
+  res.json({ stopped });
 });
 
 // ───────────────────────── Live feed relay (RTSP → HLS via ffmpeg) ─────────────────────────

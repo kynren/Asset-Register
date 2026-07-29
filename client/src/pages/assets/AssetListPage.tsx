@@ -33,6 +33,9 @@ interface Asset {
   nextServiceDate: string | null;
   notes: string | null;
   device: { lastSeen: string } | null;
+  featuredImageUrl: string | null;
+  gridPowered: boolean;
+  remoteManagementEnabled: boolean;
 }
 
 const STATUS_OPTIONS = ["IN_USE", "IN_STORAGE", "IN_REPAIR", "RETIRED", "LOST"];
@@ -361,6 +364,8 @@ export function AssetListPage() {
       )}
       {editing && (
         <AssetFormModal
+          assetId={editing.id}
+          featuredImageUrl={editing.featuredImageUrl}
           initial={{
             assetTag: editing.assetTag,
             name: editing.name,
@@ -373,6 +378,8 @@ export function AssetListPage() {
             serialNumber: editing.serialNumber ?? "",
             notes: editing.notes ?? "",
             nextServiceDate: editing.nextServiceDate ? editing.nextServiceDate.slice(0, 10) : "",
+            gridPowered: editing.gridPowered,
+            remoteManagementEnabled: editing.remoteManagementEnabled,
           }}
           onClose={() => setEditing(null)}
           onSubmit={(v) => updateMutation.mutate(v)}

@@ -11,6 +11,12 @@ const envSchema = z.object({
   REFRESH_JWT_EXPIRES_IN: z.string().default("7d"),
   REFRESH_COOKIE_NAME: z.string().default("kynren_refresh"),
   ENCRYPTION_KEY: z.string().min(1),
+
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().default("Kynren Asset Register <no-reply@kynren.local>"),
 });
 
 export const env = envSchema.parse(process.env);

@@ -4,6 +4,8 @@ import { ColumnDef } from "@tanstack/react-table";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { DataTable } from "../../components/DataTable";
+import { AssetCategoriesTable } from "./AssetCategoriesTable";
+import { FormTemplatesSection } from "./FormTemplatesSection";
 
 interface ListItem {
   id: number;
@@ -62,10 +64,13 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
 
 export function CategoriesLocationsTab() {
   return (
-    <div className="grid grid-cols-2">
-      <SimpleListManager title="Asset Categories" url="/asset-categories" queryKey="asset-categories" />
-      <SimpleListManager title="Locations" url="/locations" queryKey="locations" extraField="address" />
-      <SimpleListManager title="Ticket Categories" url="/ticket-categories" queryKey="ticket-categories" />
+    <div className="stack gap-3">
+      <AssetCategoriesTable />
+      <FormTemplatesSection />
+      <div className="grid grid-cols-2">
+        <SimpleListManager title="Locations" url="/locations" queryKey="locations" extraField="address" />
+        <SimpleListManager title="Ticket Categories" url="/ticket-categories" queryKey="ticket-categories" />
+      </div>
     </div>
   );
 }

@@ -54,10 +54,11 @@ export function NvrFormModal({
   }
 
   return (
-    <FormModal title={nvrId ? "Edit NVR" : "Add NVR"} onClose={onClose} onSubmit={() => onSubmit(values)} submitting={submitting} maxWidth={620}>
-      <div className="grid grid-cols-2">
-        <div className="field"><label>Name *</label><input className="input" value={values.name} onChange={(e) => update("name", e.target.value)} required /></div>
+    <FormModal title={nvrId ? "Edit NVR" : "Add NVR"} onClose={onClose} onSubmit={() => onSubmit(values)} submitting={submitting} maxWidth={700}>
+      <div className="grid grid-cols-3">
+        <div className="field"><label>Name *</label><input className="input" value={values.name} onChange={(e) => update("name", e.target.value)} required placeholder="e.g. Main Perimeter NVR" /></div>
         <div className="field"><label>Model</label><input className="input" value={values.model} onChange={(e) => update("model", e.target.value)} /></div>
+        <div className="field"><label>Location</label><input className="input" value={values.location} onChange={(e) => update("location", e.target.value)} /></div>
         <div className="field"><label>IP Address</label><input className="input" value={values.ipAddress} onChange={(e) => update("ipAddress", e.target.value)} placeholder="192.168.1.10" /></div>
         <div className="field"><label>Port</label><input className="input" type="number" value={values.port ?? ""} onChange={(e) => update("port", e.target.value ? Number(e.target.value) : null)} /></div>
         <div className="field">
@@ -66,9 +67,11 @@ export function NvrFormModal({
             {PROTOCOLS.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
-        <div className="field"><label>Location</label><input className="input" value={values.location} onChange={(e) => update("location", e.target.value)} /></div>
         <div className="field"><label>Username</label><input className="input" value={values.username} onChange={(e) => update("username", e.target.value)} autoComplete="off" /></div>
-        <div className="field"><label>Password</label><input className="input" type="password" value={values.password} onChange={(e) => update("password", e.target.value)} autoComplete="new-password" placeholder={nvrId ? "Leave blank to keep current password" : ""} /></div>
+        <div className="field" style={{ gridColumn: "span 2" }}>
+          <label>Password</label>
+          <input className="input" type="password" value={values.password} onChange={(e) => update("password", e.target.value)} autoComplete="new-password" placeholder={nvrId ? "Leave blank to keep current password" : ""} />
+        </div>
       </div>
       <p className="muted" style={{ fontSize: 12 }}>Credentials are encrypted at rest and never shown again after saving.</p>
 

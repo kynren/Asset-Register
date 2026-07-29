@@ -5,7 +5,7 @@ export interface AssetDetail {
   status: string;
   signOffStatus: string;
   categoryId: number | null;
-  category: { id: number; name: string } | null;
+  category: { id: number; name: string; isComputerAsset: boolean } | null;
   locationId: number | null;
   location: { id: number; name: string; address: string | null } | null;
   assignedToId: number | null;
@@ -41,6 +41,12 @@ export interface AssetDetail {
     status: string;
     priority: string;
     createdAt: string;
+  }[];
+  customFieldValues?: {
+    id: number;
+    fieldId: number;
+    value: string | null;
+    field: { id: number; label: string; fieldType: string };
   }[];
 
   featuredImageUrl: string | null;

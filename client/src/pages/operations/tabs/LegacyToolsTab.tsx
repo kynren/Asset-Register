@@ -29,12 +29,27 @@ export function LegacyToolsTab() {
     queryFn: async () => (await axiosClient.get("/operations/maintenance-due")).data,
   });
 
+  const { data: warrantyAssets } = useQuery({
+    queryKey: ["warranty-expiring"],
+    queryFn: async () => (await axiosClient.get("/operations/warranty-expiring", { params: { days: 30 } })).data,
+  });
+
   const bulkMutation = useMutation({
     mutationFn: () => axiosClient.post("/operations/bulk-status", { assetIds: selectedIds, status: bulkStatus }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets-for-bulk"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       setSelectedIds([]);
+    },
+  });
+
+  const [alertResult, setAlertResult] = useState<{ warrantyAlerts: number; serviceAlerts: number } | null>(null);
+  const runAlertsMutation = useMutation({
+    mutationFn: async () => (await axiosClient.post("/operations/maintenance-alerts/run")).data,
+    onSuccess: (data) => {
+      setAlertResult(data);
+      queryClient.invalidateQueries({ queryKey: ["warranty-expiring"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-due"] });
     },
   });
 
@@ -126,6 +141,39 @@ export function LegacyToolsTab() {
           <div className="ad-empty">No assets are currently due for maintenance.</div>
         )}
       </div>
+
+      <PermissionGate module="operations" action="edit">
+        <div className="ad-panel">
+          <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 12 }}>
+            <div className="ad-panel-title" style={{ margin: 0 }}>Warranty Expiring Soon (next 30 days)</div>
+            <button className="ad-btn ad-btn-primary" disabled={runAlertsMutation.isPending} onClick={() => runAlertsMutation.mutate()}>
+              {runAlertsMutation.isPending ? "Running..." : "Run Maintenance Alert Check Now"}
+            </button>
+          </div>
+          {alertResult && (
+            <div className="ad-badge ad-badge-success" style={{ display: "block", width: "fit-content", marginBottom: 12 }}>
+              Scan complete: {alertResult.warrantyAlerts} warranty alert(s), {alertResult.serviceAlerts} maintenance alert(s) raised as notifications.
+            </div>
+          )}
+          {warrantyAssets?.length ? (
+            <table className="ad-table">
+              <thead><tr><th>Asset Tag</th><th>Name</th><th>Warranty Expires</th><th>Assigned To</th></tr></thead>
+              <tbody>
+                {warrantyAssets.map((a: any) => (
+                  <tr key={a.id}>
+                    <td>{a.assetTag}</td>
+                    <td>{a.name}</td>
+                    <td>{dayjs(a.warrantyExpiresAt).format("DD MMM YYYY")}</td>
+                    <td>{a.assignedTo ? `${a.assignedTo.firstName} ${a.assignedTo.lastName}` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="ad-empty">No warranties expiring in the next 30 days.</div>
+          )}
+        </div>
+      </PermissionGate>
     </div>
   );
 }

@@ -31,6 +31,9 @@ import notificationsRoutes from "./modules/notifications/notifications.routes";
 import vaultRoutes from "./modules/vault/vault.routes";
 import systemRoutes from "./modules/system/system.routes";
 import assetResourcesRoutes from "./modules/assetResources/assetResources.routes";
+import licensesRoutes from "./modules/licenses/licenses.routes";
+import procurementRoutes from "./modules/procurement/procurement.routes";
+import assetFormTemplatesRoutes from "./modules/assetFormTemplates/assetFormTemplates.routes";
 
 export function createApp() {
   const app = express();
@@ -72,6 +75,9 @@ export function createApp() {
   app.use("/api/notifications", notificationsRoutes);
   app.use("/api/vault", vaultRoutes);
   app.use("/api/system", systemRoutes);
+  app.use("/api/licenses", licensesRoutes);
+  app.use("/api/procurement", procurementRoutes);
+  app.use("/api/asset-form-templates", assetFormTemplatesRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

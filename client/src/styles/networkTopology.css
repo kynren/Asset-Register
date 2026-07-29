@@ -1,0 +1,148 @@
+@layer components {
+  .nt-shell {
+    @apply flex flex-col;
+    min-height: calc(100vh - 200px);
+  }
+
+  .nt-toolbar {
+    @apply px-[18px] py-3.5 border-b border-ad-border;
+  }
+  .nt-toolbar-row {
+    @apply flex items-center gap-3.5 flex-wrap;
+  }
+  .nt-toolbar-label {
+    @apply flex items-center gap-2 text-xs font-bold tracking-wide text-ad-text-muted uppercase;
+  }
+
+  .nt-checkbox-pill {
+    @apply flex items-center gap-1.5 text-xs text-ad-text cursor-pointer select-none;
+  }
+  .nt-checkbox-pill input {
+    accent-color: var(--ad-accent);
+    @apply w-3.5 h-3.5;
+  }
+
+  .nt-tool-btn {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-ad-text bg-ad-surface-2 border border-ad-border cursor-pointer;
+  }
+  .nt-tool-btn:hover {
+    @apply bg-ad-border;
+  }
+  .nt-tool-btn.active {
+    @apply bg-ad-accent border-ad-accent text-white;
+  }
+
+  .nt-search-box {
+    @apply flex items-center gap-2 px-3 py-1.5 rounded-lg bg-ad-surface-2 border border-ad-border ml-auto min-w-[200px];
+  }
+  .nt-search-box input {
+    @apply flex-1 bg-transparent border-none outline-none text-ad-text text-xs font-sans;
+  }
+  .nt-search-box input::placeholder {
+    @apply text-ad-text-muted;
+  }
+
+  .nt-filter-row {
+    @apply flex items-center gap-2 flex-wrap mt-3;
+  }
+  .nt-filter-pill {
+    @apply inline-flex items-center gap-[7px] px-3 py-1.5 rounded-full text-xs font-semibold text-ad-text-muted bg-ad-surface-2 border border-ad-border cursor-pointer;
+  }
+  .nt-filter-pill:hover {
+    @apply text-ad-text;
+  }
+  .nt-filter-pill.active {
+    @apply text-ad-text border-ad-accent bg-primary-soft;
+  }
+  .nt-filter-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+  .nt-filter-count {
+    @apply bg-ad-border text-ad-text rounded-md px-1.5 text-[11px];
+  }
+  .nt-filter-spacer {
+    @apply flex-1;
+  }
+
+  .nt-body {
+    @apply flex flex-1 relative;
+    min-height: 520px;
+  }
+
+  .nt-legend {
+    @apply w-[220px] flex-shrink-0 border-r border-ad-border p-3.5 overflow-y-auto;
+  }
+  .nt-legend-header {
+    @apply flex items-center justify-between mb-2.5;
+  }
+  .nt-legend-title {
+    @apply text-[11px] font-bold tracking-wide uppercase text-ad-text;
+  }
+  .nt-legend-hide {
+    @apply bg-transparent border-none text-ad-text-muted text-[10px] tracking-wide cursor-pointer uppercase;
+  }
+  .nt-legend-section {
+    @apply text-[10px] font-bold tracking-wide uppercase text-ad-text-muted my-3.5 mb-2;
+  }
+  .nt-legend-item {
+    @apply flex items-center gap-2 text-xs text-ad-text mb-2;
+  }
+  .nt-legend-dot {
+    @apply w-[9px] h-[9px] rounded-full flex-shrink-0;
+  }
+  .nt-legend-icon {
+    @apply w-[18px] h-[18px] rounded bg-ad-surface-2 border border-ad-border flex items-center justify-center text-ad-accent flex-shrink-0;
+  }
+  .nt-legend-line {
+    @apply w-[22px] h-0 border-t-2 flex-shrink-0;
+  }
+
+  .nt-legend-collapsed {
+    @apply w-10;
+  }
+
+  .nt-canvas-wrap {
+    @apply flex-1 relative min-w-0;
+  }
+  .nt-canvas-wrap.fullscreen {
+    @apply fixed inset-0 z-[500] bg-ad-bg;
+  }
+
+  .nt-detail-panel {
+    @apply w-[280px] flex-shrink-0 border-l border-ad-border p-[18px] overflow-y-auto;
+  }
+  .nt-detail-empty {
+    @apply flex flex-col items-center justify-center h-full text-center text-ad-text-muted gap-2.5;
+  }
+  .nt-detail-empty-icon {
+    @apply text-ad-border;
+  }
+  .nt-detail-title {
+    @apply text-[15px] font-bold mb-1;
+  }
+  .nt-detail-subtitle {
+    @apply text-[11px] text-ad-text-muted mb-4;
+  }
+
+  .nt-bottom-bar {
+    @apply flex items-center justify-center gap-2 p-3 border-t border-ad-border flex-wrap;
+  }
+  .nt-bottom-divider {
+    @apply w-px h-[22px] bg-ad-border mx-1;
+  }
+  .nt-icon-btn {
+    @apply w-8 h-8 flex items-center justify-center rounded-lg bg-ad-surface-2 border border-ad-border text-ad-text cursor-pointer;
+  }
+  .nt-icon-btn:hover {
+    @apply bg-ad-border;
+  }
+  .nt-icon-btn.active {
+    @apply bg-ad-accent border-ad-accent text-white;
+  }
+
+  .nt-settings-popover {
+    @apply absolute bottom-[52px] left-1/2 bg-ad-surface border border-ad-border rounded-[10px] p-3.5 w-[220px] z-10;
+    transform: translateX(-50%);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+}

@@ -17,16 +17,24 @@ import { VirtualizationTab } from "./detail/VirtualizationTab";
 import { AntivirusTab } from "./detail/AntivirusTab";
 import { SubResourceTab } from "./detail/SubResourceTab";
 import { FileResourceTab } from "./detail/FileResourceTab";
+import { ReportTab } from "./detail/ReportTab";
+import { ActivityLogTab } from "./detail/ActivityLogTab";
 
 type TabKey =
   | "profile" | "impact" | "location" | "os" | "components" | "volumes" | "software"
   | "connections" | "networkPorts" | "sockets" | "remoteManagement" | "management"
-  | "contracts" | "documents" | "virtualization" | "antivirus";
+  | "contracts" | "documents" | "virtualization" | "antivirus" | "reports" | "logs";
 
-const NAV_ITEMS: { key: TabKey; label: string; icon: string }[] = [
+// Nav is assembled as: LEAD_ITEMS + (COMPUTER_NAV_ITEMS_EARLY if computer/network category) +
+// MID_ITEMS + (COMPUTER_NAV_ITEMS_LATE if computer/network category) + TAIL_ITEMS, preserving
+// the original ordering while letting non-computer categories skip every IT-specific tab.
+const LEAD_ITEMS: { key: TabKey; label: string; icon: string }[] = [
   { key: "profile", label: "Asset Profile", icon: "profile" },
   { key: "impact", label: "Impact Analysis", icon: "activity" },
   { key: "location", label: "Location History & Map", icon: "mapPin" },
+];
+
+const COMPUTER_NAV_ITEMS_EARLY: { key: TabKey; label: string; icon: string }[] = [
   { key: "os", label: "Operating systems", icon: "layers" },
   { key: "components", label: "Components", icon: "cpu" },
   { key: "volumes", label: "Volumes", icon: "hardDrive" },
@@ -35,12 +43,33 @@ const NAV_ITEMS: { key: TabKey; label: string; icon: string }[] = [
   { key: "networkPorts", label: "Network Ports", icon: "network" },
   { key: "sockets", label: "Sockets", icon: "plug" },
   { key: "remoteManagement", label: "Remote management", icon: "terminal" },
+];
+
+const MID_ITEMS: { key: TabKey; label: string; icon: string }[] = [
   { key: "management", label: "Management", icon: "briefcase" },
   { key: "contracts", label: "Contracts", icon: "fileText" },
   { key: "documents", label: "Documents", icon: "file" },
+];
+
+const COMPUTER_NAV_ITEMS_LATE: { key: TabKey; label: string; icon: string }[] = [
   { key: "virtualization", label: "Virtualization", icon: "cloud" },
   { key: "antivirus", label: "Antiviruses", icon: "shield" },
 ];
+
+const TAIL_ITEMS: { key: TabKey; label: string; icon: string }[] = [
+  { key: "reports", label: "Reports", icon: "activity" },
+  { key: "logs", label: "Logs", icon: "clock" },
+];
+
+function buildNavItems(isComputerAsset: boolean) {
+  return [
+    ...LEAD_ITEMS,
+    ...(isComputerAsset ? COMPUTER_NAV_ITEMS_EARLY : []),
+    ...MID_ITEMS,
+    ...(isComputerAsset ? COMPUTER_NAV_ITEMS_LATE : []),
+    ...TAIL_ITEMS,
+  ];
+}
 
 export function AssetDetailPage() {
   const { id } = useParams();
@@ -70,6 +99,7 @@ export function AssetDetailPage() {
 
   const isOnline = asset.device ? Date.now() - new Date(asset.device.lastSeen).getTime() < 15 * 60 * 1000 : null;
   const isActive = isOnline ?? asset.status === "IN_USE";
+  const navItems = buildNavItems(asset.category?.isComputerAsset ?? false);
 
   return (
     <div className="ad-shell">
@@ -104,7 +134,7 @@ export function AssetDetailPage() {
       <div className="ad-body">
         <div className="ad-sidebar">
           <div className="ad-nav-label">Asset Explorer</div>
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <button
               key={item.key}
               className={`ad-nav-item ${tab === item.key ? "active" : ""}`}
@@ -240,6 +270,8 @@ export function AssetDetailPage() {
           )}
           {tab === "virtualization" && <VirtualizationTab asset={asset} onUpdated={invalidate} />}
           {tab === "antivirus" && <AntivirusTab asset={asset} onUpdated={invalidate} />}
+          {tab === "reports" && <ReportTab asset={asset} />}
+          {tab === "logs" && <ActivityLogTab asset={asset} />}
         </div>
       </div>
     </div>

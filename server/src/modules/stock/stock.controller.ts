@@ -26,7 +26,10 @@ export async function list(req: Request, res: Response) {
 export async function getOne(req: Request, res: Response) {
   const item = await prisma.stockItem.findUnique({
     where: { id: Number(req.params.id) },
-    include: { transactions: { include: { performedBy: { select: { firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" }, take: 50 } },
+    include: {
+      transactions: { include: { performedBy: { select: { firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" }, take: 50 },
+      stockLevels: { include: { location: { select: { id: true, name: true } } }, orderBy: { locationId: "asc" } },
+    },
   });
   if (!item) throw new ApiError(404, "Stock item not found");
   res.json(item);
@@ -54,25 +57,80 @@ export async function remove(req: Request, res: Response) {
 
 export async function addTransaction(req: Request, res: Response) {
   const stockItemId = Number(req.params.id);
-  const { type, quantity, reason } = req.body;
+  const { type, quantity, locationId, reason } = req.body;
 
   const item = await prisma.stockItem.findUnique({ where: { id: stockItemId } });
   if (!item) throw new ApiError(404, "Stock item not found");
 
-  if (type === "OUT" && item.quantityOnHand < quantity) {
-    throw new ApiError(400, "Not enough stock on hand");
+  const location = await prisma.location.findUnique({ where: { id: locationId } });
+  if (!location) throw new ApiError(404, "Location not found");
+
+  const level = await prisma.stockLevel.findUnique({ where: { stockItemId_locationId: { stockItemId, locationId } } });
+  const currentAtLocation = level?.quantityOnHand ?? 0;
+
+  if (type === "OUT" && currentAtLocation < quantity) {
+    throw new ApiError(400, `Not enough stock at ${location.name} (${currentAtLocation} on hand)`);
   }
 
   const delta = type === "IN" ? quantity : -quantity;
 
-  const [, transaction] = await prisma.$transaction([
+  const [, , transaction] = await prisma.$transaction([
     prisma.stockItem.update({ where: { id: stockItemId }, data: { quantityOnHand: { increment: delta } } }),
+    prisma.stockLevel.upsert({
+      where: { stockItemId_locationId: { stockItemId, locationId } },
+      create: { stockItemId, locationId, quantityOnHand: Math.max(delta, 0) },
+      update: { quantityOnHand: { increment: delta } },
+    }),
     prisma.stockTransaction.create({
-      data: { stockItemId, type, quantity, reason, performedById: req.user!.id },
+      data: {
+        stockItemId,
+        type,
+        quantity,
+        reason,
+        fromLocationId: type === "OUT" ? locationId : undefined,
+        toLocationId: type === "IN" ? locationId : undefined,
+        performedById: req.user!.id,
+      },
     }),
   ]);
 
-  await logAudit({ userId: req.user!.id, action: "stockTransaction.create", entityType: "StockItem", entityId: stockItemId, metadata: { type, quantity } });
+  await logAudit({ userId: req.user!.id, action: "stockTransaction.create", entityType: "StockItem", entityId: stockItemId, metadata: { type, quantity, locationId } });
+  res.status(201).json(transaction);
+}
+
+export async function transferStock(req: Request, res: Response) {
+  const stockItemId = Number(req.params.id);
+  const { fromLocationId, toLocationId, quantity, reason } = req.body;
+
+  if (fromLocationId === toLocationId) throw new ApiError(400, "Source and destination locations must differ");
+
+  const item = await prisma.stockItem.findUnique({ where: { id: stockItemId } });
+  if (!item) throw new ApiError(404, "Stock item not found");
+
+  const [fromLocation, toLocation] = await Promise.all([
+    prisma.location.findUnique({ where: { id: fromLocationId } }),
+    prisma.location.findUnique({ where: { id: toLocationId } }),
+  ]);
+  if (!fromLocation || !toLocation) throw new ApiError(404, "Location not found");
+
+  const fromLevel = await prisma.stockLevel.findUnique({ where: { stockItemId_locationId: { stockItemId, locationId: fromLocationId } } });
+  if (!fromLevel || fromLevel.quantityOnHand < quantity) {
+    throw new ApiError(400, `Not enough stock at ${fromLocation.name} (${fromLevel?.quantityOnHand ?? 0} on hand)`);
+  }
+
+  const [, , transaction] = await prisma.$transaction([
+    prisma.stockLevel.update({ where: { stockItemId_locationId: { stockItemId, locationId: fromLocationId } }, data: { quantityOnHand: { decrement: quantity } } }),
+    prisma.stockLevel.upsert({
+      where: { stockItemId_locationId: { stockItemId, locationId: toLocationId } },
+      create: { stockItemId, locationId: toLocationId, quantityOnHand: quantity },
+      update: { quantityOnHand: { increment: quantity } },
+    }),
+    prisma.stockTransaction.create({
+      data: { stockItemId, type: "TRANSFER", quantity, reason, fromLocationId, toLocationId, performedById: req.user!.id },
+    }),
+  ]);
+
+  await logAudit({ userId: req.user!.id, action: "stockTransaction.transfer", entityType: "StockItem", entityId: stockItemId, metadata: { fromLocationId, toLocationId, quantity } });
   res.status(201).json(transaction);
 }
 

@@ -50,6 +50,12 @@ model User {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
+  mfaSecret           String?
+  mfaEnabled          Boolean   @default(false)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  passwordChangedAt   DateTime?
+
   assetsAssigned    Asset[]            @relation("AssetAssignee")
   ticketsRequested  Ticket[]           @relation("TicketRequester")
   ticketsAssigned   Ticket[]           @relation("TicketAssignee")
@@ -70,6 +76,45 @@ model User {
   assetBookings        AssetBooking[]
   savedQueries         SavedQuery[]
   resourceSchedules    ResourceSchedule[]
+
+  refreshSessions      RefreshSession[]
+  passwordResetTokens  PasswordResetToken[]
+  passwordHistory      PasswordHistory[]
+  checkoutsReceived    AssetCheckout[]      @relation("CheckoutRecipient")
+  checkoutsIssued      AssetCheckout[]      @relation("CheckoutIssuer")
+  checkoutsProcessed   AssetCheckout[]      @relation("CheckoutReceiver")
+  licenseAssignments   LicenseAssignment[]
+  purchaseOrdersCreated PurchaseOrder[]
+}
+
+model RefreshSession {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model PasswordHistory {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  passwordHash String
+  createdAt    DateTime @default(now())
 }
 
 model UserImage {
@@ -104,16 +149,67 @@ model DashboardLayout {
 // ───────────────────────── Assets ─────────────────────────
 
 model AssetCategory {
-  id     Int     @id @default(autoincrement())
-  name   String  @unique
-  assets Asset[]
+  id              Int                @id @default(autoincrement())
+  name            String             @unique
+  isComputerAsset Boolean            @default(false)
+  formTemplateId  Int?
+  formTemplate    AssetFormTemplate? @relation(fields: [formTemplateId], references: [id])
+  assets          Asset[]
+}
+
+model AssetFormTemplate {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  description String?
+  fields      AssetFormField[]
+  categories  AssetCategory[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+enum AssetFormFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DATE
+  SELECT
+  CHECKBOX
+}
+
+model AssetFormField {
+  id         Int                      @id @default(autoincrement())
+  templateId Int
+  template   AssetFormTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label      String
+  fieldKey   String
+  fieldType  AssetFormFieldType       @default(TEXT)
+  required   Boolean                  @default(false)
+  options    Json?
+  order      Int                      @default(0)
+  values     AssetCustomFieldValue[]
+  createdAt  DateTime                 @default(now())
+
+  @@unique([templateId, fieldKey])
+}
+
+model AssetCustomFieldValue {
+  id      Int            @id @default(autoincrement())
+  assetId Int
+  asset   Asset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  fieldId Int
+  field   AssetFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  value   String?
+
+  @@unique([assetId, fieldId])
 }
 
 model Location {
-  id      Int     @id @default(autoincrement())
-  name    String  @unique
-  address String?
-  assets  Asset[]
+  id         Int          @id @default(autoincrement())
+  name       String       @unique
+  address    String?
+  assets     Asset[]
+  stockItems StockItem[]
+  stockLevels StockLevel[]
 }
 
 enum AssetStatus {
@@ -177,9 +273,53 @@ model Asset {
   contracts    AssetContract[]
   documents    AssetDocument[]
   bookings     AssetBooking[]
+  checkouts    AssetCheckout[]
+  licenseAssignments LicenseAssignment[]
+  customFieldValues AssetCustomFieldValue[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model AssetCheckout {
+  id             Int       @id @default(autoincrement())
+  assetId        Int
+  asset          Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  checkedOutToId Int
+  checkedOutTo   User      @relation("CheckoutRecipient", fields: [checkedOutToId], references: [id])
+  checkedOutById Int
+  checkedOutBy   User      @relation("CheckoutIssuer", fields: [checkedOutById], references: [id])
+  checkedOutAt   DateTime  @default(now())
+  dueBackAt      DateTime?
+  checkedInAt    DateTime?
+  checkedInById  Int?
+  checkedInBy    User?     @relation("CheckoutReceiver", fields: [checkedInById], references: [id])
+  notes          String?
+}
+
+model License {
+  id           Int      @id @default(autoincrement())
+  name         String
+  vendor       String?
+  licenseKey   String?
+  seats        Int      @default(1)
+  purchaseDate DateTime?
+  expiresAt    DateTime?
+  cost         Decimal? @db.Decimal(12, 2)
+  notes        String?
+  assignments  LicenseAssignment[]
+  createdAt    DateTime @default(now())
+}
+
+model LicenseAssignment {
+  id         Int      @id @default(autoincrement())
+  licenseId  Int
+  license    License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  assetId    Int?
+  asset      Asset?   @relation(fields: [assetId], references: [id])
+  userId     Int?
+  user       User?    @relation(fields: [userId], references: [id])
+  assignedAt DateTime @default(now())
 }
 
 model AssetPhoto {
@@ -301,31 +441,41 @@ enum NodeType {
   OTHER
 }
 
+enum NodeRole {
+  CORE_SWITCH
+  DISTRIBUTION_SWITCH
+  EDGE_SWITCH
+  GATEWAY_ROUTER
+  HARDWARE_HOST
+}
+
 model NetworkNode {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   type       NodeType
+  role       NodeRole?
   label      String
   ipAddress  String?
   subnet     String?
   vendor     String?
   deviceType String?
-  deviceId   Int?     @unique
-  device     Device?  @relation(fields: [deviceId], references: [id])
+  deviceId   Int?      @unique
+  device     Device?   @relation(fields: [deviceId], references: [id])
   posX       Float?
   posY       Float?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   edgesFrom NetworkEdge[] @relation("EdgeSource")
   edgesTo   NetworkEdge[] @relation("EdgeTarget")
 }
 
 model NetworkEdge {
-  id       Int         @id @default(autoincrement())
-  sourceId Int
-  source   NetworkNode @relation("EdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
-  targetId Int
-  target   NetworkNode @relation("EdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
-  label    String?
+  id            Int         @id @default(autoincrement())
+  sourceId      Int
+  source        NetworkNode @relation("EdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId      Int
+  target        NetworkNode @relation("EdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  label         String?
+  bandwidthMbps Float?
 }
 
 enum ScanStatus {
@@ -370,6 +520,7 @@ model NetworkScanResult {
 enum StockTxType {
   IN
   OUT
+  TRANSFER
 }
 
 model StockItem {
@@ -381,21 +532,89 @@ model StockItem {
   quantityOnHand Int                @default(0)
   reorderLevel   Int                @default(0)
   unitCost       Decimal?           @db.Decimal(12, 2)
+  locationId     Int?
+  location       Location?          @relation(fields: [locationId], references: [id])
+  stockLevels    StockLevel[]
   transactions   StockTransaction[]
+  purchaseOrderItems PurchaseOrderItem[]
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 }
 
+// Per-location quantity breakdown for a StockItem. StockItem.quantityOnHand
+// remains the synced total across all locations for backward-compatible
+// consumers (dashboard, low-stock, reports); this table is the source of
+// truth for "how much is at location X".
+model StockLevel {
+  id             Int       @id @default(autoincrement())
+  stockItemId    Int
+  stockItem      StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  locationId     Int
+  location       Location  @relation(fields: [locationId], references: [id])
+  quantityOnHand Int       @default(0)
+  reorderLevel   Int       @default(0)
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([stockItemId, locationId])
+}
+
 model StockTransaction {
-  id            Int         @id @default(autoincrement())
-  stockItemId   Int
-  stockItem     StockItem   @relation(fields: [stockItemId], references: [id])
-  type          StockTxType
-  quantity      Int
-  reason        String?
-  performedById Int
-  performedBy   User        @relation(fields: [performedById], references: [id])
-  createdAt     DateTime    @default(now())
+  id             Int         @id @default(autoincrement())
+  stockItemId    Int
+  stockItem      StockItem   @relation(fields: [stockItemId], references: [id])
+  type           StockTxType
+  quantity       Int
+  reason         String?
+  fromLocationId Int?
+  toLocationId   Int?
+  performedById  Int
+  performedBy    User        @relation(fields: [performedById], references: [id])
+  createdAt      DateTime    @default(now())
+}
+
+model Supplier {
+  id             Int             @id @default(autoincrement())
+  name           String
+  contactName    String?
+  email          String?
+  phone          String?
+  address        String?
+  notes          String?
+  purchaseOrders PurchaseOrder[]
+  createdAt      DateTime        @default(now())
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id          Int                 @id @default(autoincrement())
+  poNumber    String              @unique
+  supplierId  Int
+  supplier    Supplier            @relation(fields: [supplierId], references: [id])
+  status      PurchaseOrderStatus @default(DRAFT)
+  orderedAt   DateTime?
+  expectedAt  DateTime?
+  notes       String?
+  createdById Int
+  createdBy   User                @relation(fields: [createdById], references: [id])
+  items       PurchaseOrderItem[]
+  createdAt   DateTime            @default(now())
+}
+
+model PurchaseOrderItem {
+  id               Int           @id @default(autoincrement())
+  purchaseOrderId  Int
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  stockItemId      Int
+  stockItem        StockItem     @relation(fields: [stockItemId], references: [id])
+  quantityOrdered  Int
+  quantityReceived Int           @default(0)
+  unitCost         Decimal?      @db.Decimal(12, 2)
 }
 
 // ───────────────────────── Helpdesk ─────────────────────────
@@ -521,6 +740,19 @@ model Camera {
   status            CameraStatus  @default(UNKNOWN)
   lastCheckedAt     DateTime?
   events            CameraEvent[]
+  recordings        CameraRecording[]
+}
+
+model CameraRecording {
+  id        Int       @id @default(autoincrement())
+  cameraId  Int
+  camera    Camera    @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  filePath  String
+  startedAt DateTime
+  endedAt   DateTime?
+  sizeBytes Int?
+  trigger   String
+  createdAt DateTime  @default(now())
 }
 
 model CameraEvent {

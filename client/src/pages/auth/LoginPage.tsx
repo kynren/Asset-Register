@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { useBranding } from "../../theme/BrandingContext";
 
@@ -10,6 +10,8 @@ export function LoginPage() {
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mfaToken, setMfaToken] = useState("");
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -23,8 +25,12 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await login(email, password);
-      navigate("/");
+      const result = await login(email, password, mfaRequired ? mfaToken : undefined);
+      if (result.mfaRequired) {
+        setMfaRequired(true);
+      } else {
+        navigate("/");
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || "Login failed. Check your credentials.");
     } finally {
@@ -40,21 +46,42 @@ export function LoginPage() {
             {branding.appIconUrl ? <img src={branding.appIconUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : branding.companyName[0]}
           </div>
           <h2 style={{ margin: "10px 0 0" }}>{branding.companyName}</h2>
-          <p className="muted mt-0">Sign in to continue</p>
+          <p className="muted mt-0">{mfaRequired ? "Enter your authentication code" : "Sign in to continue"}</p>
         </div>
 
         {error && <div className="alert alert-danger">{error}</div>}
 
-        <div className="field">
-          <label>Email</label>
-          <input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
-        </div>
-        <div className="field">
-          <label>Password</label>
-          <input className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-        </div>
+        {!mfaRequired ? (
+          <>
+            <div className="field">
+              <label>Email</label>
+              <input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
+            </div>
+            <div className="field">
+              <label>Password</label>
+              <input className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <div className="row" style={{ justifyContent: "flex-end", marginTop: -8, marginBottom: 4 }}>
+              <Link to="/forgot-password" className="muted" style={{ fontSize: 12 }}>Forgot password?</Link>
+            </div>
+          </>
+        ) : (
+          <div className="field">
+            <label>Authentication Code</label>
+            <input
+              className="input"
+              inputMode="numeric"
+              autoFocus
+              maxLength={6}
+              placeholder="123456"
+              value={mfaToken}
+              onChange={(e) => setMfaToken(e.target.value.replace(/\D/g, ""))}
+            />
+          </div>
+        )}
+
         <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 4 }}>
-          {loading ? "Signing in..." : "Sign in"}
+          {loading ? "Signing in..." : mfaRequired ? "Verify" : "Sign in"}
         </button>
       </form>
     </div>
