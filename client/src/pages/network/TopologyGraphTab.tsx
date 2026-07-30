@@ -364,8 +364,8 @@ function InnerTopologyGraph() {
               fitView
               proOptions={{ hideAttribution: true }}
             >
-              <Background color="#1c2536" gap={18} />
-              {showMinimap && <MiniMap style={{ background: "#0d1524" }} maskColor="rgba(0,0,0,0.6)" />}
+              <Background color="var(--ad-border)" gap={18} />
+              {showMinimap && <MiniMap style={{ background: "var(--ad-surface-2)" }} maskColor="rgba(0,0,0,0.6)" />}
             </ReactFlow>
           )}
 

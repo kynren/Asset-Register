@@ -155,6 +155,69 @@ export async function showStatus(_req: Request, res: Response) {
   res.json({ total: results.length, active, assets: results });
 }
 
+const portConnectedAssetSelect = { id: true, assetTag: true, name: true };
+
+export async function listPorts(req: Request, res: Response) {
+  const assetId = Number(req.params.id);
+  const ports = await prisma.switchPort.findMany({
+    where: { assetId },
+    include: { connectedAsset: { select: portConnectedAssetSelect } },
+    orderBy: { portNumber: "asc" },
+  });
+  res.json(ports);
+}
+
+// Bulk-creates ports 1..count, skipping any port numbers that already exist — mirrors picking a
+// switch model's port count once (like Netgear Insight's per-model port layout) rather than
+// making the user add each port one at a time.
+export async function initPorts(req: Request, res: Response) {
+  const assetId = Number(req.params.id);
+  const { count } = req.body as { count: number };
+
+  const existing = await prisma.switchPort.findMany({ where: { assetId }, select: { portNumber: true } });
+  const existingNumbers = new Set(existing.map((p) => p.portNumber));
+  const toCreate = Array.from({ length: count }, (_, i) => i + 1).filter((n) => !existingNumbers.has(n));
+
+  if (toCreate.length) {
+    await prisma.switchPort.createMany({ data: toCreate.map((portNumber) => ({ assetId, portNumber })) });
+  }
+
+  await logAudit({ userId: req.user!.id, action: "switchPorts.init", entityType: "Asset", entityId: assetId, metadata: { count } });
+
+  const ports = await prisma.switchPort.findMany({
+    where: { assetId },
+    include: { connectedAsset: { select: portConnectedAssetSelect } },
+    orderBy: { portNumber: "asc" },
+  });
+  res.status(201).json(ports);
+}
+
+export async function updatePort(req: Request, res: Response) {
+  const assetId = Number(req.params.id);
+  const portId = Number(req.params.portId);
+  const port = await prisma.switchPort.findUnique({ where: { id: portId } });
+  if (!port || port.assetId !== assetId) throw new ApiError(404, "Port not found");
+
+  const updated = await prisma.switchPort.update({
+    where: { id: portId },
+    data: req.body,
+    include: { connectedAsset: { select: portConnectedAssetSelect } },
+  });
+  await logAudit({ userId: req.user!.id, action: "switchPort.update", entityType: "SwitchPort", entityId: portId, metadata: req.body });
+  res.json(updated);
+}
+
+export async function deletePort(req: Request, res: Response) {
+  const assetId = Number(req.params.id);
+  const portId = Number(req.params.portId);
+  const port = await prisma.switchPort.findUnique({ where: { id: portId } });
+  if (!port || port.assetId !== assetId) throw new ApiError(404, "Port not found");
+
+  await prisma.switchPort.delete({ where: { id: portId } });
+  await logAudit({ userId: req.user!.id, action: "switchPort.delete", entityType: "SwitchPort", entityId: portId });
+  res.json({ ok: true });
+}
+
 export async function checkoutAsset(req: Request, res: Response) {
   const assetId = Number(req.params.id);
   const { checkedOutToId, dueBackAt, notes } = req.body;

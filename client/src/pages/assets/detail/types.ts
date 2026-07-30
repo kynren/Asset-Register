@@ -32,6 +32,9 @@ export interface AssetDetail {
     loggedInUser: string | null;
     lastLoginAt: string | null;
     installedSoftware: { name: string; version?: string }[] | null;
+    batteryPresent: boolean | null;
+    batteryPercent: number | null;
+    batteryCharging: boolean | null;
     lastSeen: string;
   } | null;
   tickets: {
@@ -55,6 +58,11 @@ export interface AssetDetail {
   remoteManagementEnabled: boolean;
   remoteManagementProtocol: string | null;
   remoteManagementUrl: string | null;
+
+  staticIpAddress: string | null;
+  subnetMask: string | null;
+  defaultGateway: string | null;
+  dnsServers: string | null;
 
   isVirtual: boolean;
   hypervisor: string | null;

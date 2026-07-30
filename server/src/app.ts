@@ -23,6 +23,7 @@ import operationsRoutes from "./modules/operations/operations.routes";
 import nvrRoutes from "./modules/nvr/nvr.routes";
 import assistantRoutes from "./modules/assistant/assistant.routes";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes";
+import preferencesRoutes from "./modules/preferences/preferences.routes";
 import profileRoutes from "./modules/profile/profile.routes";
 import auditRoutes from "./modules/audit/audit.routes";
 import settingsRoutes from "./modules/settings/settings.routes";
@@ -34,6 +35,8 @@ import assetResourcesRoutes from "./modules/assetResources/assetResources.routes
 import licensesRoutes from "./modules/licenses/licenses.routes";
 import procurementRoutes from "./modules/procurement/procurement.routes";
 import assetFormTemplatesRoutes from "./modules/assetFormTemplates/assetFormTemplates.routes";
+import mcpRoutes from "./mcp/mcp.routes";
+import mcpKeysRoutes from "./mcp/mcpKeys.routes";
 
 export function createApp() {
   const app = express();
@@ -68,6 +71,7 @@ export function createApp() {
   app.use("/api/nvr", nvrRoutes);
   app.use("/api/assistant", assistantRoutes);
   app.use("/api/dashboard", dashboardRoutes);
+  app.use("/api/preferences", preferencesRoutes);
   app.use("/api/profile", profileRoutes);
   app.use("/api/audit", auditRoutes);
   app.use("/api/settings/public", settingsPublicRoutes);
@@ -78,6 +82,8 @@ export function createApp() {
   app.use("/api/licenses", licensesRoutes);
   app.use("/api/procurement", procurementRoutes);
   app.use("/api/asset-form-templates", assetFormTemplatesRoutes);
+  app.use("/api/mcp", mcpRoutes);
+  app.use("/api/mcp-keys", mcpKeysRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

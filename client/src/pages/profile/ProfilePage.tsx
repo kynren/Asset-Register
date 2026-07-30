@@ -6,6 +6,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { AvatarGallery } from "./AvatarGallery";
 import { ColorPaletteCard } from "./ColorPaletteCard";
 import { PasswordInput } from "../../components/PasswordInput";
+import { McpConnectionCard } from "./McpConnectionCard";
 
 function initials(firstName: string, lastName: string) {
   return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
@@ -129,6 +130,8 @@ export function ProfilePage() {
       </div>
 
       <PasswordChangeCard />
+
+      <McpConnectionCard />
 
       <div className="card">
         <h3 className="mt-0">My Devices</h3>

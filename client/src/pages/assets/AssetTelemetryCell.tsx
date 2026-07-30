@@ -47,7 +47,12 @@ export function AssetTelemetryCell({ assetId }: { assetId: number }) {
   }, [assetId]);
 
   if (alive === null) {
-    return <span className="muted" style={{ fontSize: 12 }}>Pinging...</span>;
+    return (
+      <span title="Pinging..." style={{ display: "inline-flex", alignItems: "center", width: 10, height: 10, position: "relative" }}>
+        <span className="animate-ping" style={{ position: "absolute", inset: 0, borderRadius: "9999px", background: "var(--color-primary)", opacity: 0.6 }} />
+        <span style={{ position: "relative", width: 10, height: 10, borderRadius: "9999px", background: "var(--color-primary)" }} />
+      </span>
+    );
   }
 
   const sparkPoints = samples

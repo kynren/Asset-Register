@@ -16,4 +16,7 @@ export const agentIngestSchema = z.object({
   loggedInUser: z.string().optional(),
   lastLoginAt: z.string().datetime().optional(),
   installedSoftware: z.array(z.object({ name: z.string(), version: z.string().optional() })).optional(),
+  batteryPresent: z.boolean().optional(),
+  batteryPercent: z.number().min(0).max(100).optional(),
+  batteryCharging: z.boolean().optional(),
 });

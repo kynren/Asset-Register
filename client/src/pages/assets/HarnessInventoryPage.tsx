@@ -65,6 +65,7 @@ export function HarnessInventoryPage() {
         <AssetFormModal
           initial={{ categoryId: harnessCategory.id }}
           onlyCategoryNames={["Harness"]}
+          hideOperationalToggles
           onClose={() => setShowForm(false)}
           onSubmit={(v) => createMutation.mutate(v)}
           submitting={createMutation.isPending}
@@ -91,6 +92,7 @@ export function HarnessInventoryPage() {
             remoteManagementEnabled: editing.remoteManagementEnabled,
           }}
           onlyCategoryNames={["Harness"]}
+          hideOperationalToggles
           onClose={() => setEditing(null)}
           onSubmit={(v) => updateMutation.mutate(v)}
           submitting={updateMutation.isPending}

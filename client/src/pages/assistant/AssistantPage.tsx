@@ -13,7 +13,12 @@ let idCounter = 0;
 
 export function AssistantPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: idCounter++, role: "assistant", text: "Hi, I'm the Kynren Asset Assistant. Ask me about assets, tickets, stock, or devices — or try a quick action below." },
+    {
+      id: idCounter++,
+      role: "assistant",
+      text:
+        "Hi, I'm the Kynren Asset Assistant. Ask me about assets (by status, category, tag, or ping one), tickets, licenses, warranties, stock, offline devices, maintenance, or the knowledge base — I can also create a ticket for you. Try a quick action below, or connect me to Claude Desktop/Code from your Profile page.",
+    },
   ]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);

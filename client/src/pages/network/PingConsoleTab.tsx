@@ -137,7 +137,9 @@ export function PingConsoleTab() {
   };
 
   return (
-    <div className="ad-grid" style={{ gridTemplateColumns: "380px 1fr" }}>
+    <div className="ad-shell">
+      <div className="ad-content">
+        <div className="ad-grid" style={{ gridTemplateColumns: "380px 1fr" }}>
       <div className="ad-panel">
         <div className="ad-panel-title">
           <span className="row gap-2"><Icon name="activity" size={14} /> Single-Device ICMP Pinger</span>
@@ -217,6 +219,8 @@ export function PingConsoleTab() {
       {showAddDevice && (
         <AddNodeModal onClose={() => setShowAddDevice(false)} onSubmit={(v) => addNodeMutation.mutate(v)} submitting={addNodeMutation.isPending} />
       )}
+        </div>
+      </div>
     </div>
   );
 }

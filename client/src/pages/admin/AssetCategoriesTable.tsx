@@ -17,6 +17,7 @@ interface AssetCategory {
   name: string;
   isComputerAsset: boolean;
   isShowAsset: boolean;
+  isSwitchingDevice: boolean;
   formTemplateId: number | null;
   formTemplate: FormTemplateRef | null;
 }
@@ -57,6 +58,12 @@ export function AssetCategoriesTable() {
       accessorFn: (r) => (r.isShowAsset ? "Yes" : "No"),
       cell: ({ row }) =>
         row.original.isShowAsset ? <span className="badge badge-primary">Show Asset</span> : <span className="muted">—</span>,
+    },
+    {
+      header: "Switching Device",
+      accessorFn: (r) => (r.isSwitchingDevice ? "Yes" : "No"),
+      cell: ({ row }) =>
+        row.original.isSwitchingDevice ? <span className="badge badge-primary">Switching</span> : <span className="muted">—</span>,
     },
     {
       header: "Linked Form Template",
@@ -135,11 +142,12 @@ function CategoryFormModal({
   const [formTemplateId, setFormTemplateId] = useState<string>(initial?.formTemplateId ? String(initial.formTemplateId) : "");
   const [isComputerAsset, setIsComputerAsset] = useState(initial?.isComputerAsset ?? false);
   const [isShowAsset, setIsShowAsset] = useState(initial?.isShowAsset ?? false);
+  const [isSwitchingDevice, setIsSwitchingDevice] = useState(initial?.isSwitchingDevice ?? false);
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: () => {
-      const payload = { name, formTemplateId: formTemplateId ? Number(formTemplateId) : null, isComputerAsset, isShowAsset };
+      const payload = { name, formTemplateId: formTemplateId ? Number(formTemplateId) : null, isComputerAsset, isShowAsset, isSwitchingDevice };
       return initial ? axiosClient.patch(`/asset-categories/${initial.id}`, payload) : axiosClient.post("/asset-categories", payload);
     },
     onSuccess: () => {
@@ -189,6 +197,20 @@ function CategoryFormModal({
         </div>
         <label className="form-toggle-switch">
           <input type="checkbox" checked={isShowAsset} onChange={(e) => setIsShowAsset(e.target.checked)} />
+          <span className="form-toggle-switch-track" />
+        </label>
+      </div>
+      <div className="toggle-card">
+        <div className="toggle-card-icon"><Icon name="network" size={16} /></div>
+        <div className="toggle-card-body">
+          <div className="toggle-card-title">Switching Device</div>
+          <div className="toggle-card-desc">
+            Assets in this category appear on the Network Topology Map's Switching tab, where their physical ports can be
+            mapped (label, status, VLAN, and what's plugged into each one).
+          </div>
+        </div>
+        <label className="form-toggle-switch">
+          <input type="checkbox" checked={isSwitchingDevice} onChange={(e) => setIsSwitchingDevice(e.target.checked)} />
           <span className="form-toggle-switch-track" />
         </label>
       </div>

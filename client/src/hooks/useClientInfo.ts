@@ -3,8 +3,11 @@ import { axiosClient } from "../api/axiosClient";
 
 export interface ClientInfo {
   observedIp: string;
-  protocol: string;
-  host: string;
+  source: "agent" | "connection";
+  deviceHostname?: string;
+  deviceLastSeen?: string;
+  protocol?: string;
+  host?: string;
   appVersion: string;
 }
 

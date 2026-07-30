@@ -1,15 +1,15 @@
 @layer components {
   .ad-shell {
-    --ad-bg: #0b1220;
-    --ad-surface: #111a2c;
-    --ad-surface-2: #0d1524;
-    --ad-border: #1c2536;
-    --ad-text: #e6e9ef;
-    --ad-text-muted: #7b8497;
+    --ad-bg: var(--color-bg);
+    --ad-surface: var(--color-surface);
+    --ad-surface-2: var(--color-bg);
+    --ad-border: var(--color-border);
+    --ad-text: var(--color-text);
+    --ad-text-muted: var(--color-text-muted);
     --ad-accent: var(--color-primary);
-    --ad-success: #34d399;
-    --ad-danger: #f87171;
-    --ad-warning: #fbbf24;
+    --ad-success: var(--color-success);
+    --ad-danger: var(--color-danger);
+    --ad-warning: var(--color-warning);
     @apply bg-ad-bg text-ad-text rounded-xl overflow-hidden flex flex-col;
     min-height: calc(100vh - 140px);
   }

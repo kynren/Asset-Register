@@ -1,6 +1,11 @@
 @layer components {
   .sidebar {
     @apply w-sidebar min-w-sidebar bg-sidebar-bg text-sidebar-text flex flex-col h-screen sticky top-0 overflow-y-auto transition-all duration-[180ms] ease-in-out;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .sidebar::-webkit-scrollbar {
+    display: none;
   }
   .sidebar.collapsed {
     @apply w-sidebar-collapsed min-w-sidebar-collapsed;
@@ -62,12 +67,13 @@
   }
 
   .topbar {
-    --tb-bg: #0b1220;
-    --tb-border: #1c2536;
-    --tb-text: #e6e9ef;
-    --tb-muted: #7b8497;
-    --tb-green: #22c55e;
-    --tb-cyan: #22d3ee;
+    --tb-bg: var(--color-surface);
+    --tb-surface-2: var(--color-bg);
+    --tb-border: var(--color-border);
+    --tb-text: var(--color-text);
+    --tb-muted: var(--color-text-muted);
+    --tb-green: var(--color-success);
+    --tb-cyan: var(--color-primary);
     --tb-blue: var(--color-primary);
     @apply h-16 min-h-[64px] border-b border-tb-border bg-tb-bg text-tb-text flex items-center gap-5 px-5 flex-shrink-0 z-10;
   }
@@ -83,7 +89,7 @@
     @apply w-[34px] h-[34px] rounded-lg bg-tb-blue text-white flex items-center justify-center flex-shrink-0;
   }
   .topbar-brand-name {
-    @apply flex items-center gap-2 font-bold text-[15px] text-white leading-tight;
+    @apply flex items-center gap-2 font-bold text-[15px] text-tb-text leading-tight;
   }
   .topbar-brand-badge {
     @apply text-[10px] font-bold tracking-wide bg-primary-soft text-primary px-[7px] py-0.5 rounded;
@@ -94,7 +100,7 @@
   }
 
   .topbar-search {
-    @apply flex-1 max-w-[420px] flex items-center gap-2 bg-[#131b2c] border border-tb-border rounded-lg px-2.5 h-9 text-tb-muted;
+    @apply flex-1 max-w-[420px] flex items-center gap-2 bg-tb-surface-2 border border-tb-border rounded-lg px-2.5 h-9 text-tb-muted;
   }
   .topbar-search input {
     @apply bg-transparent border-none outline-none text-tb-text text-[13px] w-full;
@@ -120,7 +126,7 @@
   }
 
   .topbar-pill {
-    @apply flex items-center gap-1.5 bg-[#131b2c] border border-tb-border text-tb-text text-[11px] font-semibold tracking-wide px-3 py-[7px] rounded-full cursor-pointer whitespace-nowrap;
+    @apply flex items-center gap-1.5 bg-tb-surface-2 border border-tb-border text-tb-text text-[11px] font-semibold tracking-wide px-3 py-[7px] rounded-full cursor-pointer whitespace-nowrap;
   }
   .topbar-pill:hover {
     @apply border-tb-blue;
@@ -133,20 +139,20 @@
   }
 
   .topbar-icon-btn {
-    @apply w-[34px] h-[34px] rounded-lg bg-[#131b2c] border border-tb-border text-tb-text flex items-center justify-center cursor-pointer flex-shrink-0 relative;
+    @apply w-[34px] h-[34px] rounded-lg bg-tb-surface-2 border border-tb-border text-tb-text flex items-center justify-center cursor-pointer flex-shrink-0 relative;
   }
   .topbar-icon-btn:hover {
-    @apply border-tb-blue text-white;
+    @apply border-tb-blue text-tb-blue;
   }
 
   .topbar-user {
     @apply flex items-center gap-2.5 cursor-pointer py-1 pr-2.5 pl-1 rounded-full;
   }
   .topbar-user:hover {
-    @apply bg-[#131b2c];
+    @apply bg-tb-surface-2;
   }
   .topbar-user-name {
-    @apply text-[13px] font-semibold text-white leading-tight;
+    @apply text-[13px] font-semibold text-tb-text leading-tight;
   }
   .topbar-user-role {
     @apply text-[10px] text-tb-muted;

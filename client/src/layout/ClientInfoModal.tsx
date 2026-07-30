@@ -8,10 +8,11 @@ interface ClientInfoModalProps {
 }
 
 function Field({ label, value, mono, tone }: { label: string; value: string; mono?: boolean; tone?: "green" | "cyan" | "amber" }) {
-  const color = tone === "green" ? "#34d399" : tone === "cyan" ? "#22d3ee" : tone === "amber" ? "#fbbf24" : "#e6e9ef";
+  const color =
+    tone === "green" ? "var(--color-success)" : tone === "cyan" ? "var(--color-primary)" : tone === "amber" ? "var(--color-warning)" : "var(--color-text)";
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 10, letterSpacing: "0.05em", color: "#7b8497", marginBottom: 4, textTransform: "uppercase" }}>{label}</div>
+      <div style={{ fontSize: 10, letterSpacing: "0.05em", color: "var(--color-text-muted)", marginBottom: 4, textTransform: "uppercase" }}>{label}</div>
       <div style={{ fontSize: 13, color, fontFamily: mono ? "ui-monospace, SFMono-Regular, Consolas, monospace" : undefined, wordBreak: "break-all" }}>
         {value}
       </div>
@@ -46,7 +47,7 @@ export function ClientInfoModal({ onClose }: ClientInfoModalProps) {
     `URL: ${window.location.href}`,
     `Origin: ${window.location.origin}`,
     `Connection: ${isSecure ? "HTTPS Encrypted" : "HTTP (Not Encrypted)"}`,
-    `Observed IP (server-side): ${serverInfo?.observedIp ?? "—"}`,
+    `IP Address (${serverInfo?.source === "agent" ? "agent-reported" : "server-observed"}): ${serverInfo?.observedIp ?? "—"}`,
     `OS: ${detectOS(ua)}`,
     `Browser: ${detectBrowser(ua)}`,
     `CPU threads: ${navigator.hardwareConcurrency ?? "—"}`,
@@ -66,35 +67,53 @@ export function ClientInfoModal({ onClose }: ClientInfoModalProps) {
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal"
-        style={{ maxWidth: 620, background: "#0b1220", border: "1px solid #1c2536", color: "#e6e9ef" }}
+        style={{ maxWidth: 620, background: "var(--color-surface)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header" style={{ alignItems: "flex-start" }}>
           <div className="row gap-2" style={{ alignItems: "flex-start" }}>
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: "rgba(52,211,153,0.15)", color: "#34d399", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                background: "var(--color-success-soft)",
+                color: "var(--color-success)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
               <Icon name="cpu" size={18} />
             </div>
             <div>
               <div className="row gap-2" style={{ alignItems: "center" }}>
-                <h3 style={{ margin: 0, fontSize: 15, color: "#fff" }}>Client Physical Machine Information</h3>
-                <span className="badge" style={{ background: online ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)", color: online ? "#34d399" : "#f87171" }}>
+                <h3 style={{ margin: 0, fontSize: 15, color: "var(--color-text)" }}>Client Physical Machine Information</h3>
+                <span
+                  className="badge"
+                  style={{
+                    background: online ? "var(--color-success-soft)" : "var(--color-danger-soft)",
+                    color: online ? "var(--color-success)" : "var(--color-danger)",
+                  }}
+                >
                   {online ? "ONLINE" : "OFFLINE"}
                 </span>
               </div>
-              <p style={{ margin: "4px 0 0", fontSize: 12, color: "#7b8497" }}>Web Address, Client IP, Version &amp; Physical Host Specs</p>
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--color-text-muted)" }}>Web Address, Client IP, Version &amp; Physical Host Specs</p>
             </div>
           </div>
-          <button className="modal-close" style={{ color: "#7b8497" }} onClick={onClose}>
+          <button className="modal-close" style={{ color: "var(--color-text-muted)" }} onClick={onClose}>
             <Icon name="close" size={18} />
           </button>
         </div>
 
-        <div style={{ background: "#111a2c", border: "1px solid #1c2536", borderRadius: 10, padding: 16, marginBottom: 14 }}>
+        <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 10, padding: 16, marginBottom: 14 }}>
           <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-            <div className="row gap-2" style={{ color: "#7fb0ff", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em" }}>
+            <div className="row gap-2" style={{ color: "var(--color-primary)", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em" }}>
               <Icon name="network" size={14} /> WEB ADDRESS &amp; ENVIRONMENT
             </div>
-            <span className="badge" style={{ background: "rgba(52,211,153,0.15)", color: "#34d399" }}>ACTIVE ROUTE</span>
+            <span className="badge" style={{ background: "var(--color-success-soft)", color: "var(--color-success)" }}>ACTIVE ROUTE</span>
           </div>
           <div className="grid grid-cols-2">
             <Field label="Client Web Address (URL)" value={window.location.href} mono tone="cyan" />
@@ -104,27 +123,47 @@ export function ClientInfoModal({ onClose }: ClientInfoModalProps) {
           </div>
         </div>
 
-        <div style={{ background: "#111a2c", border: "1px solid #1c2536", borderRadius: 10, padding: 16, marginBottom: 14 }}>
-          <div className="row gap-2" style={{ color: "#7fb0ff", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", marginBottom: 12 }}>
+        <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 10, padding: 16, marginBottom: 14 }}>
+          <div className="row gap-2" style={{ color: "var(--color-primary)", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", marginBottom: 12 }}>
             <Icon name="cpu" size={14} /> PHYSICAL MACHINE &amp; NETWORK IP
           </div>
           <div className="grid grid-cols-2">
-            <Field label="Client IP (as seen by server)" value={serverInfo?.observedIp ?? "Loading..."} mono tone="green" />
+            <Field
+              label={serverInfo?.source === "agent" ? "Client IP (reported by Kynren agent)" : "Client IP (as seen by server)"}
+              value={serverInfo?.observedIp ?? "Loading..."}
+              mono
+              tone="green"
+            />
             <Field label="Operating System" value={detectOS(ua)} />
             <Field label="Client Browser" value={detectBrowser(ua)} />
             <Field label="CPU Threads" value={`${navigator.hardwareConcurrency ?? "—"} Logical CPU Threads`} tone="amber" />
             <Field label="Screen & Display" value={`${screen.width} x ${screen.height} (${dpr}x DPR)`} />
             <Field label="Timezone & Locale" value={`${timezone} · ${locale}`} />
           </div>
+          {serverInfo?.source === "connection" && (
+            <p style={{ margin: "10px 0 0", fontSize: 11.5, color: "var(--color-text-muted)" }}>
+              No Kynren agent report is linked to your account yet, so this IP is the raw connection address the server observed
+              — behind NAT it can be identical for every device on the same network. Run the agent on this machine and link it to
+              your assigned asset for a per-device IP instead.
+            </p>
+          )}
         </div>
 
-        <div style={{ background: "#0d1420", border: "1px solid #1c2536", borderRadius: 10, padding: 12, marginBottom: 16 }}>
-          <div style={{ fontSize: 10, letterSpacing: "0.05em", color: "#7b8497", marginBottom: 6, textTransform: "uppercase" }}>Full User-Agent String</div>
-          <div style={{ fontSize: 11.5, color: "#9aa4b8", fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace", wordBreak: "break-all" }}>{ua}</div>
+        <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 10, padding: 12, marginBottom: 16 }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.05em", color: "var(--color-text-muted)", marginBottom: 6, textTransform: "uppercase" }}>
+            Full User-Agent String
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--color-text-muted)", fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace", wordBreak: "break-all" }}>
+            {ua}
+          </div>
         </div>
 
         <div className="row gap-2" style={{ justifyContent: "space-between" }}>
-          <button className="btn btn-secondary btn-sm" onClick={handleCopy} style={{ background: "#131b2c", borderColor: "#1c2536", color: "#e6e9ef" }}>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={handleCopy}
+            style={{ background: "var(--color-bg)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
+          >
             <Icon name={copied ? "check" : "paperclip"} size={13} /> {copied ? "Copied" : "Copy Client Machine Specs"}
           </button>
           <button className="btn btn-primary btn-sm" onClick={onClose}>Close Inspector</button>

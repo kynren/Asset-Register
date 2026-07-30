@@ -4,6 +4,7 @@ import { Icon } from "../components/Icon";
 import { useAuth } from "../auth/AuthContext";
 import { useBranding } from "../theme/BrandingContext";
 import { useBattery } from "../hooks/useBattery";
+import { useUserPreference } from "../hooks/useUserPreference";
 import { NavItem, settingsNav, systemConsoleNav } from "./navConfig";
 
 function readCollapsed() {
@@ -58,9 +59,26 @@ export function Sidebar({ pageTitle }: { pageTitle: string }) {
   const { hasPermission } = useAuth();
   const branding = useBranding();
 
+  // localStorage gives an instant, flicker-free initial value; the server preference makes the
+  // choice follow the account onto a fresh browser/device instead of always starting expanded.
+  const { value: savedCollapsed, setValue: saveCollapsed, isLoading: collapsedLoading } = useUserPreference<boolean | null>("sidebar.collapsed", null);
+  const [collapsedHydrated, setCollapsedHydrated] = useState(false);
+
   useEffect(() => {
     localStorage.setItem("sidebar:collapsed", String(collapsed));
   }, [collapsed]);
+
+  useEffect(() => {
+    if (collapsedLoading || collapsedHydrated) return;
+    if (savedCollapsed !== null && savedCollapsed !== undefined) setCollapsed(savedCollapsed);
+    setCollapsedHydrated(true);
+  }, [collapsedLoading, collapsedHydrated, savedCollapsed]);
+
+  useEffect(() => {
+    if (!collapsedHydrated) return;
+    saveCollapsed(collapsed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapsed, collapsedHydrated]);
 
   const visibleConsole = systemConsoleNav.filter((item) => !item.module || hasPermission(item.module, "view"));
   const visibleSettings = settingsNav.filter((item) => !item.module || hasPermission(item.module, "view"));
