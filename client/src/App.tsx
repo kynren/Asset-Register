@@ -17,6 +17,7 @@ import { TicketListPage } from "./pages/helpdesk/TicketListPage";
 import { TicketDetailPage } from "./pages/helpdesk/TicketDetailPage";
 import { OperationsPage } from "./pages/operations/OperationsPage";
 import { NvrPage } from "./pages/nvr/NvrPage";
+import { OperationalContextPage } from "./pages/operational/OperationalContextPage";
 import { AssistantPage } from "./pages/assistant/AssistantPage";
 import { ProfilePage } from "./pages/profile/ProfilePage";
 import { AdminPage } from "./pages/admin/AdminPage";
@@ -52,6 +53,8 @@ function App() {
           <Route path="/operations" element={<PermissionGate module="operations" redirect><OperationsPage /></PermissionGate>} />
 
           <Route path="/nvr" element={<PermissionGate module="nvr" redirect><NvrPage /></PermissionGate>} />
+
+          <Route path="/operational-context" element={<PermissionGate module="assets" redirect><OperationalContextPage /></PermissionGate>} />
 
           <Route path="/assistant" element={<PermissionGate module="virtual-assistant" redirect><AssistantPage /></PermissionGate>} />
 

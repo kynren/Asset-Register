@@ -16,6 +16,7 @@ router.get("/stats", requirePermission("assets", "view"), controller.stats);
 router.get("/by-tag/:tag", requirePermission("assets", "view"), controller.getByTag);
 router.get("/export", requirePermission("assets", "export"), controller.exportCsv);
 router.get("/export.json", requirePermission("assets", "export"), controller.exportJson);
+router.get("/show-status", requirePermission("assets", "view"), controller.showStatus);
 router.get("/:id/history", requirePermission("assets", "view"), controller.history);
 router.get("/:id/report", requirePermission("assets", "view"), controller.report);
 router.get("/:id/report/pdf", requirePermission("assets", "export"), controller.reportPdf);

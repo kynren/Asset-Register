@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../auth/AuthContext";
 import { useBranding } from "../theme/BrandingContext";
+import { useBattery } from "../hooks/useBattery";
 import { NavItem, settingsNav, systemConsoleNav } from "./navConfig";
 
 function readCollapsed() {
@@ -25,7 +26,34 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
   );
 }
 
-export function Sidebar() {
+function SidebarBattery({ collapsed }: { collapsed: boolean }) {
+  const { supported, state } = useBattery();
+  if (supported !== true || !state) return null;
+
+  const levelPct = Math.round(state.level * 100);
+  const color = levelPct <= 20 ? "var(--color-danger)" : levelPct <= 50 ? "var(--color-warning)" : "var(--color-success)";
+  const label = `Client battery: ${levelPct}%${state.charging ? " (charging)" : ""}`;
+
+  if (collapsed) {
+    return (
+      <div className="sidebar-battery sidebar-battery-collapsed" title={label}>
+        <Icon name={state.charging ? "power" : "battery"} size={16} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="sidebar-battery" title={label}>
+      <Icon name={state.charging ? "power" : "battery"} size={15} />
+      <div className="sidebar-battery-bar">
+        <div className="sidebar-battery-bar-fill" style={{ width: `${levelPct}%`, background: color }} />
+      </div>
+      <span className="sidebar-battery-pct">{levelPct}%</span>
+    </div>
+  );
+}
+
+export function Sidebar({ pageTitle }: { pageTitle: string }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const { hasPermission } = useAuth();
   const branding = useBranding();
@@ -39,11 +67,14 @@ export function Sidebar() {
 
   return (
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
-      <div className="sidebar-brand">
-        <div className="sidebar-brand-mark">
-          {branding.appIconUrl ? <img src={branding.appIconUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} /> : branding.companyName[0]}
+      <div className="sidebar-brand-block">
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-mark">
+            {branding.appIconUrl ? <img src={branding.appIconUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} /> : branding.companyName[0]}
+          </div>
+          {!collapsed && <span>{branding.companyName}</span>}
         </div>
-        {!collapsed && <span>{branding.companyName}</span>}
+        {!collapsed && <div className="sidebar-page-title">{pageTitle.toUpperCase()}</div>}
       </div>
 
       <nav className="sidebar-nav">
@@ -57,6 +88,8 @@ export function Sidebar() {
           <SidebarLink key={item.path} item={item} collapsed={collapsed} />
         ))}
       </nav>
+
+      <SidebarBattery collapsed={collapsed} />
 
       <button className="sidebar-collapse-btn" onClick={() => setCollapsed((c) => !c)}>
         <Icon name={collapsed ? "chevronRight" : "chevronLeft"} size={16} />
