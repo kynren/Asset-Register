@@ -12,7 +12,9 @@
     "db:migrate": "npm run prisma:migrate -w server",
     "db:seed": "npm run prisma:seed -w server",
     "db:studio": "npm run prisma:studio -w server",
-    "db:generate": "npm run prisma:generate -w server"
+    "db:generate": "npm run prisma:generate -w server",
+    "desktop:dev": "npm run dev --prefix desktop",
+    "desktop:build": "npm run build --prefix desktop"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
