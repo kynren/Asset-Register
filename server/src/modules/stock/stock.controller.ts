@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { env } from "../../config/env";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
@@ -106,6 +107,12 @@ export async function addTransaction(req: Request, res: Response) {
       type: "stock_low",
       message: `"${item.name}" has dropped to ${newQuantityOnHand} on hand (reorder level: ${item.reorderLevel})`,
       linkUrl: `/stock`,
+      email: {
+        eventType: "LOW_STOCK",
+        fallbackSubject: `Low stock: "${item.name}"`,
+        fallbackText: `"${item.name}" has dropped to ${newQuantityOnHand} on hand (reorder level: ${item.reorderLevel}).\n\nView stock: ${env.CLIENT_ORIGIN}/stock`,
+        variables: { itemName: item.name, quantityOnHand: String(newQuantityOnHand), reorderLevel: String(item.reorderLevel), stockUrl: `${env.CLIENT_ORIGIN}/stock` },
+      },
     });
   }
 

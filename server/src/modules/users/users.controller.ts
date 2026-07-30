@@ -1,8 +1,10 @@
 import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
+import { env } from "../../config/env";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
+import { sendEventEmail } from "../../lib/emailNotify";
 import { generateTempPassword } from "../../lib/passwords";
 import { getPagination, paginatedResponse } from "../../lib/pagination";
 
@@ -78,6 +80,13 @@ export async function create(req: Request, res: Response) {
   });
 
   await logAudit({ userId: req.user!.id, action: "user.create", entityType: "User", entityId: user.id });
+  await sendEventEmail({
+    eventType: "ACCOUNT_CREATED",
+    to: user.email,
+    variables: { firstName: user.firstName, lastName: user.lastName, email: user.email, tempPassword, loginUrl: `${env.CLIENT_ORIGIN}/login` },
+    fallbackSubject: "Your Kynren Asset Register account",
+    fallbackText: `Hello ${user.firstName},\n\nAn account was created for you on the Kynren Asset Register.\n\nEmail: ${user.email}\nTemporary password: ${tempPassword}\n\nYou'll be asked to set a new password on first login: ${env.CLIENT_ORIGIN}/login`,
+  });
   res.status(201).json({ user, tempPassword });
 }
 

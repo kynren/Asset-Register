@@ -35,6 +35,7 @@ import assetResourcesRoutes from "./modules/assetResources/assetResources.routes
 import licensesRoutes from "./modules/licenses/licenses.routes";
 import procurementRoutes from "./modules/procurement/procurement.routes";
 import assetFormTemplatesRoutes from "./modules/assetFormTemplates/assetFormTemplates.routes";
+import emailTemplatesRoutes from "./modules/emailTemplates/emailTemplates.routes";
 import mcpRoutes from "./mcp/mcp.routes";
 import mcpKeysRoutes from "./mcp/mcpKeys.routes";
 
@@ -53,6 +54,7 @@ export function createApp() {
   app.use("/uploads/branding", express.static(path.join(__dirname, "..", "uploads", "branding")));
   app.use("/uploads/avatars", express.static(path.join(__dirname, "..", "uploads", "avatars")));
   app.use("/uploads/assets", express.static(path.join(__dirname, "..", "uploads", "assets")));
+  app.use("/uploads/email-templates", express.static(path.join(__dirname, "..", "uploads", "email-templates")));
 
   app.use("/api/auth", authRoutes);
   app.use("/api/users", usersRoutes);
@@ -82,6 +84,7 @@ export function createApp() {
   app.use("/api/licenses", licensesRoutes);
   app.use("/api/procurement", procurementRoutes);
   app.use("/api/asset-form-templates", assetFormTemplatesRoutes);
+  app.use("/api/email-templates", emailTemplatesRoutes);
   app.use("/api/mcp", mcpRoutes);
   app.use("/api/mcp-keys", mcpKeysRoutes);
 

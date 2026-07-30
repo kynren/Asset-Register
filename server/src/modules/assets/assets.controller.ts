@@ -1,12 +1,14 @@
 import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import PDFDocument from "pdfkit";
+import { env } from "../../config/env";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { getPagination, paginatedResponse } from "../../lib/pagination";
 import { parseCsvRaw, toCsv } from "../../lib/csv";
 import { notifyUsers } from "../../lib/notify";
+import { sendEventEmail } from "../../lib/emailNotify";
 import { generateTempPassword } from "../../lib/passwords";
 import { pingHost } from "../../lib/ping";
 
@@ -249,6 +251,12 @@ export async function checkoutAsset(req: Request, res: Response) {
     type: "asset_assigned",
     message: `Asset "${asset.name}" (${asset.assetTag}) was checked out to you`,
     linkUrl: `/assets/${assetId}`,
+    email: {
+      eventType: "ASSET_ASSIGNED",
+      fallbackSubject: `"${asset.name}" was assigned to you`,
+      fallbackText: `Hello,\n\nThe asset "${asset.name}" (${asset.assetTag}) was checked out to you.\n\nView it here: ${env.CLIENT_ORIGIN}/assets/${assetId}`,
+      variables: { assetName: asset.name, assetTag: asset.assetTag, assetUrl: `${env.CLIENT_ORIGIN}/assets/${assetId}` },
+    },
   });
   res.status(201).json(checkout);
 }
@@ -481,6 +489,12 @@ export async function create(req: Request, res: Response) {
       type: "asset_assigned",
       message: `Asset "${asset.name}" (${asset.assetTag}) was assigned to you`,
       linkUrl: `/assets/${asset.id}`,
+      email: {
+        eventType: "ASSET_ASSIGNED",
+        fallbackSubject: `"${asset.name}" was assigned to you`,
+        fallbackText: `Hello,\n\nThe asset "${asset.name}" (${asset.assetTag}) was assigned to you.\n\nView it here: ${env.CLIENT_ORIGIN}/assets/${asset.id}`,
+        variables: { assetName: asset.name, assetTag: asset.assetTag, assetUrl: `${env.CLIENT_ORIGIN}/assets/${asset.id}` },
+      },
     });
   }
   res.status(201).json(customFieldValues?.length ? await prisma.asset.findUnique({ where: { id: asset.id }, include }) : asset);
@@ -502,6 +516,12 @@ export async function update(req: Request, res: Response) {
       type: "asset_assigned",
       message: `Asset "${asset.name}" (${asset.assetTag}) was assigned to you`,
       linkUrl: `/assets/${id}`,
+      email: {
+        eventType: "ASSET_ASSIGNED",
+        fallbackSubject: `"${asset.name}" was assigned to you`,
+        fallbackText: `Hello,\n\nThe asset "${asset.name}" (${asset.assetTag}) was assigned to you.\n\nView it here: ${env.CLIENT_ORIGIN}/assets/${id}`,
+        variables: { assetName: asset.name, assetTag: asset.assetTag, assetUrl: `${env.CLIENT_ORIGIN}/assets/${id}` },
+      },
     });
   }
   res.json(customFieldValues?.length ? await prisma.asset.findUnique({ where: { id }, include }) : asset);
@@ -696,6 +716,13 @@ export async function importCsv(req: Request, res: Response) {
     emailMap.set(email, user.id);
     nameMap.set(`${user.firstName} ${user.lastName}`.toLowerCase(), user.id);
     usersCreated.push({ ...user, tempPassword });
+    await sendEventEmail({
+      eventType: "ACCOUNT_CREATED",
+      to: user.email,
+      variables: { firstName: user.firstName, lastName: user.lastName, email: user.email, tempPassword, loginUrl: `${env.CLIENT_ORIGIN}/login` },
+      fallbackSubject: "Your Kynren Asset Register account",
+      fallbackText: `Hello ${user.firstName},\n\nAn account was created for you on the Kynren Asset Register.\n\nEmail: ${user.email}\nTemporary password: ${tempPassword}\n\nYou'll be asked to set a new password on first login: ${env.CLIENT_ORIGIN}/login`,
+    });
     return user.id;
   }
 
@@ -744,6 +771,12 @@ export async function importCsv(req: Request, res: Response) {
           type: "asset_assigned",
           message: `Asset "${asset.name}" (${asset.assetTag}) was assigned to you`,
           linkUrl: `/assets/${asset.id}`,
+          email: {
+            eventType: "ASSET_ASSIGNED",
+            fallbackSubject: `"${asset.name}" was assigned to you`,
+            fallbackText: `Hello,\n\nThe asset "${asset.name}" (${asset.assetTag}) was assigned to you.\n\nView it here: ${env.CLIENT_ORIGIN}/assets/${asset.id}`,
+            variables: { assetName: asset.name, assetTag: asset.assetTag, assetUrl: `${env.CLIENT_ORIGIN}/assets/${asset.id}` },
+          },
         });
       }
     } catch (err) {
