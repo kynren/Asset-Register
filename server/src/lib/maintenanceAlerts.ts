@@ -1,4 +1,6 @@
+import { env } from "../config/env";
 import { prisma } from "../config/prisma";
+import { sendEventEmail } from "./emailNotify";
 
 async function getAlertWindowDays(): Promise<number> {
   const setting = await prisma.systemSetting.findUnique({ where: { key: "maintenanceAlertDays" } });
@@ -6,7 +8,12 @@ async function getAlertWindowDays(): Promise<number> {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
 }
 
-async function notifyEligibleUsers(message: string, type: string, linkUrl: string) {
+interface OverdueEmailConfig {
+  taskName: string;
+  dueDate: string;
+}
+
+async function notifyEligibleUsers(message: string, type: string, linkUrl: string, overdueEmail?: OverdueEmailConfig) {
   // Alert everyone whose role can act on assets (edit permission), not just admins.
   const eligibleRoles = await prisma.rolePermission.findMany({
     where: { module: "assets", canEdit: true },
@@ -15,7 +22,7 @@ async function notifyEligibleUsers(message: string, type: string, linkUrl: strin
   const roleIds = eligibleRoles.map((r) => r.roleId);
   if (roleIds.length === 0) return;
 
-  const users = await prisma.user.findMany({ where: { roleId: { in: roleIds }, isActive: true }, select: { id: true } });
+  const users = await prisma.user.findMany({ where: { roleId: { in: roleIds }, isActive: true }, select: { id: true, email: true } });
 
   // Avoid re-notifying about the same thing within a 24h window.
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -31,6 +38,24 @@ async function notifyEligibleUsers(message: string, type: string, linkUrl: strin
   await prisma.notification.createMany({
     data: toCreate.map((u) => ({ userId: u.id, type, message, linkUrl })),
   });
+
+  // Only overdue maintenance (not the "upcoming" reminder) goes out as a TASK_OVERDUE email —
+  // fired only for the users who actually got a fresh notification above, so it shares the
+  // same 24h de-dup boundary rather than re-emailing everyone on every scan.
+  if (overdueEmail) {
+    const taskUrl = `${env.CLIENT_ORIGIN}${linkUrl}`;
+    await Promise.all(
+      toCreate.map((u) =>
+        sendEventEmail({
+          eventType: "TASK_OVERDUE",
+          to: u.email,
+          variables: { taskType: "Asset Maintenance", taskName: overdueEmail.taskName, dueDate: overdueEmail.dueDate, taskUrl },
+          fallbackSubject: `Overdue: ${overdueEmail.taskName}`,
+          fallbackText: `${message}\n\nView it here: ${taskUrl}`,
+        })
+      )
+    );
+  }
 }
 
 /**
@@ -66,7 +91,10 @@ export async function runMaintenanceAlertCheck(): Promise<{ warrantyAlerts: numb
     const message = overdue
       ? `${asset.name} (${asset.assetTag}) is overdue for scheduled maintenance.`
       : `${asset.name} (${asset.assetTag}) is due for maintenance in ${daysLeft} day(s).`;
-    await notifyEligibleUsers(message, "maintenance_due", `/assets/${asset.id}`);
+    const overdueEmail = overdue
+      ? { taskName: `${asset.name} (${asset.assetTag})`, dueDate: asset.nextServiceDate!.toISOString().slice(0, 10) }
+      : undefined;
+    await notifyEligibleUsers(message, "maintenance_due", `/assets/${asset.id}`, overdueEmail);
   }
 
   return { warrantyAlerts: warrantyDue.length, serviceAlerts: serviceDue.length };

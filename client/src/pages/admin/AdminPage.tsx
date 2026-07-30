@@ -4,11 +4,13 @@ import { RolesTab } from "./RolesTab";
 import { CategoriesLocationsTab } from "./CategoriesLocationsTab";
 import { SystemSettingsTab } from "./SystemSettingsTab";
 import { AuditLogTab } from "./AuditLogTab";
+import { EmailTemplatesTab } from "./EmailTemplatesTab";
 
 const TABS = [
   { key: "users", label: "Users" },
   { key: "roles", label: "Roles & Permissions" },
   { key: "catalog", label: "Categories & Locations" },
+  { key: "email-templates", label: "Email Templates" },
   { key: "settings", label: "System Settings" },
   { key: "audit", label: "Audit Log" },
 ] as const;
@@ -38,6 +40,7 @@ export function AdminPage() {
       {tab === "users" && <UsersTab />}
       {tab === "roles" && <RolesTab />}
       {tab === "catalog" && <CategoriesLocationsTab />}
+      {tab === "email-templates" && <EmailTemplatesTab />}
       {tab === "settings" && <SystemSettingsTab />}
       {tab === "audit" && <AuditLogTab />}
     </div>

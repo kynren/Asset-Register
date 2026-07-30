@@ -5,7 +5,7 @@ import { env } from "../../config/env";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
-import { sendEmail } from "../../lib/email";
+import { sendEventEmail } from "../../lib/emailNotify";
 import { resolveClientIp } from "../../lib/network";
 import {
   createRefreshSession,
@@ -134,10 +134,12 @@ export async function forgotPassword(req: Request, res: Response) {
     await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt } });
 
     const resetUrl = `${env.CLIENT_ORIGIN}/reset-password/${rawToken}`;
-    await sendEmail({
+    await sendEventEmail({
+      eventType: "PASSWORD_RESET",
       to: user.email,
-      subject: "Reset your Kynren Asset Register password",
-      text: `Hello ${user.firstName},\n\nA password reset was requested for your account. This link expires in 1 hour:\n\n${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
+      variables: { firstName: user.firstName, resetUrl },
+      fallbackSubject: "Reset your Kynren Asset Register password",
+      fallbackText: `Hello ${user.firstName},\n\nA password reset was requested for your account. This link expires in 1 hour:\n\n${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
     });
     await logAudit({ userId: user.id, action: "auth.forgot_password_requested", entityType: "User", entityId: user.id, ipAddress: req.ip });
   }

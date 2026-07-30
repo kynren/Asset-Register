@@ -87,6 +87,7 @@ model User {
   checkoutsProcessed   AssetCheckout[]      @relation("CheckoutReceiver")
   licenseAssignments   LicenseAssignment[]
   purchaseOrdersCreated PurchaseOrder[]
+  emailTemplatesCreated EmailTemplate[]
 }
 
 model RefreshSession {
@@ -841,6 +842,33 @@ model Notification {
   isRead    Boolean  @default(false)
   linkUrl   String?
   createdAt DateTime @default(now())
+}
+
+enum EmailEventType {
+  ACCOUNT_CREATED
+  ASSET_ASSIGNED
+  PASSWORD_RESET
+  TASK_OVERDUE
+  LOW_STOCK
+}
+
+// Blocks is an ordered array of { id, type, ...type-specific fields } — rendered to HTML by
+// server/src/lib/emailTemplateRenderer.ts. Only one template per eventType is ever "active"
+// (enforced in the controller, not the DB) — that's the one sendEventEmail() picks up; the rest
+// are drafts/alternates an admin can keep around and swap in later.
+model EmailTemplate {
+  id          Int            @id @default(autoincrement())
+  name        String
+  eventType   EmailEventType
+  subject     String
+  blocks      Json
+  isActive    Boolean        @default(false)
+  createdById Int
+  createdBy   User           @relation(fields: [createdById], references: [id])
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([eventType])
 }
 
 model SystemSetting {
