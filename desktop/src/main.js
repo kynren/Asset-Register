@@ -9,7 +9,7 @@ const store = new Store({
   },
 });
 
-const ICON_PATH = path.join(__dirname, "..", "build", "icon.png");
+const ICON_PATH = path.join(__dirname, "..", "assets", "icon.png");
 
 let mainWindow = null;
 let settingsWindow = null;
