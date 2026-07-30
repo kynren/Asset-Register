@@ -55,5 +55,8 @@
       "icon": "build/icon.png",
       "category": "Office"
     }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
   }
 }
