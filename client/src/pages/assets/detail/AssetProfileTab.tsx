@@ -17,6 +17,17 @@ interface Checkout {
   checkedInBy: { id: number; firstName: string; lastName: string } | null;
 }
 
+function OverviewField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="ad-row-card">
+      <div>
+        <div className="ad-row-label">{label}</div>
+        <div className="ad-row-value">{value}</div>
+      </div>
+    </div>
+  );
+}
+
 export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUpdated: () => void }) {
   const queryClient = useQueryClient();
   const featuredInputRef = useRef<HTMLInputElement>(null);
@@ -97,6 +108,26 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
       <div className="ad-content-header">
         <h2 className="ad-content-title"><Icon name="profile" size={16} /> Asset Profile &amp; Identity</h2>
         <p className="ad-content-subtitle">Manage asset imagery, visual gallery, and assign staff responsibility.</p>
+      </div>
+
+      <div className="ad-panel" style={{ marginBottom: 18 }}>
+        <div className="ad-panel-title">Asset Overview</div>
+        <div className="ad-grid">
+          <OverviewField label="Asset Tag" value={asset.assetTag} />
+          <OverviewField label="Category" value={asset.category?.name ?? "Uncategorized"} />
+          <OverviewField label="Status" value={asset.status.replace("_", " ")} />
+          <OverviewField label="Manufacturer" value={asset.manufacturer ?? "—"} />
+          <OverviewField label="Model" value={asset.model ?? "—"} />
+          <OverviewField label="Serial Number" value={asset.serialNumber ?? "—"} />
+          <OverviewField label="Location" value={asset.location?.name ?? "Unassigned"} />
+          <OverviewField label="Notes" value={asset.notes ?? "—"} />
+          {asset.device && (
+            <>
+              <OverviewField label="Network Hostname" value={asset.device.hostname} />
+              <OverviewField label="Operating System" value={`${asset.device.os ?? "Unknown"} ${asset.device.osVersion ?? ""}`.trim()} />
+            </>
+          )}
+        </div>
       </div>
 
       <div className="ad-grid">
@@ -218,6 +249,31 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
               <span className="ad-toggle-slider" />
             </label>
           </div>
+
+          {!asset.gridPowered && (
+            <div className="ad-row-card">
+              <div className="row gap-2">
+                <div className="ad-icon-circle"><Icon name="battery" size={16} /></div>
+                <div>
+                  <div className="ad-row-label">Battery State</div>
+                  <div className="ad-row-value">
+                    {asset.device?.batteryPresent === true && asset.device.batteryPercent != null
+                      ? `${asset.device.batteryPercent}% ${asset.device.batteryCharging ? "· Charging" : "· On Battery"}`
+                      : asset.device?.batteryPresent === false
+                        ? "Linked device reports no battery"
+                        : "No live reading yet — reported by the device agent"}
+                  </div>
+                </div>
+              </div>
+              {asset.device?.batteryPercent != null && (
+                <span
+                  className={`ad-badge ${asset.device.batteryPercent <= 20 ? "ad-badge-danger" : asset.device.batteryPercent <= 50 ? "ad-badge-warning" : "ad-badge-success"}`}
+                >
+                  {asset.device.batteryPercent}%
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="ad-panel-title" style={{ marginTop: 18 }}>Checkout History</div>
           {checkouts && checkouts.length > 0 ? (

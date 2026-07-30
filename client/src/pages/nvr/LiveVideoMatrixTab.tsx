@@ -1,10 +1,18 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { MatrixTile } from "./MatrixTile";
 import { PtzAlignmentPanel } from "./PtzAlignmentPanel";
 import { useClientInfo } from "../../hooks/useClientInfo";
+import { useUserPreference } from "../../hooks/useUserPreference";
+
+interface MatrixLayout {
+  gridSize: number;
+  slots: (number | null)[];
+}
+
+const MAX_GRID_SIZE = 36;
 
 interface Camera {
   id: number;
@@ -26,9 +34,9 @@ interface Nvr {
   cameras: Camera[];
 }
 const GRID_SIZES = [
-  { key: 1 as const, label: "1x1" },
-  { key: 4 as const, label: "2x2" },
-  { key: 9 as const, label: "3x3" },
+  { key: 1, label: "1x1" },
+  { key: 4, label: "2x2" },
+  { key: 9, label: "3x3" },
 ];
 
 function subnetOf(ip: string | null | undefined): string | null {
@@ -51,12 +59,34 @@ export function LiveVideoMatrixTab() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ONLINE" | "OFFLINE" | "UNKNOWN">("ALL");
   const [groupFilter, setGroupFilter] = useState("ALL");
 
-  const [gridSize, setGridSize] = useState<1 | 4 | 9>(4);
+  const { value: savedLayout, setValue: saveLayout, isLoading: layoutLoading } = useUserPreference<MatrixLayout | null>("nvr.matrixLayout", null);
+  const [gridSize, setGridSize] = useState<number>(4);
   const [slots, setSlots] = useState<(number | null)[]>(Array(4).fill(null));
+  const [customSizeInput, setCustomSizeInput] = useState("");
+  const [layoutHydrated, setLayoutHydrated] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [muted, setMuted] = useState(true);
   const gridRef = useRef<HTMLDivElement>(null);
   const snapFnsRef = useRef<Map<number, () => void>>(new Map());
+
+  // Restore this user's saved grid size + camera selection once, on first load — never overwrite
+  // it with the local defaults before the saved value has actually arrived.
+  useEffect(() => {
+    if (layoutLoading || layoutHydrated) return;
+    if (savedLayout) {
+      setGridSize(savedLayout.gridSize);
+      setSlots(savedLayout.slots);
+    }
+    setLayoutHydrated(true);
+  }, [layoutLoading, layoutHydrated, savedLayout]);
+
+  // Persist every change the user makes to the grid — so reopening this tab (or logging in on
+  // another device) restores exactly what they were watching, instead of showing everything.
+  useEffect(() => {
+    if (!layoutHydrated) return;
+    saveLayout({ gridSize, slots });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gridSize, slots, layoutHydrated]);
 
   const allCameras = useMemo(() => (nvrs ?? []).flatMap((n) => n.cameras), [nvrs]);
 
@@ -80,14 +110,22 @@ export function LiveVideoMatrixTab() {
     return set;
   }, [allCameras, search, typeFilter, subnetFilter, statusFilter, groupFilter]);
 
-  function changeGridSize(size: 1 | 4 | 9) {
-    setGridSize(size);
+  function changeGridSize(size: number) {
+    const clamped = Math.min(MAX_GRID_SIZE, Math.max(1, Math.round(size)));
+    setGridSize(clamped);
     setSlots((prev) => {
-      const next: (number | null)[] = Array(size).fill(null);
-      for (let i = 0; i < Math.min(prev.length, size); i++) next[i] = prev[i];
+      const next: (number | null)[] = Array(clamped).fill(null);
+      for (let i = 0; i < Math.min(prev.length, clamped); i++) next[i] = prev[i];
       return next;
     });
     setFocusedIndex(null);
+  }
+
+  function applyCustomGridSize() {
+    const n = Number(customSizeInput);
+    if (!Number.isFinite(n) || n < 1) return;
+    changeGridSize(n);
+    setCustomSizeInput("");
   }
 
   function assignCamera(cameraId: number) {
@@ -127,7 +165,7 @@ export function LiveVideoMatrixTab() {
   }
 
   const focusedCamera = focusedIndex !== null && slots[focusedIndex] != null ? allCameras.find((c) => c.id === slots[focusedIndex]) ?? null : null;
-  const gridCols = gridSize === 1 ? 1 : gridSize === 4 ? 2 : 3;
+  const gridCols = Math.ceil(Math.sqrt(gridSize));
   const totalNodes = (nvrs?.length ?? 0) + allCameras.length;
 
   return (
@@ -225,6 +263,22 @@ export function LiveVideoMatrixTab() {
                   {g.label}
                 </button>
               ))}
+            </div>
+            <div className="row gap-1" style={{ marginTop: 6, marginBottom: 6 }}>
+              <input
+                type="number"
+                min={1}
+                max={MAX_GRID_SIZE}
+                placeholder={`Custom (1-${MAX_GRID_SIZE})`}
+                className="input"
+                style={{ fontSize: 11, padding: "5px 8px", height: "auto" }}
+                value={customSizeInput}
+                onChange={(e) => setCustomSizeInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && applyCustomGridSize()}
+              />
+              <button type="button" className="nvx-grid-size-btn" onClick={applyCustomGridSize} disabled={!customSizeInput}>
+                Apply
+              </button>
             </div>
             <div className="nvx-toggle-row">
               <button type="button" className={`nvx-toggle-btn ${muted ? "" : "on"}`} onClick={() => setMuted((m) => !m)}>

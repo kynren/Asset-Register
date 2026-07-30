@@ -27,9 +27,14 @@ interface SubResourceTabProps {
   columns: Column[];
   fields: FieldConfig[];
   extraInfo?: string;
+  /** Read-only rows sourced live from the Kynren agent (same cell keys as `columns`), shown in
+   * their own section above the manually-recorded entries — there's no DB row backing these, so
+   * they're never editable or deletable here. */
+  agentRows?: Record<string, any>[];
+  agentSectionLabel?: string;
 }
 
-export function SubResourceTab({ assetId, resource, title, subtitle, addLabel, columns, fields, extraInfo }: SubResourceTabProps) {
+export function SubResourceTab({ assetId, resource, title, subtitle, addLabel, columns, fields, extraInfo, agentRows, agentSectionLabel }: SubResourceTabProps) {
   const queryClient = useQueryClient();
   const [values, setValues] = useState<Record<string, string>>({});
   const [deleting, setDeleting] = useState<Record<string, any> | null>(null);
@@ -73,6 +78,27 @@ export function SubResourceTab({ assetId, resource, title, subtitle, addLabel, c
       </div>
 
       {extraInfo && <div className="ad-row-card" style={{ marginBottom: 16 }}><span style={{ fontSize: 12 }}>{extraInfo}</span></div>}
+
+      {agentRows && agentRows.length > 0 && (
+        <div className="ad-panel" style={{ marginBottom: 16 }}>
+          <div className="row gap-2" style={{ marginBottom: 10 }}>
+            <span className="badge badge-success">LIVE</span>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>{agentSectionLabel ?? "Reported by the Kynren agent"}</span>
+          </div>
+          <table className="ad-table">
+            <thead>
+              <tr>{columns.map((c) => <th key={c.key}>{c.label}</th>)}</tr>
+            </thead>
+            <tbody>
+              {agentRows.map((row, i) => (
+                <tr key={i}>
+                  {columns.map((c) => <td key={c.key}>{row[c.key] ?? "—"}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="ad-panel">
         <div className="ad-add-form">

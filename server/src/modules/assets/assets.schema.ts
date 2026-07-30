@@ -24,6 +24,10 @@ export const createAssetSchema = z.object({
   remoteManagementEnabled: z.boolean().optional(),
   remoteManagementProtocol: z.string().nullable().optional(),
   remoteManagementUrl: z.string().nullable().optional(),
+  staticIpAddress: z.string().nullable().optional(),
+  subnetMask: z.string().nullable().optional(),
+  defaultGateway: z.string().nullable().optional(),
+  dnsServers: z.string().nullable().optional(),
   isVirtual: z.boolean().optional(),
   hypervisor: z.string().nullable().optional(),
   vmHost: z.string().nullable().optional(),
@@ -48,4 +52,16 @@ export const checkinSchema = z.object({
 export const bulkStatusSchema = z.object({
   assetIds: z.array(z.number().int()).min(1),
   status: assetStatusEnum,
+});
+
+export const initPortsSchema = z.object({
+  count: z.number().int().min(1).max(96),
+});
+
+export const updatePortSchema = z.object({
+  label: z.string().nullable().optional(),
+  status: z.enum(["UP", "DOWN", "DISABLED"]).optional(),
+  vlan: z.string().nullable().optional(),
+  connectedAssetId: z.number().int().nullable().optional(),
+  notes: z.string().nullable().optional(),
 });

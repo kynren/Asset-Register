@@ -35,7 +35,7 @@ export interface Asset {
   serialNumber: string | null;
   nextServiceDate: string | null;
   notes: string | null;
-  device: { lastSeen: string } | null;
+  device: { lastSeen: string; batteryPresent: boolean | null; batteryPercent: number | null; batteryCharging: boolean | null } | null;
   featuredImageUrl: string | null;
   gridPowered: boolean;
   remoteManagementEnabled: boolean;
@@ -187,6 +187,35 @@ export function AssetListPage() {
         ),
     },
     { header: "Location", accessorFn: (r) => r.location?.name ?? "—" },
+    {
+      header: "Power",
+      cell: ({ row }) => {
+        const a = row.original;
+        if (a.gridPowered) {
+          return (
+            <span className="badge badge-neutral" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <Icon name="plug" size={11} /> Grid
+            </span>
+          );
+        }
+        const battery = a.device;
+        if (!battery || battery.batteryPresent !== true || battery.batteryPercent == null) {
+          return <span className="muted" style={{ fontSize: 12 }}>—</span>;
+        }
+        const level = battery.batteryPercent;
+        const color = level <= 20 ? "var(--color-danger)" : level <= 50 ? "var(--color-warning)" : "var(--color-success)";
+        return (
+          <span
+            className="row gap-1"
+            style={{ fontSize: 12, alignItems: "center", color }}
+            title={battery.batteryCharging ? "Charging" : "On battery"}
+          >
+            <Icon name="battery" size={13} />
+            {level}%{battery.batteryCharging ? " ⚡" : ""}
+          </span>
+        );
+      },
+    },
     {
       header: "Telemetry",
       cell: ({ row }) => <AssetTelemetryCell assetId={row.original.id} />,

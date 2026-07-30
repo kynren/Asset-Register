@@ -16,10 +16,25 @@ import { RemoteManagementTab } from "./detail/RemoteManagementTab";
 import { VirtualizationTab } from "./detail/VirtualizationTab";
 import { AntivirusTab } from "./detail/AntivirusTab";
 import { SubResourceTab } from "./detail/SubResourceTab";
+import { NetworkSettingsCard } from "./detail/NetworkSettingsCard";
 import { FileResourceTab } from "./detail/FileResourceTab";
 import { ReportTab } from "./detail/ReportTab";
 import { ActivityLogTab } from "./detail/ActivityLogTab";
 import { Skeleton, SkeletonText } from "../../components/Skeleton";
+
+// Mirrors the exact format the agent writes in agent/kynren_agent.py get_disk_info():
+// "C:\\ 512.0GB total, 200.0GB free; D:\\ 1024.0GB total, 400.0GB free"
+function parseDiskInfo(diskInfo: string | null | undefined): { label: string; totalGb: string; freeGb: string; fileSystem: string }[] {
+  if (!diskInfo) return [];
+  return diskInfo
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const m = part.match(/^(.+?)\s+([\d.]+)GB total,\s*([\d.]+)GB free$/i);
+      return m ? { label: m[1], totalGb: m[2], freeGb: m[3], fileSystem: "—" } : { label: part, totalGb: "—", freeGb: "—", fileSystem: "—" };
+    });
+}
 
 type TabKey =
   | "profile" | "impact" | "location" | "os" | "components" | "volumes" | "software"
@@ -209,24 +224,41 @@ export function AssetDetailPage() {
                 { key: "freeGb", label: "Free (GB)", type: "number", placeholder: "128" },
                 { key: "fileSystem", label: "File System", placeholder: "NTFS" },
               ]}
-              extraInfo={asset.device?.diskInfo ? `Agent-reported disk summary: ${asset.device.diskInfo}` : undefined}
+              agentRows={parseDiskInfo(asset.device?.diskInfo)}
+              agentSectionLabel="Disk volumes reported by the Kynren agent"
             />
           )}
           {tab === "software" && <SoftwareTab asset={asset} />}
           {tab === "connections" && (
-            <SubResourceTab
-              assetId={asset.id}
-              resource="connections"
-              title="Connections"
-              subtitle="Cables, peripherals, and network connections attached to this asset."
-              addLabel="Add Connection"
-              columns={[{ key: "label", label: "Label" }, { key: "type", label: "Type" }, { key: "target", label: "Connected To" }]}
-              fields={[
-                { key: "label", label: "Label", required: true, placeholder: "e.g. Uplink" },
-                { key: "type", label: "Type", placeholder: "Ethernet / Wi-Fi / USB" },
-                { key: "target", label: "Connected To", placeholder: "e.g. Switch Port 4" },
-              ]}
-            />
+            <>
+              <NetworkSettingsCard asset={asset} onUpdated={invalidate} />
+              <SubResourceTab
+                assetId={asset.id}
+                resource="connections"
+                title="Connections"
+                subtitle="Cables, peripherals, and network connections attached to this asset."
+                addLabel="Add Connection"
+                columns={[{ key: "label", label: "Label" }, { key: "type", label: "Type" }, { key: "target", label: "Connected To" }]}
+                fields={[
+                  { key: "label", label: "Label", required: true, placeholder: "e.g. Uplink" },
+                  { key: "type", label: "Type", placeholder: "Ethernet / Wi-Fi / USB" },
+                  { key: "target", label: "Connected To", placeholder: "e.g. Switch Port 4" },
+                ]}
+                agentRows={
+                  asset.device
+                    ? [
+                        ...asset.device.ipAddresses.map((ip, i) => ({
+                          label: i === 0 ? "Primary Network Adapter" : `Network Adapter ${i + 1}`,
+                          type: "Network",
+                          target: ip,
+                        })),
+                        { label: "MAC Address", type: "Physical", target: asset.device.macAddress },
+                      ]
+                    : []
+                }
+                agentSectionLabel="Network identity reported by the Kynren agent"
+              />
+            </>
           )}
           {tab === "networkPorts" && (
             <SubResourceTab

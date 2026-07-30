@@ -69,6 +69,8 @@ model User {
   vaultEntries      VaultEntry[]
   images            UserImage[]
   dashboardLayout   DashboardLayout?
+  preferences       UserPreference[]
+  mcpApiKeys        McpApiKey[]
 
   projectCardsAssigned ProjectCard[]      @relation("ProjectCardAssignee")
   projectCardsCreated  ProjectCard[]      @relation("ProjectCardCreator")
@@ -146,13 +148,28 @@ model DashboardLayout {
   updatedAt  DateTime @updatedAt
 }
 
+// Generic per-user UI-state store (grid layouts, panel selections, collapsed states, etc.) so
+// changes a user makes follow their account instead of resetting every session. One row per
+// (user, key); `value` holds whatever shape that key's feature needs.
+model UserPreference {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+}
+
 // ───────────────────────── Assets ─────────────────────────
 
 model AssetCategory {
   id              Int                @id @default(autoincrement())
   name            String             @unique
-  isComputerAsset Boolean            @default(false)
-  isShowAsset     Boolean            @default(false)
+  isComputerAsset    Boolean         @default(false)
+  isShowAsset        Boolean         @default(false)
+  isSwitchingDevice  Boolean         @default(false)
   formTemplateId  Int?
   formTemplate    AssetFormTemplate? @relation(fields: [formTemplateId], references: [id])
   assets          Asset[]
@@ -257,6 +274,11 @@ model Asset {
   remoteManagementProtocol String?
   remoteManagementUrl      String?
 
+  staticIpAddress String?
+  subnetMask      String?
+  defaultGateway  String?
+  dnsServers      String?
+
   isVirtual  Boolean @default(false)
   hypervisor String?
   vmHost     String?
@@ -277,9 +299,35 @@ model Asset {
   checkouts    AssetCheckout[]
   licenseAssignments LicenseAssignment[]
   customFieldValues AssetCustomFieldValue[]
+  switchPorts        SwitchPort[]        @relation("SwitchOwnedPorts")
+  connectedViaPorts  SwitchPort[]        @relation("SwitchPortConnectedAsset")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ───────────────────────── Switching (switches/routers port mapping) ─────────────────────────
+
+enum PortStatus {
+  UP
+  DOWN
+  DISABLED
+}
+
+model SwitchPort {
+  id               Int         @id @default(autoincrement())
+  assetId          Int
+  asset            Asset       @relation("SwitchOwnedPorts", fields: [assetId], references: [id], onDelete: Cascade)
+  portNumber       Int
+  label            String?
+  status           PortStatus  @default(DOWN)
+  vlan             String?
+  connectedAssetId Int?
+  connectedAsset   Asset?      @relation("SwitchPortConnectedAsset", fields: [connectedAssetId], references: [id], onDelete: SetNull)
+  notes            String?
+  updatedAt        DateTime    @updatedAt
+
+  @@unique([assetId, portNumber])
 }
 
 model AssetCheckout {
@@ -425,6 +473,9 @@ model Device {
   loggedInUser       String?
   lastLoginAt        DateTime?
   installedSoftware  Json?
+  batteryPresent     Boolean?
+  batteryPercent     Int?
+  batteryCharging    Boolean?
   lastSeen           DateTime  @default(now())
   createdAt          DateTime  @default(now())
 
@@ -803,6 +854,20 @@ model AgentApiKey {
   label     String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+// Bearer key for external MCP clients (Claude Desktop, Claude Code, etc.) connecting to this
+// app's MCP server at /api/mcp. Tied to a real user so any write actions the client performs
+// (e.g. creating a ticket) are attributed to that account, same as everything else in the app.
+model McpApiKey {
+  id         Int       @id @default(autoincrement())
+  key        String    @unique
+  label      String?
+  ownerId    Int
+  owner      User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
 }
 
 // ───────────────────────── Operations Tools ─────────────────────────

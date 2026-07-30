@@ -69,6 +69,7 @@ export function AssetFormModal({
   submitting,
   excludeCategoryNames,
   onlyCategoryNames,
+  hideOperationalToggles,
 }: {
   assetId?: number;
   initial?: Partial<AssetFormValues>;
@@ -81,6 +82,8 @@ export function AssetFormModal({
   excludeCategoryNames?: string[];
   /** Restrict the picker to only these categories. */
   onlyCategoryNames?: string[];
+  /** Hide the Grid Powered / Remote Management toggles — irrelevant for non-IT asset types like Harness/PPE. */
+  hideOperationalToggles?: boolean;
 }) {
   const [values, setValues] = useState<AssetFormValues>({ ...emptyValues, ...initial });
   const queryClient = useQueryClient();
@@ -267,28 +270,32 @@ export function AssetFormModal({
         </div>
       )}
 
-      <div className="toggle-card">
-        <div className="toggle-card-icon"><Icon name="power" size={16} /></div>
-        <div className="toggle-card-body">
-          <div className="toggle-card-title">Grid Powered</div>
-          <div className="toggle-card-desc">This asset draws power from mains electricity (Main AC), rather than battery or backup power.</div>
-        </div>
-        <label className="form-toggle-switch">
-          <input type="checkbox" checked={values.gridPowered} onChange={(e) => update("gridPowered", e.target.checked)} />
-          <span className="form-toggle-switch-track" />
-        </label>
-      </div>
-      <div className="toggle-card">
-        <div className="toggle-card-icon"><Icon name="terminal" size={16} /></div>
-        <div className="toggle-card-body">
-          <div className="toggle-card-title">Remote Management</div>
-          <div className="toggle-card-desc">Enable remote access tooling for this asset. Connection details can be configured after saving.</div>
-        </div>
-        <label className="form-toggle-switch">
-          <input type="checkbox" checked={values.remoteManagementEnabled} onChange={(e) => update("remoteManagementEnabled", e.target.checked)} />
-          <span className="form-toggle-switch-track" />
-        </label>
-      </div>
+      {!hideOperationalToggles && (
+        <>
+          <div className="toggle-card">
+            <div className="toggle-card-icon"><Icon name="power" size={16} /></div>
+            <div className="toggle-card-body">
+              <div className="toggle-card-title">Grid Powered</div>
+              <div className="toggle-card-desc">This asset draws power from mains electricity (Main AC), rather than battery or backup power.</div>
+            </div>
+            <label className="form-toggle-switch">
+              <input type="checkbox" checked={values.gridPowered} onChange={(e) => update("gridPowered", e.target.checked)} />
+              <span className="form-toggle-switch-track" />
+            </label>
+          </div>
+          <div className="toggle-card">
+            <div className="toggle-card-icon"><Icon name="terminal" size={16} /></div>
+            <div className="toggle-card-body">
+              <div className="toggle-card-title">Remote Management</div>
+              <div className="toggle-card-desc">Enable remote access tooling for this asset. Connection details can be configured after saving.</div>
+            </div>
+            <label className="form-toggle-switch">
+              <input type="checkbox" checked={values.remoteManagementEnabled} onChange={(e) => update("remoteManagementEnabled", e.target.checked)} />
+              <span className="form-toggle-switch-track" />
+            </label>
+          </div>
+        </>
+      )}
 
       {assetId ? (
         <div className="upload-panel-row">

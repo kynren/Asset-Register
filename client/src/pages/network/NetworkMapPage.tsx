@@ -4,11 +4,13 @@ import { TopologyGraphTab } from "./TopologyGraphTab";
 import { PingConsoleTab } from "./PingConsoleTab";
 import { DevicesTab } from "./DevicesTab";
 import { IpRangeScannerTab } from "./IpRangeScannerTab";
+import { SwitchingTab } from "./SwitchingTab";
 
 const TABS = [
   { key: "graph", label: "Topology Graph", icon: "network" },
   { key: "pinger", label: "ICMP Pinger", icon: "activity" },
   { key: "scanner", label: "IP Range Scanner", icon: "radar" },
+  { key: "switching", label: "Switching", icon: "route" },
   { key: "clients", label: "App Client Devices", icon: "grid" },
 ] as const;
 
@@ -37,6 +39,7 @@ export function NetworkMapPage() {
       {tab === "graph" && <TopologyGraphTab />}
       {tab === "pinger" && <PingConsoleTab />}
       {tab === "scanner" && <IpRangeScannerTab />}
+      {tab === "switching" && <SwitchingTab />}
       {tab === "clients" && <DevicesTab />}
     </div>
   );

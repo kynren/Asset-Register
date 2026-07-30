@@ -2,6 +2,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { FloatingAssistant } from "./FloatingAssistant";
+import { ThemeSync } from "../theme/ThemeSync";
 import { settingsNav, systemConsoleNav } from "./navConfig";
 
 const allNav = [...systemConsoleNav, ...settingsNav];
@@ -20,6 +21,7 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
+      <ThemeSync />
       <Sidebar pageTitle={titleForPath(location.pathname)} />
       <div className="main-area">
         <Topbar />

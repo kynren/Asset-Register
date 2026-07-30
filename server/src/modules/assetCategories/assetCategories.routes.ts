@@ -15,6 +15,7 @@ const schema = z.object({
   formTemplateId: z.number().int().nullable().optional(),
   isComputerAsset: z.boolean().optional(),
   isShowAsset: z.boolean().optional(),
+  isSwitchingDevice: z.boolean().optional(),
 });
 
 const categorySelect = {
@@ -22,6 +23,7 @@ const categorySelect = {
   name: true,
   isComputerAsset: true,
   isShowAsset: true,
+  isSwitchingDevice: true,
   formTemplateId: true,
   formTemplate: { select: { id: true, name: true } },
 };

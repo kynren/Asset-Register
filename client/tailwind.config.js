@@ -24,6 +24,7 @@ export default {
         "sidebar-text-active": "var(--color-sidebar-text-active)",
         "sidebar-hover": "var(--color-sidebar-hover)",
         "tb-bg": "var(--tb-bg)",
+        "tb-surface-2": "var(--tb-surface-2)",
         "tb-border": "var(--tb-border)",
         "tb-text": "var(--tb-text)",
         "tb-muted": "var(--tb-muted)",

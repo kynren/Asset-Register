@@ -4,7 +4,7 @@ import { verifyJwt } from "../../middleware/auth";
 import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import * as controller from "./assets.controller";
-import { checkinSchema, checkoutSchema, createAssetSchema, updateAssetSchema } from "./assets.schema";
+import { checkinSchema, checkoutSchema, createAssetSchema, initPortsSchema, updateAssetSchema, updatePortSchema } from "./assets.schema";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -23,6 +23,10 @@ router.get("/:id/report/pdf", requirePermission("assets", "export"), controller.
 router.get("/:id/harness-report/pdf", requirePermission("assets", "export"), controller.harnessReportPdf);
 router.get("/:id/checkouts", requirePermission("assets", "view"), controller.listCheckouts);
 router.get("/:id/ping", requirePermission("assets", "view"), controller.pingAsset);
+router.get("/:id/ports", requirePermission("network", "view"), controller.listPorts);
+router.post("/:id/ports/init", requirePermission("network", "edit"), validateBody(initPortsSchema), controller.initPorts);
+router.patch("/:id/ports/:portId", requirePermission("network", "edit"), validateBody(updatePortSchema), controller.updatePort);
+router.delete("/:id/ports/:portId", requirePermission("network", "edit"), controller.deletePort);
 router.post("/:id/checkout", requirePermission("assets", "edit"), validateBody(checkoutSchema), controller.checkoutAsset);
 router.post("/:id/checkin", requirePermission("assets", "edit"), validateBody(checkinSchema), controller.checkinAsset);
 router.get("/:id", requirePermission("assets", "view"), controller.getOne);

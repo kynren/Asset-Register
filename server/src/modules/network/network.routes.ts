@@ -160,4 +160,61 @@ router.post("/scan-results/:resultId/promote", requirePermission("network", "edi
   res.status(201).json(node);
 });
 
+// ───────────────────────── Switching (switches/routers) ─────────────────────────
+
+// "Adopted" switches are real Assets in a category flagged isSwitchingDevice, with their port
+// counts. "Discovered" candidates come from the most recent completed IP range scan, filtered to
+// hosts the same real vendor/port heuristic used by the IP Range Scanner classified as
+// "Network Infrastructure" — no separate SNMP/fingerprinting pass, just the same signal already
+// shown there. A candidate already matching an adopted asset's recorded static IP is flagged so
+// the UI doesn't invite adopting it twice.
+router.get("/switching", requirePermission("network", "view"), async (_req, res) => {
+  const adopted = await prisma.asset.findMany({
+    where: { category: { isSwitchingDevice: true } },
+    select: {
+      id: true,
+      assetTag: true,
+      name: true,
+      status: true,
+      categoryId: true,
+      locationId: true,
+      assignedToId: true,
+      manufacturer: true,
+      model: true,
+      serialNumber: true,
+      staticIpAddress: true,
+      notes: true,
+      nextServiceDate: true,
+      gridPowered: true,
+      remoteManagementEnabled: true,
+      featuredImageUrl: true,
+      _count: { select: { switchPorts: true } },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  const latestScan = await prisma.networkScan.findFirst({
+    where: { status: "COMPLETED" },
+    orderBy: { startedAt: "desc" },
+    include: { results: { where: { deviceType: "Network Infrastructure" }, orderBy: { ipAddress: "asc" } } },
+  });
+
+  const adoptedIps = new Set(adopted.map((a) => a.staticIpAddress).filter((ip): ip is string => !!ip));
+  const discovered = (latestScan?.results ?? []).map((r) => ({
+    id: r.id,
+    ipAddress: r.ipAddress,
+    hostname: r.hostname,
+    macAddress: r.macAddress,
+    vendor: r.vendor,
+    openPorts: r.openPorts,
+    alreadyAdopted: adoptedIps.has(r.ipAddress),
+  }));
+
+  res.json({
+    adopted: adopted.map((a) => ({ ...a, portCount: a._count.switchPorts, _count: undefined })),
+    discovered,
+    scannedAt: latestScan?.completedAt ?? null,
+  });
+});
+
 export default router;

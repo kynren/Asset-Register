@@ -137,6 +137,25 @@ def get_windows_hardware_info() -> dict[str, str | None]:
         return {"manufacturer": None, "model": None, "serialNumber": None}
 
 
+def get_battery_info() -> dict[str, bool | int | None]:
+    """Real battery state via psutil.sensors_battery() — returns batteryPresent=False on
+    desktops/servers with no battery rather than fabricating a level. Not available on every
+    platform/psutil build, so this is feature-detected like get_windows_hardware_info()."""
+    try:
+        battery = psutil.sensors_battery()
+    except Exception:
+        return {"batteryPresent": None, "batteryPercent": None, "batteryCharging": None}
+
+    if battery is None:
+        return {"batteryPresent": False, "batteryPercent": None, "batteryCharging": None}
+
+    return {
+        "batteryPresent": True,
+        "batteryPercent": round(battery.percent),
+        "batteryCharging": bool(battery.power_plugged),
+    }
+
+
 def get_logged_in_user() -> tuple[str | None, str | None]:
     """Currently logged-in user and their session start time (ISO 8601), via psutil."""
     try:
@@ -213,7 +232,7 @@ def build_payload() -> dict:
     hardware = get_windows_hardware_info()
     logged_in_user, last_login_at = get_logged_in_user()
 
-    return {
+    payload = {
         "hostname": get_hostname(),
         "macAddress": get_mac_address_str(),
         "ipAddresses": get_ip_addresses(),
@@ -230,6 +249,13 @@ def build_payload() -> dict:
         "lastLoginAt": last_login_at,
         "installedSoftware": get_installed_software(),
     }
+
+    # Omit rather than send null — the API's battery fields are optional, not nullable.
+    for key, value in get_battery_info().items():
+        if value is not None:
+            payload[key] = value
+
+    return payload
 
 
 def send_payload(payload: dict, api_base_url: str, api_key: str, logger: logging.Logger) -> bool:
