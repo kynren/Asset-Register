@@ -1,0 +1,59 @@
+{
+  "name": "kynren-asset-register-desktop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Native desktop shell for the Kynren Asset Register — loads your hosted deployment in a dedicated window instead of a browser tab. All application logic still runs on your server; this changes nothing about how the app works.",
+  "main": "src/main.js",
+  "author": "Kynren",
+  "scripts": {
+    "dev": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0"
+  },
+  "build": {
+    "appId": "com.kynren.assetregister",
+    "productName": "Kynren Asset Register",
+    "copyright": "Copyright © Kynren",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "icon": "build/icon.png",
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png",
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Office"
+    }
+  }
+}
