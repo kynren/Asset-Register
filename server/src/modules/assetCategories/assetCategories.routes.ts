@@ -14,12 +14,14 @@ const schema = z.object({
   name: z.string().min(1),
   formTemplateId: z.number().int().nullable().optional(),
   isComputerAsset: z.boolean().optional(),
+  isShowAsset: z.boolean().optional(),
 });
 
 const categorySelect = {
   id: true,
   name: true,
   isComputerAsset: true,
+  isShowAsset: true,
   formTemplateId: true,
   formTemplate: { select: { id: true, name: true } },
 };

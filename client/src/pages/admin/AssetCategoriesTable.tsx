@@ -16,6 +16,7 @@ interface AssetCategory {
   id: number;
   name: string;
   isComputerAsset: boolean;
+  isShowAsset: boolean;
   formTemplateId: number | null;
   formTemplate: FormTemplateRef | null;
 }
@@ -50,6 +51,12 @@ export function AssetCategoriesTable() {
           {row.original.isComputerAsset ? "Computer / Network" : "Generic"}
         </span>
       ),
+    },
+    {
+      header: "Show Asset",
+      accessorFn: (r) => (r.isShowAsset ? "Yes" : "No"),
+      cell: ({ row }) =>
+        row.original.isShowAsset ? <span className="badge badge-primary">Show Asset</span> : <span className="muted">—</span>,
     },
     {
       header: "Linked Form Template",
@@ -127,11 +134,12 @@ function CategoryFormModal({
   const [name, setName] = useState(initial?.name ?? "");
   const [formTemplateId, setFormTemplateId] = useState<string>(initial?.formTemplateId ? String(initial.formTemplateId) : "");
   const [isComputerAsset, setIsComputerAsset] = useState(initial?.isComputerAsset ?? false);
+  const [isShowAsset, setIsShowAsset] = useState(initial?.isShowAsset ?? false);
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: () => {
-      const payload = { name, formTemplateId: formTemplateId ? Number(formTemplateId) : null, isComputerAsset };
+      const payload = { name, formTemplateId: formTemplateId ? Number(formTemplateId) : null, isComputerAsset, isShowAsset };
       return initial ? axiosClient.patch(`/asset-categories/${initial.id}`, payload) : axiosClient.post("/asset-categories", payload);
     },
     onSuccess: () => {
@@ -167,6 +175,20 @@ function CategoryFormModal({
         </div>
         <label className="form-toggle-switch">
           <input type="checkbox" checked={isComputerAsset} onChange={(e) => setIsComputerAsset(e.target.checked)} />
+          <span className="form-toggle-switch-track" />
+        </label>
+      </div>
+      <div className="toggle-card">
+        <div className="toggle-card-icon"><Icon name="activity" size={16} /></div>
+        <div className="toggle-card-body">
+          <div className="toggle-card-title">Show Asset</div>
+          <div className="toggle-card-desc">
+            Assets in this category are counted on the Operational Context page's Active Show Assets gauge, which pings
+            each one live by its asset tag to report how many are currently reachable on the network.
+          </div>
+        </div>
+        <label className="form-toggle-switch">
+          <input type="checkbox" checked={isShowAsset} onChange={(e) => setIsShowAsset(e.target.checked)} />
           <span className="form-toggle-switch-track" />
         </label>
       </div>

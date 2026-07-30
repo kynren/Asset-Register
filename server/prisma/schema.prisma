@@ -152,6 +152,7 @@ model AssetCategory {
   id              Int                @id @default(autoincrement())
   name            String             @unique
   isComputerAsset Boolean            @default(false)
+  isShowAsset     Boolean            @default(false)
   formTemplateId  Int?
   formTemplate    AssetFormTemplate? @relation(fields: [formTemplateId], references: [id])
   assets          Asset[]

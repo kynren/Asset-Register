@@ -6,11 +6,18 @@
     @apply w-sidebar-collapsed min-w-sidebar-collapsed;
   }
 
+  .sidebar-brand-block {
+    @apply px-4 py-[18px] border-b border-white/[8%] whitespace-nowrap overflow-hidden;
+  }
   .sidebar-brand {
-    @apply flex items-center gap-2.5 px-4 py-[18px] font-bold text-sm text-white border-b border-white/[8%] whitespace-nowrap overflow-hidden;
+    @apply flex items-center gap-2.5 font-bold text-sm text-white;
   }
   .sidebar-brand-mark {
     @apply w-[30px] h-[30px] min-w-[30px] rounded-lg bg-primary flex items-center justify-center font-extrabold;
+  }
+  .sidebar-page-title {
+    @apply mt-2 text-[10px] tracking-wide uppercase text-[#6b7488];
+    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   }
 
   .sidebar-nav {
@@ -29,6 +36,22 @@
   }
   .sidebar-link.active {
     @apply bg-primary text-white;
+  }
+
+  .sidebar-battery {
+    @apply flex items-center gap-2 mx-2 mb-1 px-2.5 py-2 rounded-md border border-white/10 text-sidebar-text text-xs whitespace-nowrap overflow-hidden;
+  }
+  .sidebar-battery-collapsed {
+    @apply justify-center mx-2 mb-1 px-0 py-2;
+  }
+  .sidebar-battery-bar {
+    @apply flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden;
+  }
+  .sidebar-battery-bar-fill {
+    @apply h-full transition-[width] duration-500 ease-in-out;
+  }
+  .sidebar-battery-pct {
+    @apply text-[11px] font-semibold text-white;
   }
 
   .sidebar-collapse-btn {

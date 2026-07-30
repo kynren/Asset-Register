@@ -133,6 +133,28 @@ export async function pingAsset(req: Request, res: Response) {
   res.json({ ...result, target: asset.assetTag });
 }
 
+// "Show assets" are whatever categories an admin has flagged AssetCategory.isShowAsset on
+// (rig gear, comms, etc. — anything tracked as part of a live show's operational footprint).
+// Each one is pinged live by its asset tag, same mechanism as pingAsset, so "active" here means
+// genuinely reachable on the network right now, not a stored/cached status.
+export async function showStatus(_req: Request, res: Response) {
+  const assets = await prisma.asset.findMany({
+    where: { category: { isShowAsset: true } },
+    select: { id: true, assetTag: true, name: true },
+    orderBy: { assetTag: "asc" },
+  });
+
+  const results = await Promise.all(
+    assets.map(async (asset) => {
+      const result = await pingHost(asset.assetTag);
+      return { id: asset.id, assetTag: asset.assetTag, name: asset.name, ...result };
+    })
+  );
+
+  const active = results.filter((r) => r.alive).length;
+  res.json({ total: results.length, active, assets: results });
+}
+
 export async function checkoutAsset(req: Request, res: Response) {
   const assetId = Number(req.params.id);
   const { checkedOutToId, dueBackAt, notes } = req.body;

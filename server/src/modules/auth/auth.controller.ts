@@ -51,7 +51,7 @@ export async function login(req: Request, res: Response) {
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
   const accessToken = issueAccessToken(user);
-  const refreshToken = await createRefreshSession(user.id, req.headers["user-agent"] as string | undefined, resolveClientIp(req.ip) ?? undefined);
+  const refreshToken = await createRefreshSession(user.id, req.headers["user-agent"] as string | undefined, (await resolveClientIp(req.ip)) ?? undefined);
   res.cookie(env.REFRESH_COOKIE_NAME, refreshToken, REFRESH_COOKIE_OPTIONS);
 
   await logAudit({ userId: user.id, action: "auth.login", entityType: "User", entityId: user.id, ipAddress: req.ip });

@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { usePermission } from "../auth/PermissionGate";
 import { useTheme } from "../theme/ThemeContext";
-import { useBranding } from "../theme/BrandingContext";
 import { axiosClient } from "../api/axiosClient";
 import { Icon } from "../components/Icon";
 import { NotificationBell } from "./NotificationBell";
@@ -41,10 +40,9 @@ function useLatency() {
   return latency;
 }
 
-export function Topbar({ title }: { title: string }) {
+export function Topbar() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const branding = useBranding();
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -83,19 +81,6 @@ export function Topbar({ title }: { title: string }) {
 
   return (
     <header className="topbar">
-      <div className="topbar-brand">
-        <div className="topbar-brand-icon">
-          {branding.appIconUrl ? <img src={branding.appIconUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} /> : <Icon name="cpu" size={18} />}
-        </div>
-        <div>
-          <div className="topbar-brand-name">
-            {branding.companyName}
-            <span className="topbar-brand-badge">TECH OPS</span>
-          </div>
-          <div className="topbar-brand-tagline">{title.toUpperCase()}</div>
-        </div>
-      </div>
-
       <div className="topbar-search">
         <Icon name="search" size={14} />
         <input

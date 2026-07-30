@@ -20,9 +20,9 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
-      <Sidebar />
+      <Sidebar pageTitle={titleForPath(location.pathname)} />
       <div className="main-area">
-        <Topbar title={titleForPath(location.pathname)} />
+        <Topbar />
         <div className="page-content">
           <Outlet />
         </div>
