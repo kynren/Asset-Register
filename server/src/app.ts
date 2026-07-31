@@ -23,6 +23,7 @@ import ticketCategoriesRoutes from "./modules/tickets/ticketCategories.routes";
 import operationsRoutes from "./modules/operations/operations.routes";
 import nvrRoutes from "./modules/nvr/nvr.routes";
 import accessControlRoutes from "./modules/accessControl/accessControl.routes";
+import lightingRoutes from "./modules/lighting/lighting.routes";
 import assistantRoutes from "./modules/assistant/assistant.routes";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes";
 import preferencesRoutes from "./modules/preferences/preferences.routes";
@@ -77,6 +78,7 @@ export function createApp() {
   app.use("/api/operations", operationsRoutes);
   app.use("/api/nvr", nvrRoutes);
   app.use("/api/access-control", accessControlRoutes);
+  app.use("/api/lighting", lightingRoutes);
   app.use("/api/assistant", assistantRoutes);
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/preferences", preferencesRoutes);
