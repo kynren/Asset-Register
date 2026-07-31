@@ -1,0 +1,20 @@
+{
+  "externalKey": "e390d754-a15b-419a-a513-36f129011608",
+  "title": "Helpdesk & Ticketing — User Manual",
+  "docType": "GENERAL",
+  "category": "IT & Computing Systems",
+  "collectionName": "Asset Register SOPs",
+  "summary": "How the ticket status workflow, comments, attachments, and satisfaction ratings work.",
+  "sections": {
+    "body": "<h2>Overview</h2>\n<p>Helpdesk & Ticketing is the IT support queue. Tickets can optionally be linked to an asset, carry a priority, and move through a fixed status workflow.</p>\n<svg viewBox=\"0 0 758 74\" width=\"758\" height=\"74\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"OPEN then IN PROGRESS then RESOLVED then CLOSED\">\n<defs><marker id=\"arrow-6\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L6,3 L0,6 Z\" fill=\"var(--color-text-muted)\"/></marker></defs>\n<rect x=\"12\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"91\" y=\"41\">OPEN</tspan></text><rect x=\"204\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"283\" y=\"41\">IN PROGRESS</tspan></text><rect x=\"396\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"475\" y=\"41\">RESOLVED</tspan></text><rect x=\"588\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"667\" y=\"41\">CLOSED</tspan></text><line x1=\"174\" y1=\"37\" x2=\"197\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-6)\"/><line x1=\"366\" y1=\"37\" x2=\"389\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-6)\"/><line x1=\"558\" y1=\"37\" x2=\"581\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-6)\"/>\n</svg>\n<h2>Key Features</h2>\n<ul><li>Status workflow buttons on the ticket detail page: OPEN → IN PROGRESS → RESOLVED → CLOSED.</li><li><strong>Comments</strong>, with an \"Internal note (staff only)\" toggle for notes the requester never sees.</li><li><strong>Attach File</strong> for supporting screenshots/logs.</li><li><strong>Watch</strong> / <strong>Watching</strong> to get notified of updates on tickets you care about.</li><li>Once a ticket is RESOLVED, the requester can <strong>Rate this resolution</strong> and <strong>Submit Rating</strong>.</li></ul>\n<h2>Step-by-Step</h2>\n<ol><li>Create a ticket, optionally linking it to the affected asset, and set a priority.</li><li>Move it through the status buttons as work progresses: OPEN → IN PROGRESS → RESOLVED → CLOSED.</li><li>Use Comments to keep the requester updated; use the internal-note toggle for anything staff-only.</li><li>Click <strong>Watch</strong> on any ticket you want update notifications for.</li></ol>"
+  },
+  "tags": [
+    "manual",
+    "helpdesk",
+    "tickets",
+    "readme"
+  ],
+  "isPublished": true,
+  "reviewDueDate": null,
+  "updatedAt": "2026-07-31T08:46:51.798Z"
+}

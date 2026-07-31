@@ -1,0 +1,20 @@
+{
+  "externalKey": "99d054a3-52e0-4d54-923a-a757333e7b12",
+  "title": "Password Management — User Manual",
+  "docType": "GENERAL",
+  "category": "IT & Computing Systems",
+  "collectionName": "Asset Register SOPs",
+  "summary": "How the shared Password Vault and Account Security tabs work.",
+  "sections": {
+    "body": "<h2>Overview</h2>\n<p>Password Management has two tabs: <strong>Password Vault</strong> (shared, AES-encrypted team credential storage) and <strong>Account Security</strong> (your own login password).</p>\n<svg viewBox=\"0 0 566 74\" width=\"566\" height=\"74\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Add Vault Entry\n(encrypted) then Reveal / Copy\nwhen needed then Change Account\nPassword\">\n<defs><marker id=\"arrow-14\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L6,3 L0,6 Z\" fill=\"var(--color-text-muted)\"/></marker></defs>\n<rect x=\"12\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"91\" y=\"34\">Add Vault Entry</tspan><tspan x=\"91\" y=\"48\">(encrypted)</tspan></text><rect x=\"204\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"283\" y=\"34\">Reveal / Copy</tspan><tspan x=\"283\" y=\"48\">when needed</tspan></text><rect x=\"396\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"475\" y=\"34\">Change Account</tspan><tspan x=\"475\" y=\"48\">Password</tspan></text><line x1=\"174\" y1=\"37\" x2=\"197\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-14)\"/><line x1=\"366\" y1=\"37\" x2=\"389\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-14)\"/>\n</svg>\n<h2>Step-by-Step</h2>\n<ol><li>In <strong>Password Vault</strong>, add a credential entry — it's encrypted at rest and only revealed on demand.</li><li>In <strong>Account Security</strong>, click <strong>Change Password</strong> under \"Account Password\" to update your own login password.</li></ol>\n<h2>Tips</h2>\n<ul><li>New accounts are forced to change their temporary password on first login, before they can access anything else.</li></ul>"
+  },
+  "tags": [
+    "manual",
+    "password",
+    "vault",
+    "readme"
+  ],
+  "isPublished": true,
+  "reviewDueDate": null,
+  "updatedAt": "2026-07-31T08:46:51.813Z"
+}

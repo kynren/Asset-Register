@@ -1,0 +1,19 @@
+{
+  "externalKey": "912cfd62-c900-4258-9713-4e7cbac56c3b",
+  "title": "Stock Register & Analytics — User Manual",
+  "docType": "GENERAL",
+  "category": "Finance",
+  "collectionName": "Asset Register SOPs",
+  "summary": "How to manage stock items, log movements, transfer between locations, and work with suppliers/POs.",
+  "sections": {
+    "body": "<h2>Overview</h2>\n<p>Stock Register & Analytics tracks consumables and spare parts across three tabs: <strong>Register</strong> (the item list), <strong>Analytics</strong> (consumption trends and low-stock exposure), and <strong>Suppliers & POs</strong> (purchase order workflow).</p>\n<svg viewBox=\"0 0 758 74\" width=\"758\" height=\"74\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Register Item then Stock In / Out /\nTransfer then Low-Stock Alert then Raise Purchase\nOrder\">\n<defs><marker id=\"arrow-5\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L6,3 L0,6 Z\" fill=\"var(--color-text-muted)\"/></marker></defs>\n<rect x=\"12\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"91\" y=\"41\">Register Item</tspan></text><rect x=\"204\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"283\" y=\"34\">Stock In / Out /</tspan><tspan x=\"283\" y=\"48\">Transfer</tspan></text><rect x=\"396\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"475\" y=\"41\">Low-Stock Alert</tspan></text><rect x=\"588\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"667\" y=\"34\">Raise Purchase</tspan><tspan x=\"667\" y=\"48\">Order</tspan></text><line x1=\"174\" y1=\"37\" x2=\"197\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-5)\"/><line x1=\"366\" y1=\"37\" x2=\"389\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-5)\"/><line x1=\"558\" y1=\"37\" x2=\"581\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-5)\"/>\n</svg>\n<h2>Step-by-Step</h2>\n<ol><li>Click <strong>Add Item</strong> to register a new stock item — SKU, reorder level, and starting location.</li><li>Open an item and use <strong>Manage Stock</strong>; choose <strong>Stock In / Out</strong> to log a simple movement, or <strong>Transfer</strong> to move quantity between locations, then submit (\"Log Movement\" / \"Transfer Stock\").</li><li>Check the <strong>Analytics</strong> tab for consumption trends and which items are at risk of running out.</li><li>When something is low, use <strong>Suppliers & POs</strong> to raise a purchase order and track it through to delivery.</li></ol>\n<h2>Tips</h2>\n<ul><li>Items that cross their reorder level surface automatically as a Low Stock widget on the Dashboard.</li></ul>"
+  },
+  "tags": [
+    "manual",
+    "stock",
+    "readme"
+  ],
+  "isPublished": true,
+  "reviewDueDate": null,
+  "updatedAt": "2026-07-31T08:46:51.796Z"
+}
