@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -18,13 +19,21 @@ function titleForPath(pathname: string) {
 
 export function AppShell() {
   const location = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // A route change always means the user picked a destination — close the drawer so the next
+  // page isn't hidden behind it on a phone-width viewport.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${mobileNavOpen ? " mobile-nav-open" : ""}`}>
       <ThemeSync />
       <Sidebar pageTitle={titleForPath(location.pathname)} />
+      {mobileNavOpen && <div className="mobile-nav-backdrop" onClick={() => setMobileNavOpen(false)} />}
       <div className="main-area">
-        <Topbar />
+        <Topbar onToggleMobileNav={() => setMobileNavOpen((v) => !v)} />
         <div className="page-content">
           <Outlet />
         </div>

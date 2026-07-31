@@ -70,7 +70,7 @@ function useLatency() {
   return latency;
 }
 
-export function Topbar() {
+export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -139,6 +139,9 @@ export function Topbar() {
 
   return (
     <header className="topbar">
+      <button className="topbar-hamburger-btn" onClick={onToggleMobileNav} title="Menu" aria-label="Toggle navigation menu">
+        <Icon name="menu" size={18} />
+      </button>
       <div className="topbar-search" style={{ position: "relative" }}>
         <Icon name="search" size={14} />
         <input
