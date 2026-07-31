@@ -100,6 +100,12 @@
     font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   }
 
+  /* Hidden on desktop; shown by the responsive block at the bottom of this file once the
+     sidebar switches from an always-visible column to an off-canvas drawer. */
+  .topbar-hamburger-btn {
+    @apply hidden items-center justify-center w-9 h-9 rounded-full bg-tb-surface-2 text-tb-text border-none cursor-pointer flex-shrink-0 mr-1;
+  }
+
   .topbar-search {
     @apply flex-1 max-w-[420px] flex items-center gap-2 bg-tb-surface-2 rounded-full px-4 h-10 text-tb-muted;
   }
@@ -196,5 +202,84 @@
 
   .floating-assistant-panel {
     @apply fixed bottom-[88px] right-6 w-80 z-[200] shadow-md;
+  }
+
+  /* ── Mobile/tablet shell ───────────────────────────────────────────
+     Below this width the sidebar no longer has room to sit permanently
+     alongside content, so it becomes an off-canvas drawer: fixed, off-screen
+     by default, slid in via .app-shell's mobile-nav-open class (toggled by
+     the hamburger button that appears in the topbar at this same breakpoint)
+     with a backdrop to close it. Must stay inside this @layer components
+     block — Tailwind hoists @layer content to the @tailwind components
+     position in index.css (after all the plain @import'd rules), so an
+     unlayered block here would actually lose the cascade to the base
+     .app-shell/.sidebar/.topbar rules despite appearing later in the file. */
+  @media (max-width: 900px) {
+    .app-shell {
+      position: relative;
+    }
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      z-index: 210;
+      transform: translateX(-100%);
+      transition: transform 200ms ease-in-out;
+    }
+    .app-shell.mobile-nav-open .sidebar {
+      transform: translateX(0);
+    }
+    .sidebar.collapsed {
+      /* A collapsed icon-only rail makes little sense as a full-height overlay drawer —
+         always show it expanded once it's off-canvas, regardless of the desktop preference. */
+      width: theme("width.sidebar");
+      min-width: theme("width.sidebar");
+    }
+    .mobile-nav-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(16, 24, 40, 0.5);
+      z-index: 205;
+    }
+    .topbar-hamburger-btn {
+      display: flex;
+    }
+    .topbar-stat {
+      display: none;
+    }
+    /* At tablet widths the topbar has too many actions to share a row with a
+       flexible search box without squeezing it down to a few unusable pixels
+       (the exact bug this pass set out to fix) — so search drops to its own
+       full-width row below the brand/actions row instead. */
+    .topbar {
+      height: auto;
+      min-height: 64px;
+      flex-wrap: wrap;
+      row-gap: 8px;
+      padding-top: 10px;
+      padding-bottom: 10px;
+    }
+    .topbar-search {
+      order: 3;
+      flex-basis: 100%;
+      max-width: 100%;
+    }
+    .topbar-actions {
+      flex-wrap: wrap;
+      row-gap: 8px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .app-shell {
+      margin: 0;
+      border-radius: 0;
+      height: 100vh;
+    }
+    .page-content {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
   }
 }

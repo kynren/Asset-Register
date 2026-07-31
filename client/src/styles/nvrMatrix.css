@@ -158,6 +158,17 @@
   .nvx-tile.focused {
     @apply border-ad-accent;
   }
+  /* Native Fullscreen API target (see MatrixTile's per-tile expand button) — the grid's fixed
+     16:10 aspect-ratio would otherwise letterbox the tile inside the fullscreen viewport, so
+     drop it here and let the video itself be fully visible rather than cropped by object-cover. */
+  .nvx-tile:fullscreen {
+    aspect-ratio: auto;
+    width: 100vw;
+    height: 100vh;
+  }
+  .nvx-tile:fullscreen video {
+    object-fit: contain;
+  }
   .nvx-tile-empty {
     @apply text-ad-text-muted text-xs flex flex-col items-center gap-2;
   }

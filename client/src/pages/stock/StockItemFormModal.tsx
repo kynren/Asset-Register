@@ -1,5 +1,8 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
+import { QuickAddSelect } from "../../components/QuickAddSelect";
 
 export interface StockItemFormValues {
   sku: string;
@@ -8,10 +11,12 @@ export interface StockItemFormValues {
   unit: string;
   reorderLevel: number;
   unitCost: number | null;
+  locationId: number | null;
 }
 
 export function StockItemFormModal({ onClose, onSubmit, submitting }: { onClose: () => void; onSubmit: (v: StockItemFormValues) => void; submitting?: boolean }) {
-  const [values, setValues] = useState<StockItemFormValues>({ sku: "", name: "", category: "", unit: "pcs", reorderLevel: 0, unitCost: null });
+  const [values, setValues] = useState<StockItemFormValues>({ sku: "", name: "", category: "", unit: "pcs", reorderLevel: 0, unitCost: null, locationId: null });
+  const { data: locations } = useQuery({ queryKey: ["locations"], queryFn: async () => (await axiosClient.get("/locations")).data });
 
   function update<K extends keyof StockItemFormValues>(key: K, value: StockItemFormValues[K]) {
     setValues((v) => ({ ...v, [key]: value }));
@@ -26,6 +31,7 @@ export function StockItemFormModal({ onClose, onSubmit, submitting }: { onClose:
         <div className="field"><label>Unit</label><input className="input" value={values.unit} onChange={(e) => update("unit", e.target.value)} /></div>
         <div className="field"><label>Reorder Level</label><input className="input" type="number" min={0} value={values.reorderLevel} onChange={(e) => update("reorderLevel", Number(e.target.value))} /></div>
         <div className="field"><label>Unit Cost</label><input className="input" type="number" min={0} step="0.01" value={values.unitCost ?? ""} onChange={(e) => update("unitCost", e.target.value ? Number(e.target.value) : null)} /></div>
+        <QuickAddSelect label="Location" value={values.locationId} onChange={(id) => update("locationId", id)} options={locations} createUrl="/locations" queryKey="locations" />
       </div>
     </FormModal>
   );

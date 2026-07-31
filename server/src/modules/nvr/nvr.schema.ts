@@ -7,7 +7,7 @@ export const createNvrSchema = z.object({
   protocol: z.string().optional(),
   username: z.string().optional(),
   password: z.string().optional(),
-  location: z.string().optional(),
+  locationId: z.number().int().nullable().optional(),
   model: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -17,7 +17,7 @@ export const updateNvrSchema = createNvrSchema.partial();
 export const createCameraSchema = z.object({
   name: z.string().min(1),
   channel: z.number().int().nullable().optional(),
-  location: z.string().optional(),
+  locationId: z.number().int().nullable().optional(),
   ipAddress: z.string().optional(),
   port: z.number().int().nullable().optional(),
   username: z.string().optional(),

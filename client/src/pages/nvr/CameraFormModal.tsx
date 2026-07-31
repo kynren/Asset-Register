@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
+import { QuickAddSelect } from "../../components/QuickAddSelect";
 import { Icon } from "../../components/Icon";
 import { TestConnectionButton } from "./TestConnectionButton";
 import { LiveFeedPreview } from "./LiveFeedPreview";
@@ -13,7 +16,7 @@ import { PasswordInput } from "../../components/PasswordInput";
 export interface CameraFormValues {
   name: string;
   channel: number | null;
-  location: string;
+  locationId: number | null;
   ipAddress: string;
   port: number | null;
   username: string;
@@ -25,7 +28,7 @@ export interface CameraFormValues {
 const emptyValues: CameraFormValues = {
   name: "",
   channel: null,
-  location: "",
+  locationId: null,
   ipAddress: "",
   port: 554,
   username: "",
@@ -61,6 +64,7 @@ export function CameraFormModal({
   submitting?: boolean;
 }) {
   const [values, setValues] = useState<CameraFormValues>({ ...emptyValues, ...initial });
+  const { data: locations } = useQuery({ queryKey: ["locations"], queryFn: async () => (await axiosClient.get("/locations")).data });
   // While true, the Stream URL field tracks the connection fields automatically; typing
   // directly into it (or loading an existing camera that already has one saved) turns
   // this off so we never clobber a hand-entered or previously-saved URL.
@@ -88,7 +92,7 @@ export function CameraFormModal({
       <div className="grid grid-cols-3">
         <div className="field"><label>Name *</label><input className="input" value={values.name} onChange={(e) => update("name", e.target.value)} required placeholder="e.g. Gate Sentry Dome" /></div>
         <div className="field"><label>Channel</label><input className="input" type="number" value={values.channel ?? ""} onChange={(e) => update("channel", e.target.value ? Number(e.target.value) : null)} placeholder="Channel # on the NVR (optional)" /></div>
-        <div className="field"><label>Location</label><input className="input" value={values.location} onChange={(e) => update("location", e.target.value)} /></div>
+        <QuickAddSelect label="Location" value={values.locationId} onChange={(id) => update("locationId", id)} options={locations} createUrl="/locations" queryKey="locations" />
         <div className="field"><label>IP Address</label><input className="input" value={values.ipAddress} onChange={(e) => update("ipAddress", e.target.value)} /></div>
         <div className="field"><label>Port</label><input className="input" type="number" value={values.port ?? ""} onChange={(e) => update("port", e.target.value ? Number(e.target.value) : null)} /></div>
         <div className="field"><label>Username</label><input className="input" value={values.username} onChange={(e) => update("username", e.target.value)} autoComplete="off" /></div>
