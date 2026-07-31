@@ -534,6 +534,9 @@ model NetworkEdge {
 }
 
 enum ScanStatus {
+  // Queued for a network relay agent to pick up — the VPS itself has no route into a private
+  // office LAN, so when relay mode is enabled, scans wait here instead of running immediately.
+  PENDING
   RUNNING
   COMPLETED
   FAILED
@@ -554,6 +557,9 @@ model NetworkScan {
   aliveHosts   Int                 @default(0)
   scannedHosts Int                 @default(0)
   triggeredBy  NetworkScanTrigger  @default(MANUAL)
+  // True when this scan was (or is being) executed by an on-prem relay agent rather than
+  // directly by the server process — see server/src/modules/network/relay.routes.ts.
+  viaRelay     Boolean             @default(false)
   // Null for scheduled scans kicked off by the continuous network monitor rather than a person.
   startedById  Int?
   startedBy    User?               @relation(fields: [startedById], references: [id])
@@ -572,6 +578,10 @@ model NetworkScanResult {
   macAddress     String?
   vendor         String?
   deviceType     String?
+  // Cross-referenced from Device (the Python agent's own hardware self-report) by MAC/IP match —
+  // never guessed for hosts the agent isn't installed on. Real remote "who's logged in" discovery
+  // would need admin credentials on every target machine (WMI/RPC), which this app doesn't have.
+  loggedInUser   String?
   responseTimeMs Int?
   openPorts      Int[]
   discoveredAt   DateTime    @default(now())
@@ -611,6 +621,8 @@ model MonitoredNetworkDevice {
   hostname         String?
   vendor           String?
   deviceType       String?
+  // Cross-referenced from Device by MAC/IP match, same as NetworkScanResult.loggedInUser above.
+  loggedInUser     String?
   status           DeviceLiveStatus @default(ONLINE)
   firstSeenAt      DateTime         @default(now())
   lastSeenAt       DateTime         @default(now())

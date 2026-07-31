@@ -17,6 +17,7 @@ const paths: Record<string, string> = {
   password: "M12 15a2 2 0 100-4 2 2 0 000 4zm6-5V7a6 6 0 10-12 0v3a2 2 0 00-2 2v7a2 2 0 002 2h12a2 2 0 002-2v-7a2 2 0 00-2-2zM8 10V7a4 4 0 118 0v3",
   chevronLeft: "M15 18l-6-6 6-6",
   chevronRight: "M9 18l6-6-6-6",
+  chevronDown: "M6 9l6 6 6-6",
   logout: "M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m6 14l5-5-5-5m5 5H9",
   bell: "M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9zm4 13a2 2 0 004 0",
   search: "M11 19a8 8 0 100-16 8 8 0 000 16zm10 2l-4.35-4.35",

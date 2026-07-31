@@ -12,7 +12,27 @@ export function validateRange(startIp: string, endIp: string) {
   return expandRange(startIp, endIp, MAX_HOSTS_PER_SCAN);
 }
 
+// A VPS has no network route into a private office LAN — no code running on it can ping/ARP
+// local devices no matter how it's written. When an admin enables this (System Settings), scans
+// are queued for an on-prem relay agent (agent/kynren_network_relay.py) to actually execute,
+// instead of running directly on the server process.
+export async function isNetworkRelayEnabled(): Promise<boolean> {
+  const setting = await prisma.systemSetting.findUnique({ where: { key: "networkRelayEnabled" } });
+  return setting?.value === "true";
+}
+
+export async function enqueueRelayScan(startIp: string, endIp: string, userId: number | null, triggeredBy: "MANUAL" | "SCHEDULED" = "MANUAL") {
+  const addresses = validateRange(startIp, endIp);
+  return prisma.networkScan.create({
+    data: { startIp, endIp, totalHosts: addresses.length, startedById: userId, triggeredBy, status: "PENDING", viaRelay: true },
+  });
+}
+
 export async function startScan(startIp: string, endIp: string, userId: number | null, triggeredBy: "MANUAL" | "SCHEDULED" = "MANUAL") {
+  if (await isNetworkRelayEnabled()) {
+    return enqueueRelayScan(startIp, endIp, userId, triggeredBy);
+  }
+
   const addresses = validateRange(startIp, endIp);
 
   const scan = await prisma.networkScan.create({
@@ -47,6 +67,41 @@ export async function runScheduledScan(startIp: string, endIp: string): Promise<
   return { id: scan.id, results };
 }
 
+interface DeviceLookupEntry {
+  hostname: string;
+  loggedInUser: string | null;
+}
+
+interface DeviceLookup {
+  byIp: Map<string, DeviceLookupEntry>;
+  byMac: Map<string, DeviceLookupEntry>;
+}
+
+// Cross-references scanned hosts against Device — the Python agent's own hardware self-report,
+// which (when installed) already knows who's logged in via psutil.users(). Prefers a MAC match
+// (stable across DHCP IP churn) over an IP match. A host without the agent installed simply gets
+// no match — remotely determining who's logged into an arbitrary machine would need admin
+// credentials on every target (WMI/RPC), which this app deliberately doesn't attempt.
+async function buildDeviceLookup(): Promise<DeviceLookup> {
+  const devices = await prisma.device.findMany({ select: { hostname: true, ipAddresses: true, macAddress: true, loggedInUser: true } });
+  const byIp = new Map<string, DeviceLookupEntry>();
+  const byMac = new Map<string, DeviceLookupEntry>();
+  for (const device of devices) {
+    const entry: DeviceLookupEntry = { hostname: device.hostname, loggedInUser: device.loggedInUser };
+    byMac.set(device.macAddress.toLowerCase(), entry);
+    for (const ip of device.ipAddresses) byIp.set(ip, entry);
+  }
+  return { byIp, byMac };
+}
+
+function matchDevice(ip: string, mac: string | null, lookup: DeviceLookup): DeviceLookupEntry | null {
+  if (mac) {
+    const byMac = lookup.byMac.get(mac.toLowerCase());
+    if (byMac) return byMac;
+  }
+  return lookup.byIp.get(ip) ?? null;
+}
+
 // Resolves a scanned IP's hostname through three fallbacks, in order of cost/reliability:
 // 1. Reverse DNS — fast and authoritative when PTR records exist, but most LANs don't have them.
 // 2. The Kynren agent's own device check-ins — free (already in memory) and exact for any
@@ -69,7 +124,7 @@ async function resolveHostname(ip: string, deviceHostnameByIp: Map<string, strin
 // asset has no static IP recorded yet and isn't already linked to a Device (which would carry its
 // own MAC/IP info), fill in the discovered IP. Best-effort and silent on no match — most scanned
 // hosts won't correspond to any inventory asset.
-async function fillAssetIpFromHostname(hostname: string, ip: string, scanId: number) {
+export async function fillAssetIpFromHostname(hostname: string, ip: string, scanId: number) {
   const updated = await prisma.asset.updateMany({
     where: {
       staticIpAddress: null,
@@ -87,11 +142,9 @@ async function runScan(scanId: number, addresses: string[]) {
   let aliveCount = 0;
   let scannedCount = 0;
 
-  const devices = await prisma.device.findMany({ select: { hostname: true, ipAddresses: true } });
+  const deviceLookup = await buildDeviceLookup();
   const deviceHostnameByIp = new Map<string, string>();
-  for (const device of devices) {
-    for (const ip of device.ipAddresses) deviceHostnameByIp.set(ip, device.hostname);
-  }
+  for (const [ip, entry] of deviceLookup.byIp) deviceHostnameByIp.set(ip, entry.hostname);
 
   await mapLimit(addresses, SCAN_CONCURRENCY, async (ip) => {
     const ping = await pingHost(ip);
@@ -102,11 +155,13 @@ async function runScan(scanId: number, addresses: string[]) {
 
     let vendor: string | null = null;
     let deviceType: string | null = null;
+    let loggedInUser: string | null = null;
 
     if (ping.alive) {
       [hostname, mac, openPorts] = await Promise.all([resolveHostname(ip, deviceHostnameByIp), getArpMac(ip), scanCommonPorts(ip)]);
       vendor = lookupVendor(mac) ?? (await lookupVendorOnline(mac));
       deviceType = guessDeviceType(vendor, openPorts);
+      loggedInUser = matchDevice(ip, mac, deviceLookup)?.loggedInUser ?? null;
       aliveCount += 1;
       if (hostname) await fillAssetIpFromHostname(hostname, ip, scanId).catch(() => undefined);
     }
@@ -122,6 +177,7 @@ async function runScan(scanId: number, addresses: string[]) {
         macAddress: mac,
         vendor,
         deviceType,
+        loggedInUser,
         responseTimeMs: ping.responseTimeMs,
         openPorts,
       },
@@ -137,4 +193,54 @@ async function runScan(scanId: number, addresses: string[]) {
     where: { id: scanId },
     data: { status: "COMPLETED", completedAt: new Date() },
   });
+}
+
+export interface RelayHostResult {
+  ipAddress: string;
+  alive: boolean;
+  hostname: string | null;
+  macAddress: string | null;
+  openPorts: number[];
+  responseTimeMs: number | null;
+}
+
+// Counterpart to runScan() above for relay-executed scans: the relay agent does the actual
+// network probing (it's the one with a real route into the LAN) and hands back raw per-host
+// results; this applies the exact same server-side processing runScan() does directly — vendor
+// classification, device-type guessing, and the hostname-match asset IP auto-fill — so scans
+// behave identically regardless of which mode produced them.
+export async function applyRelayResults(scanId: number, results: RelayHostResult[]): Promise<{ aliveHosts: number; scannedHosts: number }> {
+  let aliveHosts = 0;
+  const deviceLookup = await buildDeviceLookup();
+
+  for (const r of results) {
+    let vendor: string | null = null;
+    let deviceType: string | null = null;
+    let loggedInUser: string | null = null;
+
+    if (r.alive) {
+      vendor = lookupVendor(r.macAddress) ?? (await lookupVendorOnline(r.macAddress));
+      deviceType = guessDeviceType(vendor, r.openPorts);
+      loggedInUser = matchDevice(r.ipAddress, r.macAddress, deviceLookup)?.loggedInUser ?? null;
+      aliveHosts += 1;
+      if (r.hostname) await fillAssetIpFromHostname(r.hostname, r.ipAddress, scanId).catch(() => undefined);
+    }
+
+    await prisma.networkScanResult.create({
+      data: {
+        scanId,
+        ipAddress: r.ipAddress,
+        alive: r.alive,
+        hostname: r.hostname,
+        macAddress: r.macAddress,
+        vendor,
+        deviceType,
+        loggedInUser,
+        responseTimeMs: r.responseTimeMs,
+        openPorts: r.openPorts,
+      },
+    });
+  }
+
+  return { aliveHosts, scannedHosts: results.length };
 }

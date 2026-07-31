@@ -42,6 +42,7 @@ interface MonitoredDevice {
   hostname: string | null;
   vendor: string | null;
   deviceType: string | null;
+  loggedInUser: string | null;
   status: "ONLINE" | "OFFLINE";
   firstSeenAt: string;
   lastSeenAt: string;
@@ -140,6 +141,11 @@ export function MonitoringTab() {
       <div>
         <div style={{ fontWeight: 600 }}>{row.original.hostname || row.original.ipAddress}</div>
         <div className="muted" style={{ fontSize: 11, fontFamily: "monospace" }}>{row.original.ipAddress}</div>
+        {row.original.loggedInUser && (
+          <div className="muted" style={{ fontSize: 11 }}>
+            <Icon name="profile" size={10} /> {row.original.loggedInUser}
+          </div>
+        )}
       </div>
     ) },
     { header: "Vendor / Type", accessorFn: (d) => [d.vendor, d.deviceType].filter(Boolean).join(" · ") || "—" },

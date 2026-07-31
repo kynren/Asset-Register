@@ -16,6 +16,7 @@ import assetsRoutes from "./modules/assets/assets.routes";
 import devicesRoutes from "./modules/devices/devices.routes";
 import agentRoutes from "./modules/devices/agent.routes";
 import networkRoutes from "./modules/network/network.routes";
+import networkRelayRoutes from "./modules/network/relay.routes";
 import stockRoutes from "./modules/stock/stock.routes";
 import ticketsRoutes from "./modules/tickets/tickets.routes";
 import ticketCategoriesRoutes from "./modules/tickets/ticketCategories.routes";
@@ -67,6 +68,7 @@ export function createApp() {
   app.use("/api/devices", devicesRoutes);
   app.use("/api/agent", agentRoutes);
   app.use("/api/network", networkRoutes);
+  app.use("/api/network-relay", networkRelayRoutes);
   app.use("/api/stock", stockRoutes);
   app.use("/api/tickets", ticketsRoutes);
   app.use("/api/ticket-categories", ticketCategoriesRoutes);

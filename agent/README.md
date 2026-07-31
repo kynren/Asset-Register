@@ -1,4 +1,16 @@
-# Kynren Asset Register — Device Agent
+# Kynren Asset Register — Agents
+
+Two standalone Python scripts live in this folder, sharing the same `.env`
+(`API_BASE_URL` + `AGENT_API_KEY`) but doing very different jobs:
+
+- **`kynren_agent.py`** — the *device agent*. Runs on each individual client
+  machine and reports about itself (hostname, MAC, hardware, battery, etc).
+- **`kynren_network_relay.py`** — the *network relay agent*. Runs on one
+  machine inside your office LAN and scans *other* devices on the network on
+  the server's behalf. See its own section below — most deployments won't
+  need it.
+
+## Device Agent (`kynren_agent.py`)
 
 A small Python script that reports a machine's hostname, IP address(es), MAC
 address, OS, CPU, RAM, disk info, and (on Windows) manufacturer/model/serial
@@ -9,7 +21,7 @@ Browsers cannot read a MAC address or hardware serial number for security
 reasons, which is why this runs as a standalone script on each machine
 rather than in the web app itself.
 
-## Setup
+### Setup
 
 1. Install Python 3.10+ on the client machine.
 2. Install dependencies:
@@ -26,7 +38,7 @@ rather than in the web app itself.
    ```
    Check the app's Network Topology Map → Devices tab — the machine should appear.
 
-## Scheduling
+### Scheduling
 
 To run automatically, register it as a Windows Scheduled Task (run at logon
 and every 4 hours) with the included helper:
@@ -39,12 +51,12 @@ Run as Administrator. Adjust the interval in `install_task.ps1` if needed, or
 manage the task afterwards via Task Scheduler (`taskschd.msc`) under the name
 `KynrenAssetAgent`.
 
-## Logs
+### Logs
 
 Each run appends to `agent.log` in this folder (rotated at ~1MB, 3 backups
 kept) — check it if a device isn't showing up as expected.
 
-## Notes
+### Notes
 
 - Manufacturer/model/serial number collection uses Windows Management
   Instrumentation (`wmi` / `pywin32`) and only works on Windows. On other
@@ -52,3 +64,59 @@ kept) — check it if a device isn't showing up as expected.
 - The agent identifies a device by its MAC address — re-running it just
   updates the existing device record's "last seen" time and details rather
   than creating duplicates.
+
+## Network Relay Agent (`kynren_network_relay.py`)
+
+If this app is hosted on a cloud VPS (e.g. the Hostinger deployment in
+`DEPLOY.md`), it has **no network route into your office's private LAN**.
+The IP Range Scanner, ICMP Pinger, and continuous Monitoring tab all need to
+ping/ARP/SNMP-poll devices on that LAN directly — no code running on a
+remote VPS can do that, regardless of how it's written, because there's no
+network path there at all.
+
+This script solves that: run it on one machine that's actually inside the
+LAN (an old PC, a NUC, even a Raspberry Pi — anything that stays on), and it
+polls the server for scan jobs, does the real network work locally, and
+reports results back over the internet. **Skip this whole section** if the
+app is self-hosted on a machine already inside your LAN — direct scanning
+just works there.
+
+### Setup
+
+1. Install Python 3.10+ on a machine that's on the same LAN as the devices
+   you want to monitor, and stays powered on.
+2. Install dependencies (lighter than the device agent's — no `psutil`/`wmi`):
+   ```
+   pip install -r requirements-network-relay.txt
+   ```
+3. Copy `.env.example` to `.env` and fill in `API_BASE_URL` / `AGENT_API_KEY`
+   exactly as for the device agent above (the same key works for both).
+4. In the web app, go to **Admin & Setup → System Settings → Network Relay
+   Agent** and check "Route network scans through an on-prem relay agent".
+5. Start the relay — unlike the device agent, this one is a long-running
+   loop, not a one-shot script:
+   ```
+   python kynren_network_relay.py
+   ```
+   Leave it running (a console window, `pythonw` in the background, a Task
+   Scheduler task with no time limit, or wrap it as a Windows service with a
+   tool like NSSM — any of these work equally well).
+6. Run a scan from **Network Topology Map → IP Range Scanner** — it'll show
+   "Queued..." until the relay picks it up, then run and complete normally.
+
+### Scope
+
+- Ping, ARP MAC lookup, reverse DNS, active NetBIOS name query, and common
+  TCP port scanning all mirror the server's own direct-mode logic exactly.
+- SNMP polling (for devices with it enabled in the Monitoring tab) fetches
+  `sysDescr` and `sysUpTime` only — no interface-table walk. A device still
+  shows as reachable with real uptime; the fuller per-interface view is a
+  possible future enhancement, not something silently faked here.
+- Hostname resolution doesn't cross-check the Kynren device agent's own
+  reported hostnames (the relay has no database access) — only DNS and
+  NetBIOS, versus the three-way fallback direct-mode scanning uses.
+
+### Logs
+
+Each run appends to `network_relay.log` in this folder (rotated at ~2MB, 3
+backups kept).
