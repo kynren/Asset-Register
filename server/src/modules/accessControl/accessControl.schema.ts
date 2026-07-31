@@ -21,7 +21,7 @@ export const createDoorSchema = z.object({
 export const updateDoorSchema = createDoorSchema.partial();
 
 export const doorControlSchema = z.object({
-  action: z.enum(["open", "close"]),
+  action: z.enum(["open", "close", "alwaysOpen", "alwaysClose", "resume"]),
 });
 
 export const isapiConnectionSchema = z.object({
@@ -31,18 +31,29 @@ export const isapiConnectionSchema = z.object({
   password: z.string().optional(),
 });
 
+// Mirrors Hikvision's own UserInfo.RightPlan — one schedule template per door this credential
+// may use. planTemplateNo references a template already configured on the controller itself
+// (this app doesn't author templates); an empty array leaves the controller's own default
+// access behavior in place, same as omitting RightPlan from the ISAPI call entirely.
+const doorRightSchema = z.object({
+  doorId: z.number().int().positive(),
+  planTemplateNo: z.string().min(1).max(8).default("1"),
+});
+
 export const createCredentialSchema = z.object({
   userId: z.number().int(),
   cardNumber: z.string().min(1).optional(),
   hasPin: z.boolean().optional(),
   validFrom: z.string().datetime().nullable().optional(),
   validTo: z.string().datetime().nullable().optional(),
+  doorRights: z.array(doorRightSchema).default([]),
 });
 
 export const updateCredentialSchema = z.object({
   status: z.enum(["ACTIVE", "DISABLED"]).optional(),
   validFrom: z.string().datetime().nullable().optional(),
   validTo: z.string().datetime().nullable().optional(),
+  doorRights: z.array(doorRightSchema).optional(),
 });
 
 export const syncEventsSchema = z.object({

@@ -58,9 +58,24 @@ const deviceSelect = {
       validTo: true,
       createdAt: true,
       user: { select: { id: true, firstName: true, lastName: true, email: true } },
+      doorRights: { select: { doorId: true, planTemplateNo: true, door: { select: { id: true, name: true, doorNumber: true } } } },
     },
   },
 };
+
+// Resolves {doorId, planTemplateNo} pairs into the {doorNumber, planTemplateNo} shape ISAPI
+// expects, validating every doorId actually belongs to this device (a stale/foreign doorId
+// would otherwise silently produce a RightPlan entry ISAPI rejects or, worse, misapplies).
+async function resolveRightPlan(deviceId: number, doorRights: { doorId: number; planTemplateNo: string }[]) {
+  if (doorRights.length === 0) return [];
+  const doors = await prisma.door.findMany({ where: { deviceId, id: { in: doorRights.map((r) => r.doorId) } } });
+  const doorNumberById = new Map(doors.map((d) => [d.id, d.doorNumber]));
+  return doorRights.map((r) => {
+    const doorNumber = doorNumberById.get(r.doorId);
+    if (doorNumber === undefined) throw new ApiError(400, `Door ${r.doorId} does not belong to this device`);
+    return { doorNumber, planTemplateNo: r.planTemplateNo };
+  });
+}
 
 function splitCredentials(body: Record<string, any>): { rest: Record<string, any>; encryptedPassword?: string } {
   const { password, ...rest } = body;
@@ -193,7 +208,11 @@ router.post("/doors/:doorId/control", requirePermission("access-control", "edit"
   await logAudit({ userId: req.user!.id, action: `door.${req.body.action}`, entityType: "Door", entityId: door.id, metadata: { ok: result.ok } });
 
   if (result.ok) {
-    await prisma.door.update({ where: { id: door.id }, data: { lockState: req.body.action === "open" ? "UNLOCKED" : "LOCKED", lastCheckedAt: new Date() } });
+    // "resume" cancels an always-open/always-close override and hands control back to the
+    // door's own schedule — we don't know its resulting state without a real status read, so
+    // it's left UNKNOWN here (Refresh Doors will pick up the true state on the next poll).
+    const lockState = req.body.action === "open" || req.body.action === "alwaysOpen" ? "UNLOCKED" : req.body.action === "resume" ? "UNKNOWN" : "LOCKED";
+    await prisma.door.update({ where: { id: door.id }, data: { lockState, lastCheckedAt: new Date() } });
   }
   res.json(result);
 });
@@ -213,12 +232,14 @@ router.post("/devices/:id/credentials", requirePermission("access-control", "cre
   const employeeNo = String(user.id);
   const validFrom = req.body.validFrom ? new Date(req.body.validFrom) : null;
   const validTo = req.body.validTo ? new Date(req.body.validTo) : null;
+  const rightPlan = await resolveRightPlan(device.id, req.body.doorRights ?? []);
 
   const provision = await createOrUpdateAcsUser(device.ipAddress, device.port, device.username ?? "", devicePassword(device), {
     employeeNo,
     name: `${user.firstName} ${user.lastName}`,
     validFrom,
     validTo,
+    rightPlan,
   });
   if (!provision.ok) throw new ApiError(502, provision.message);
 
@@ -236,20 +257,49 @@ router.post("/devices/:id/credentials", requirePermission("access-control", "cre
       hasPin: Boolean(req.body.hasPin),
       validFrom,
       validTo,
+      doorRights: { create: (req.body.doorRights ?? []).map((r: { doorId: number; planTemplateNo: string }) => ({ doorId: r.doorId, planTemplateNo: r.planTemplateNo })) },
     },
+    include: { doorRights: { select: { doorId: true, planTemplateNo: true } } },
   });
   await logAudit({ userId: req.user!.id, action: "accessCredential.create", entityType: "AccessCredential", entityId: credential.id, metadata: { targetUserId: user.id } });
   res.status(201).json(credential);
 });
 
 router.patch("/credentials/:credentialId", requirePermission("access-control", "edit"), validateBody(updateCredentialSchema), async (req, res) => {
+  const existing = await prisma.accessCredential.findUnique({ where: { id: Number(req.params.credentialId) }, include: { device: true, user: true } });
+  if (!existing) throw new ApiError(404, "Credential not found");
+
+  const validFrom = req.body.validFrom !== undefined ? (req.body.validFrom ? new Date(req.body.validFrom) : null) : existing.validFrom;
+  const validTo = req.body.validTo !== undefined ? (req.body.validTo ? new Date(req.body.validTo) : null) : existing.validTo;
+
+  // Door rights live inside the same UserInfo record on the controller (RightPlan), so changing
+  // them means re-provisioning the whole person record, not a separate call — same as validity
+  // dates already did implicitly by never touching the controller after creation. Only
+  // re-provision when doorRights was actually part of this request, to avoid an unnecessary
+  // ISAPI round-trip (and possible failure) on a plain status toggle.
+  if (req.body.doorRights !== undefined && existing.device.ipAddress) {
+    const rightPlan = await resolveRightPlan(existing.deviceId, req.body.doorRights);
+    const provision = await createOrUpdateAcsUser(existing.device.ipAddress, existing.device.port, existing.device.username ?? "", devicePassword(existing.device), {
+      employeeNo: existing.employeeNo,
+      name: `${existing.user.firstName} ${existing.user.lastName}`,
+      validFrom,
+      validTo,
+      rightPlan,
+    });
+    if (!provision.ok) throw new ApiError(502, provision.message);
+  }
+
   const credential = await prisma.accessCredential.update({
-    where: { id: Number(req.params.credentialId) },
+    where: { id: existing.id },
     data: {
       ...(req.body.status ? { status: req.body.status } : {}),
-      ...(req.body.validFrom !== undefined ? { validFrom: req.body.validFrom ? new Date(req.body.validFrom) : null } : {}),
-      ...(req.body.validTo !== undefined ? { validTo: req.body.validTo ? new Date(req.body.validTo) : null } : {}),
+      ...(req.body.validFrom !== undefined ? { validFrom } : {}),
+      ...(req.body.validTo !== undefined ? { validTo } : {}),
+      ...(req.body.doorRights !== undefined
+        ? { doorRights: { deleteMany: {}, create: req.body.doorRights.map((r: { doorId: number; planTemplateNo: string }) => ({ doorId: r.doorId, planTemplateNo: r.planTemplateNo })) } }
+        : {}),
     },
+    include: { doorRights: { select: { doorId: true, planTemplateNo: true } } },
   });
   await logAudit({ userId: req.user!.id, action: "accessCredential.update", entityType: "AccessCredential", entityId: credential.id });
   res.json(credential);

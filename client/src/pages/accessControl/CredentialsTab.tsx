@@ -8,6 +8,11 @@ import { PermissionGate } from "../../auth/PermissionGate";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
 
+interface DoorRight {
+  doorId: number;
+  planTemplateNo: string;
+  door: { id: number; name: string; doorNumber: number };
+}
 interface Credential {
   id: number;
   deviceId: number;
@@ -19,11 +24,18 @@ interface Credential {
   validTo: string | null;
   createdAt: string;
   user: { id: number; firstName: string; lastName: string; email: string };
+  doorRights: DoorRight[];
+}
+interface DeviceDoor {
+  id: number;
+  name: string;
+  doorNumber: number;
 }
 interface Device {
   id: number;
   name: string;
   ipAddress: string | null;
+  doors: DeviceDoor[];
   credentials: Credential[];
 }
 interface DirectoryUser {
@@ -76,13 +88,18 @@ export function CredentialsTab() {
             <div className="muted" style={{ fontSize: 13 }}>No credentials enrolled on this device yet.</div>
           ) : (
             <table className="data-table">
-              <thead><tr><th>Person</th><th>Card</th><th>PIN</th><th>Valid</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Person</th><th>Card</th><th>PIN</th><th>Door Access</th><th>Valid</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {device.credentials.map((c) => (
                   <tr key={c.id}>
                     <td>{c.user.firstName} {c.user.lastName}<div className="muted" style={{ fontSize: 11 }}>{c.user.email}</div></td>
                     <td style={{ fontFamily: "monospace" }}>{c.cardNumber ?? "—"}</td>
                     <td>{c.hasPin ? "Yes" : "—"}</td>
+                    <td className="muted" style={{ fontSize: 12 }}>
+                      {c.doorRights.length === 0
+                        ? "Controller default"
+                        : c.doorRights.map((r) => `${r.door.name} (plan ${r.planTemplateNo})`).join(", ")}
+                    </td>
                     <td className="muted" style={{ fontSize: 12 }}>
                       {c.validFrom || c.validTo
                         ? `${c.validFrom ? dayjs(c.validFrom).format("DD MMM YYYY") : "…"} – ${c.validTo ? dayjs(c.validTo).format("DD MMM YYYY") : "…"}`
@@ -136,8 +153,21 @@ function AddCredentialModal({ device, onClose, onCreated }: { device: Device; on
   const [hasPin, setHasPin] = useState(false);
   const [validFrom, setValidFrom] = useState("");
   const [validTo, setValidTo] = useState("");
+  // Mirrors Hikvision's own RightPlan: which doors this person may use, and which pre-configured
+  // schedule template applies on each (template numbers are authored on the controller itself,
+  // e.g. "1" = All-day, "2" = Weekday — this app only assigns a template number per door).
+  const [doorTemplates, setDoorTemplates] = useState<Record<number, string>>({});
 
   const { data: users } = useQuery({ queryKey: ["users-directory"], queryFn: async () => (await axiosClient.get("/users/directory")).data as DirectoryUser[] });
+
+  function toggleDoor(doorId: number, checked: boolean) {
+    setDoorTemplates((prev) => {
+      const next = { ...prev };
+      if (checked) next[doorId] = next[doorId] ?? "1";
+      else delete next[doorId];
+      return next;
+    });
+  }
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -147,6 +177,7 @@ function AddCredentialModal({ device, onClose, onCreated }: { device: Device; on
         hasPin,
         validFrom: validFrom ? new Date(validFrom).toISOString() : undefined,
         validTo: validTo ? new Date(validTo).toISOString() : undefined,
+        doorRights: Object.entries(doorTemplates).map(([doorId, planTemplateNo]) => ({ doorId: Number(doorId), planTemplateNo })),
       }),
     onSuccess: () => { onCreated(); onClose(); },
   });
@@ -179,7 +210,34 @@ function AddCredentialModal({ device, onClose, onCreated }: { device: Device; on
         <div className="field"><label>Valid From</label><input className="input" type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} /></div>
         <div className="field"><label>Valid To</label><input className="input" type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)} /></div>
       </div>
-      <p className="muted" style={{ fontSize: 12 }}>Leave the validity dates blank for no expiry. This provisions the person directly on the controller over ISAPI.</p>
+
+      <div className="field">
+        <label>Door Access</label>
+        {device.doors.length === 0 ? (
+          <p className="muted" style={{ fontSize: 12, margin: 0 }}>No doors added to this device yet — leave unchecked and the controller's own default access applies.</p>
+        ) : (
+          <div className="stack gap-1">
+            {device.doors.map((door) => (
+              <label key={door.id} className="row gap-2" style={{ fontSize: 13, cursor: "pointer" }}>
+                <input type="checkbox" checked={door.id in doorTemplates} onChange={(e) => toggleDoor(door.id, e.target.checked)} />
+                {door.name} (Door {door.doorNumber})
+                {door.id in doorTemplates && (
+                  <input
+                    className="input"
+                    style={{ width: 70, marginLeft: "auto" }}
+                    value={doorTemplates[door.id]}
+                    onChange={(e) => setDoorTemplates((prev) => ({ ...prev, [door.id]: e.target.value }))}
+                    placeholder="Plan #"
+                    title="Schedule template number configured on the controller (e.g. 1 = All-day)"
+                  />
+                )}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <p className="muted" style={{ fontSize: 12 }}>Leave the validity dates blank for no expiry. This provisions the person directly on the controller over ISAPI, including door access and schedule template assignment (RightPlan).</p>
     </FormModal>
   );
 }

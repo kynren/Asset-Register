@@ -28,10 +28,6 @@
   .docs-shelf-track {
     @apply flex gap-4 overflow-x-auto scroll-smooth;
     padding: 14px 4px 26px;
-    scrollbar-width: none;
-  }
-  .docs-shelf-track::-webkit-scrollbar {
-    display: none;
   }
 
   .docs-shelf-arrow {
