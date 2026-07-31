@@ -88,6 +88,7 @@ model User {
   licenseAssignments   LicenseAssignment[]
   purchaseOrdersCreated PurchaseOrder[]
   emailTemplatesCreated EmailTemplate[]
+  documentsCreated      Document[]
 }
 
 model RefreshSession {
@@ -971,4 +972,72 @@ model ResourceSchedule {
   endAt         DateTime
   notes         String?
   createdAt     DateTime @default(now())
+}
+
+// ───────────────────────── Docs & SOPs ─────────────────────────
+
+enum DocType {
+  SOP
+  WORK_INSTRUCTION
+  TECHNICAL_RUNBOOK
+  MAINTENANCE_CHECKLIST
+  POLICY
+  SHOW_PRODUCTION
+  TRAINING
+  GENERAL
+}
+
+// Every document belongs to exactly one collection (e.g. "Asset Register SOPs") — a simple named
+// grouping, same shape as AssetCategory, used to organize the library beyond just docType/category.
+model DocCollection {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique
+  description String?
+  documents   Document[]
+  createdAt   DateTime   @default(now())
+}
+
+// `sections` holds the docType-specific structured content as JSON (e.g. an SOP's
+// purpose/scope/responsibilities/steps vs. a Maintenance Checklist's frequency/checklist
+// items) — one flexible column instead of a dozen mostly-empty columns per type, rendered by a
+// per-docType form/view on the client. Top-level "textarea" sections store WYSIWYG-authored HTML.
+// `searchText` is a plain-text flattening (HTML stripped) of title + summary + every section +
+// tags, regenerated on every write, and is what the full-text search index actually runs
+// against — keeps the search query simple regardless of how deeply nested a given type's
+// sections are.
+// `externalKey` is a stable UUID assigned the first time a document is exported to the git repo
+// (see lib/docsGitSync.ts) — it's the upsert key the VPS's import script matches on, since the
+// auto-increment `id` isn't portable between separate databases.
+model Document {
+  id            Int       @id @default(autoincrement())
+  externalKey   String?   @unique
+  title         String
+  docType       DocType
+  category      String
+  collectionId  Int
+  collection    DocCollection @relation(fields: [collectionId], references: [id])
+  summary       String?
+  sections      Json
+  tags          String[]  @default([])
+  searchText    String
+  isPublished   Boolean   @default(true)
+  reviewDueDate DateTime?
+  createdById   Int
+  createdBy     User      @relation(fields: [createdById], references: [id])
+  attachments   DocumentAttachment[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([docType])
+  @@index([category])
+  @@index([collectionId])
+}
+
+model DocumentAttachment {
+  id         Int      @id @default(autoincrement())
+  documentId Int
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  fileName   String
+  url        String
+  createdAt  DateTime @default(now())
 }

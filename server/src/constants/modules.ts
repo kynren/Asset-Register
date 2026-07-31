@@ -7,6 +7,7 @@ export const MODULES = [
   "operations",
   "nvr",
   "virtual-assistant",
+  "docs",
   "admin",
 ] as const;
 

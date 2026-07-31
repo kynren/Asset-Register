@@ -1,0 +1,208 @@
+@layer components {
+  /* ---------- Shelves (Netflix-style rows) ---------- */
+
+  .docs-library {
+    @apply pb-6;
+  }
+
+  .docs-shelf {
+    @apply mb-8;
+  }
+
+  .docs-shelf-header {
+    @apply flex items-baseline justify-between mb-2.5 px-0.5;
+  }
+
+  .docs-shelf-title {
+    @apply text-[15px] font-bold text-text;
+  }
+
+  .docs-shelf-count {
+    @apply text-xs text-text-muted;
+  }
+
+  .docs-shelf-track-wrap {
+    @apply relative;
+  }
+
+  .docs-shelf-track {
+    @apply flex gap-4 overflow-x-auto scroll-smooth;
+    padding: 14px 4px 26px;
+    scrollbar-width: none;
+  }
+  .docs-shelf-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .docs-shelf-arrow {
+    @apply absolute top-0 flex items-center justify-center border-none cursor-pointer text-text opacity-0 transition-opacity duration-200 ease-in-out;
+    bottom: 26px;
+    width: 44px;
+    z-index: 5;
+  }
+  .docs-shelf-track-wrap:hover .docs-shelf-arrow {
+    @apply opacity-100;
+  }
+  .docs-shelf-arrow.left {
+    left: 0;
+    background: linear-gradient(to right, var(--color-bg) 20%, transparent);
+    justify-content: flex-start;
+  }
+  .docs-shelf-arrow.right {
+    right: 0;
+    background: linear-gradient(to left, var(--color-bg) 20%, transparent);
+    justify-content: flex-end;
+  }
+
+  .docs-shelf-ledge {
+    @apply h-px;
+    margin: -14px 4px 0;
+    background: linear-gradient(to right, transparent, var(--color-border) 15%, var(--color-border) 85%, transparent);
+  }
+
+  /* ---------- Book card (flip animation) ---------- */
+
+  .book-card {
+    @apply relative flex-shrink-0 cursor-pointer select-none;
+    width: 152px;
+    height: 224px;
+    perspective: 1200px;
+  }
+
+  .book-card-inner {
+    @apply relative w-full h-full rounded-md;
+    transform-style: preserve-3d;
+    transition: transform 0.65s cubic-bezier(0.22, 0.85, 0.32, 1), box-shadow 0.35s ease;
+    box-shadow: var(--shadow-md);
+  }
+
+  .book-card:hover .book-card-inner,
+  .book-card:focus-visible .book-card-inner {
+    transform: translateY(-12px) scale(1.1) rotateY(180deg);
+    box-shadow: 0 24px 44px rgba(0, 0, 0, 0.5);
+    z-index: 30;
+  }
+
+  .book-card-face {
+    @apply absolute inset-0 rounded-md overflow-hidden;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .book-card-front {
+    @apply flex flex-col justify-between text-white;
+    padding: 16px 14px;
+  }
+  .book-card-front::before {
+    /* spine shading along the left edge */
+    content: "";
+    @apply absolute left-0 top-0 bottom-0;
+    width: 9px;
+    background: rgba(0, 0, 0, 0.28);
+    box-shadow: inset -2px 0 3px rgba(0, 0, 0, 0.3);
+  }
+  .book-card-front::after {
+    /* page-edge along the right, like a closed book viewed from the cover */
+    content: "";
+    @apply absolute top-0.5 bottom-0.5 right-0;
+    width: 5px;
+    border-radius: 0 4px 4px 0;
+    background: repeating-linear-gradient(180deg, #f4efe2 0 2px, #ddd4bb 2px 4px);
+    box-shadow: inset -1px 0 2px rgba(0, 0, 0, 0.35);
+  }
+
+  .book-card-title {
+    @apply text-[13px] font-bold leading-snug;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .book-card-type {
+    @apply text-[10px] font-semibold uppercase tracking-wide mt-1.5 opacity-80;
+  }
+
+  .book-card-ribbon {
+    @apply absolute font-bold uppercase;
+    top: 10px;
+    right: -6px;
+    font-size: 9px;
+    background: var(--color-danger);
+    color: #fff;
+    padding: 3px 11px;
+    transform: rotate(6deg);
+    border-radius: 2px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+    z-index: 2;
+  }
+  .book-card-draft {
+    @apply absolute font-bold uppercase;
+    top: 10px;
+    left: 12px;
+    font-size: 9px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 3px;
+    z-index: 2;
+  }
+
+  .book-card-back {
+    @apply flex flex-col gap-1.5 bg-surface border border-border;
+    padding: 14px;
+    transform: rotateY(180deg);
+  }
+  .book-card-back-type {
+    @apply text-[10px] font-semibold uppercase tracking-wide text-primary;
+  }
+  .book-card-back-title {
+    @apply text-[13px] font-bold leading-snug text-text;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .book-card-back-summary {
+    @apply text-[11px] text-text-muted leading-snug;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .book-card-back-tags {
+    @apply flex flex-wrap gap-1 mt-auto;
+  }
+  .book-card-back-footer {
+    @apply flex items-center justify-between mt-1.5 pt-1.5 border-t border-border;
+  }
+  .book-card-open {
+    @apply flex items-center gap-1 text-[11px] font-semibold text-primary;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .book-card-inner {
+      transition: none;
+    }
+    .book-card:hover .book-card-inner,
+    .book-card:focus-visible .book-card-inner {
+      transform: none;
+      outline: 2px solid var(--color-primary);
+    }
+  }
+
+  /* ---------- View toggle ---------- */
+
+  .docs-view-toggle {
+    @apply inline-flex border border-border rounded-md overflow-hidden;
+  }
+  .docs-view-toggle button {
+    @apply flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border-none bg-surface text-text-muted cursor-pointer transition-colors duration-150 ease-in-out;
+  }
+  .docs-view-toggle button + button {
+    @apply border-l border-border;
+  }
+  .docs-view-toggle button.active {
+    @apply bg-primary text-white;
+  }
+}

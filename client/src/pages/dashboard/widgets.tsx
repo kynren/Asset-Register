@@ -16,6 +16,8 @@ interface Summary {
     lowStockCount: number;
     devicesTotal: number;
     devicesSeen24h: number;
+    documentsTotal: number;
+    docsReviewOverdue: number;
   };
   assetsByStatus: { status: string; count: number }[];
   ticketsByStatus: { status: string; count: number }[];
@@ -47,6 +49,19 @@ export function KpiLowStockWidget() {
 export function KpiDevicesWidget() {
   const { data } = useSummary();
   return <KpiCard label="Devices Seen (24h)" value={data ? `${data.kpis.devicesSeen24h} / ${data.kpis.devicesTotal}` : "—"} icon="network" tone="success" />;
+}
+
+export function KpiDocsWidget() {
+  const { data } = useSummary();
+  const overdue = data?.kpis.docsReviewOverdue ?? 0;
+  return (
+    <KpiCard
+      label="Docs & SOPs"
+      value={data?.kpis.documentsTotal ?? "—"}
+      icon="book"
+      tone={overdue > 0 ? "warning" : "primary"}
+    />
+  );
 }
 
 export function AssetsByStatusWidget() {
@@ -172,6 +187,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: "kpi-open-tickets", title: "Open Tickets", defaultCols: 1, Component: KpiOpenTicketsWidget },
   { id: "kpi-low-stock", title: "Low Stock Items", defaultCols: 1, Component: KpiLowStockWidget },
   { id: "kpi-devices", title: "Devices Seen (24h)", defaultCols: 1, Component: KpiDevicesWidget },
+  { id: "kpi-docs", title: "Docs & SOPs", defaultCols: 1, Component: KpiDocsWidget },
   { id: "chart-assets-status", title: "Assets by Status", defaultCols: 2, Component: AssetsByStatusWidget },
   { id: "chart-tickets-status", title: "Tickets by Status", defaultCols: 2, Component: TicketsByStatusWidget },
   { id: "recent-activity", title: "Recent Activity", defaultCols: 4, Component: RecentActivityWidget },
@@ -185,6 +201,7 @@ export const DEFAULT_DASHBOARD_LAYOUT = [
   { id: "kpi-open-tickets", cols: 1 },
   { id: "kpi-low-stock", cols: 1 },
   { id: "kpi-devices", cols: 1 },
+  { id: "kpi-docs", cols: 1 },
   { id: "chart-assets-status", cols: 2 },
   { id: "chart-tickets-status", cols: 2 },
   { id: "recent-activity", cols: 4 },

@@ -13,6 +13,7 @@
     "db:seed": "npm run prisma:seed -w server",
     "db:studio": "npm run prisma:studio -w server",
     "db:generate": "npm run prisma:generate -w server",
+    "db:import-docs": "npm run docs:import -w server",
     "desktop:dev": "npm run dev --prefix desktop",
     "desktop:build": "npm run build --prefix desktop"
   },

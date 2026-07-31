@@ -145,4 +145,100 @@
     transform: translateX(-50%);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
+
+  /* ---------- IP Range Scanner (Angry IP Scanner-style) ---------- */
+
+  .ips-field-inline {
+    @apply flex items-center gap-2;
+  }
+  .ips-field-label {
+    @apply text-xs font-bold text-ad-text-muted whitespace-nowrap;
+  }
+  .ips-to {
+    @apply text-xs text-ad-text-muted;
+  }
+  .ips-input {
+    @apply px-2.5 py-1.5 rounded-md border border-ad-border bg-ad-surface text-ad-text text-[13px] font-mono;
+    width: 138px;
+  }
+  .ips-input:focus {
+    @apply outline-none border-ad-accent;
+  }
+  .ips-input[readonly] {
+    @apply text-ad-text-muted cursor-default;
+  }
+  .ips-select {
+    @apply px-2.5 py-1.5 rounded-md border border-ad-border bg-ad-surface text-ad-text text-xs font-sans cursor-pointer;
+  }
+  .ips-start-btn {
+    @apply inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[13px] font-semibold text-white cursor-pointer border-none;
+    background: var(--color-success);
+  }
+  .ips-start-btn:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .ips-start-btn:disabled {
+    @apply opacity-60 cursor-not-allowed;
+  }
+
+  .ips-progress-track {
+    @apply h-1.5 rounded-full overflow-hidden bg-ad-border mx-[18px];
+  }
+  .ips-progress-fill {
+    @apply h-full;
+    background: var(--color-success);
+    transition: width 0.3s ease;
+  }
+
+  .ips-table-wrap {
+    @apply px-[18px] py-2;
+  }
+  .ips-table-wrap table.data-table {
+    @apply text-[13px];
+  }
+  .ips-table-wrap table.data-table th {
+    @apply py-2 text-[11px];
+  }
+  .ips-table-wrap table.data-table td {
+    @apply py-[7px];
+  }
+  .ips-table-wrap table.data-table tbody tr:hover {
+    @apply bg-ad-surface-2;
+  }
+  .ips-ip-cell {
+    @apply font-mono font-semibold text-ad-accent;
+  }
+
+  .ips-dot {
+    @apply inline-block w-2.5 h-2.5 rounded-full flex-shrink-0;
+  }
+  .ips-dot.dead {
+    background: var(--color-danger);
+  }
+  .ips-dot.alive {
+    background: var(--color-primary);
+  }
+  .ips-dot.info {
+    background: var(--color-success);
+  }
+
+  .ips-statusbar {
+    @apply flex items-center justify-between gap-3 flex-wrap px-[18px] py-2 border-t border-ad-border text-xs text-ad-text-muted;
+  }
+
+  .ips-stats-icon {
+    @apply w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0;
+    background: var(--color-success-soft);
+    color: var(--color-success);
+  }
+  .ips-stats-grid {
+    @apply grid gap-x-4 gap-y-1.5 text-[13px];
+    grid-template-columns: auto 1fr;
+  }
+  .ips-stats-grid dt {
+    @apply text-ad-text-muted;
+  }
+  .ips-stats-grid dd {
+    @apply m-0 font-semibold text-ad-text;
+  }
 }

@@ -11,11 +11,13 @@ const router = Router();
 router.use(verifyJwt);
 
 async function computeSummary() {
-  const [assetsByStatus, ticketsByStatus, stockItems, devices] = await Promise.all([
+  const [assetsByStatus, ticketsByStatus, stockItems, devices, documentsTotal, docsReviewOverdue] = await Promise.all([
     prisma.asset.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.ticket.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.stockItem.findMany(),
     prisma.device.findMany({ select: { lastSeen: true } }),
+    prisma.document.count(),
+    prisma.document.count({ where: { reviewDueDate: { lt: new Date() } } }),
   ]);
 
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
@@ -31,7 +33,7 @@ async function computeSummary() {
     .reduce((sum, g) => sum + g._count._all, 0);
 
   return {
-    kpis: { totalAssets, openTickets, closedTickets, lowStockCount, devicesTotal: devices.length, devicesSeen24h },
+    kpis: { totalAssets, openTickets, closedTickets, lowStockCount, devicesTotal: devices.length, devicesSeen24h, documentsTotal, docsReviewOverdue },
     assetsByStatus: assetsByStatus.map((g) => ({ status: g.status, count: g._count._all })),
     ticketsByStatus: ticketsByStatus.map((g) => ({ status: g.status, count: g._count._all })),
   };
@@ -68,6 +70,7 @@ router.get("/briefing", requirePermission("dashboard", "view"), async (req, res)
   doc.text(`Open tickets: ${summary.kpis.openTickets}   Closed tickets: ${summary.kpis.closedTickets}`);
   doc.text(`Low stock items: ${summary.kpis.lowStockCount}`);
   doc.text(`Devices seen (24h): ${summary.kpis.devicesSeen24h} / ${summary.kpis.devicesTotal}`);
+  doc.text(`Docs & SOPs: ${summary.kpis.documentsTotal}${summary.kpis.docsReviewOverdue ? ` (${summary.kpis.docsReviewOverdue} overdue for review)` : ""}`);
   doc.moveDown(1);
 
   doc.fontSize(13).text("Maintenance Due");

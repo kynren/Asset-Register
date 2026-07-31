@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import { axiosClient } from "../../api/axiosClient";
@@ -27,16 +27,74 @@ interface Scan {
   aliveHosts: number;
   scannedHosts: number;
   startedAt: string;
+  completedAt: string | null;
   results?: ScanResult[];
   startedBy?: { firstName: string; lastName: string };
+}
+
+// Mirrors server/src/lib/ping.ts COMMON_PORTS — informational only, shown in the settings popover.
+const COMMON_PORTS: { port: number; label: string }[] = [
+  { port: 21, label: "FTP" },
+  { port: 22, label: "SSH" },
+  { port: 23, label: "Telnet" },
+  { port: 25, label: "SMTP" },
+  { port: 80, label: "HTTP" },
+  { port: 443, label: "HTTPS" },
+  { port: 554, label: "RTSP" },
+  { port: 3389, label: "RDP" },
+  { port: 8080, label: "HTTP-Alt" },
+  { port: 8443, label: "HTTPS-Alt" },
+];
+// Mirrors server/src/modules/network/scan.service.ts SCAN_CONCURRENCY / MAX_HOSTS_PER_SCAN.
+const SCAN_CONCURRENCY = 24;
+const MAX_HOSTS_PER_SCAN = 1024;
+const CIDR_PRESETS = [16, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+
+function isValidIpv4(ip: string): boolean {
+  const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  return !!m && m.slice(1).every((o) => Number(o) >= 0 && Number(o) <= 255);
+}
+function ipToLong(ip: string): number {
+  return ip.split(".").reduce((acc, o) => acc * 256 + Number(o), 0);
+}
+function longToIp(v: number): string {
+  return [24, 16, 8, 0].map((shift) => (v >>> shift) & 255).join(".");
+}
+function applyNetmaskToRange(startIp: string, prefix: number): { start: string; end: string } | null {
+  if (!isValidIpv4(startIp)) return null;
+  const ipLong = ipToLong(startIp);
+  const hostBits = 32 - prefix;
+  const mask = hostBits === 0 ? 0xffffffff : (0xffffffff << hostBits) >>> 0;
+  const network = (ipLong & mask) >>> 0;
+  const broadcast = (network | (~mask >>> 0)) >>> 0;
+  return { start: longToIp(network), end: longToIp(broadcast) };
+}
+
+// A host is shown "identified" (green) once we resolved something about it beyond a bare ping —
+// a reverse-DNS hostname or an open port — the same at-a-glance signal Angry IP Scanner gives.
+function statusTone(r: ScanResult): "dead" | "info" | "alive" {
+  if (!r.alive) return "dead";
+  if (r.hostname || r.openPorts.length > 0) return "info";
+  return "alive";
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds.toFixed(2)} sec`;
+  const mins = Math.floor(seconds / 60);
+  const secs = (seconds % 60).toFixed(0);
+  return `${mins} min ${secs} sec`;
 }
 
 export function IpRangeScannerTab() {
   const [startIp, setStartIp] = useState("192.168.1.1");
   const [endIp, setEndIp] = useState("192.168.1.254");
+  const [netmaskPick, setNetmaskPick] = useState("");
   const [activeScanId, setActiveScanId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aliveOnly, setAliveOnly] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [statsScan, setStatsScan] = useState<Scan | null>(null);
+  const statsShownFor = useRef<number | null>(null);
   const queryClient = useQueryClient();
 
   const { data: history } = useQuery({
@@ -54,8 +112,12 @@ export function IpRangeScannerTab() {
   useEffect(() => {
     if (activeScan?.status === "COMPLETED") {
       queryClient.invalidateQueries({ queryKey: ["network-scans"] });
+      if (statsShownFor.current !== activeScan.id) {
+        statsShownFor.current = activeScan.id;
+        setStatsScan(activeScan);
+      }
     }
-  }, [activeScan?.status, queryClient]);
+  }, [activeScan?.status, activeScan?.id, activeScan, queryClient]);
 
   const startMutation = useMutation({
     mutationFn: () => axiosClient.post("/network/scan", { startIp, endIp }),
@@ -75,19 +137,33 @@ export function IpRangeScannerTab() {
   const scan = activeScan ?? history?.find((s) => s.id === activeScanId);
   const results = (activeScan?.results ?? []).filter((r) => !aliveOnly || r.alive);
   const progressPct = scan && scan.totalHosts > 0 ? Math.round((scan.scannedHosts / scan.totalHosts) * 100) : 0;
+  const scanning = scan?.status === "RUNNING";
+
+  function pickNetmask(value: string) {
+    setNetmaskPick("");
+    if (!value) return;
+    const range = applyNetmaskToRange(startIp, Number(value));
+    if (!range) {
+      setError("Enter a valid start IP before picking a netmask.");
+      return;
+    }
+    setError(null);
+    setStartIp(range.start);
+    setEndIp(range.end);
+  }
 
   const resultColumns: ColumnDef<ScanResult, any>[] = [
-    { header: "", id: "status-dot", cell: ({ row }) => <span className={`tag-dot ${row.original.alive ? "online" : "offline"}`} /> },
-    { header: "IP Address", accessorKey: "ipAddress", cell: ({ row }) => <span style={{ fontFamily: "monospace" }}>{row.original.ipAddress}</span> },
-    { header: "Hostname", accessorFn: (r) => r.hostname ?? "—" },
-    { header: "MAC Address", cell: ({ row }) => <span style={{ fontFamily: "monospace" }}>{row.original.macAddress ?? "—"}</span> },
-    { header: "Vendor", accessorFn: (r) => r.vendor ?? "—" },
-    { header: "Device Type", accessorFn: (r) => r.deviceType ?? "—" },
-    { header: "Ping (ms)", accessorFn: (r) => r.responseTimeMs ?? "—" },
-    { header: "Open Ports", accessorFn: (r) => (r.openPorts.length ? r.openPorts.join(", ") : "—") },
+    { header: "", id: "status-dot", enableSorting: false, cell: ({ row }) => <span className={`ips-dot ${statusTone(row.original)}`} title={statusTone(row.original) === "dead" ? "No response" : statusTone(row.original) === "info" ? "Alive — identified" : "Alive"} /> },
+    { header: "IP Address", accessorKey: "ipAddress", cell: ({ row }) => <span className="ips-ip-cell">{row.original.ipAddress}</span> },
+    { header: "Ping", accessorFn: (r) => (r.responseTimeMs ?? null), cell: ({ row }) => (row.original.responseTimeMs != null ? `${row.original.responseTimeMs} ms` : "[n/a]") },
+    { header: "Hostname", accessorFn: (r) => r.hostname ?? "" , cell: ({ row }) => row.original.hostname || <span className="muted">[n/a]</span> },
+    { header: "Ports", accessorFn: (r) => r.openPorts.length, cell: ({ row }) => (row.original.openPorts.length ? row.original.openPorts.join(", ") : <span className="muted">[n/a]</span>) },
+    { header: "MAC Address", enableSorting: false, cell: ({ row }) => <span className="muted" style={{ fontFamily: "monospace", fontSize: 12 }}>{row.original.macAddress ?? "—"}</span> },
+    { header: "Vendor / Type", enableSorting: false, accessorFn: (r) => [r.vendor, r.deviceType].filter(Boolean).join(" · ") || "—" },
     {
       header: "",
       id: "actions",
+      enableSorting: false,
       cell: ({ row }) =>
         row.original.alive && (
           <PermissionGate module="network" action="edit">
@@ -100,7 +176,7 @@ export function IpRangeScannerTab() {
   ];
 
   const historyColumns: ColumnDef<Scan, any>[] = [
-    { header: "Range", cell: ({ row }) => <span style={{ fontFamily: "monospace" }}>{row.original.startIp} – {row.original.endIp}</span> },
+    { header: "Range", cell: ({ row }) => <span className="ips-ip-cell" style={{ fontSize: 12 }}>{row.original.startIp} – {row.original.endIp}</span> },
     { header: "Status", cell: ({ row }) => <span className="badge badge-neutral">{row.original.status}</span> },
     { header: "Alive / Total", accessorFn: (s) => `${s.aliveHosts} / ${s.totalHosts}` },
     { header: "Started", accessorFn: (s) => new Date(s.startedAt).toLocaleString() },
@@ -108,64 +184,143 @@ export function IpRangeScannerTab() {
   ];
 
   return (
-    <div className="stack gap-3">
-      <div className="card">
-        <h3 className="mt-0">IP Range Scanner</h3>
-        <p className="muted" style={{ marginTop: -6 }}>
-          Ping-sweep a range of addresses on your network (like Angry IP Scanner) to discover live hosts, hostnames, MAC
-          addresses, vendor/device type, response times, and common open ports.
-        </p>
-        {error && <div className="alert alert-danger">{error}</div>}
-        <PermissionGate module="network" action="create">
-          <div className="row gap-2 flex-wrap" style={{ alignItems: "flex-end" }}>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>Start IP</label>
-              <input className="input" value={startIp} onChange={(e) => setStartIp(e.target.value)} style={{ width: 160 }} />
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>End IP</label>
-              <input className="input" value={endIp} onChange={(e) => setEndIp(e.target.value)} style={{ width: 160 }} />
-            </div>
-            <button className="btn btn-primary" disabled={startMutation.isPending || scan?.status === "RUNNING"} onClick={() => startMutation.mutate()}>
-              <Icon name="radar" size={14} /> {scan?.status === "RUNNING" ? "Scanning..." : "Start Scan"}
+    <div className="ad-shell nt-shell">
+      <div className="nt-toolbar">
+        <div className="nt-toolbar-row">
+          <span className="ips-field-inline">
+            <span className="ips-field-label">IP Range:</span>
+            <input className="ips-input" value={startIp} onChange={(e) => setStartIp(e.target.value)} disabled={scanning} />
+          </span>
+          <span className="ips-to">to</span>
+          <input className="ips-input" value={endIp} onChange={(e) => setEndIp(e.target.value)} disabled={scanning} />
+
+          <select className="ips-select" value={netmaskPick} onChange={(e) => pickNetmask(e.target.value)} disabled={scanning} title="Fill the range from a CIDR netmask">
+            <option value="">Netmask</option>
+            {CIDR_PRESETS.map((p) => (
+              <option key={p} value={p}>/{p} ({p >= 31 ? "2" : (2 ** (32 - p) - 2).toLocaleString()} hosts)</option>
+            ))}
+          </select>
+
+          <div style={{ position: "relative" }}>
+            <button className="nt-icon-btn" title="Scan settings" onClick={() => setShowSettings((v) => !v)}>
+              <Icon name="settings" size={15} />
             </button>
+            {showSettings && (
+              <div className="nt-settings-popover" style={{ bottom: "auto", top: 44, left: "auto", right: 0, transform: "none", width: 240 }}>
+                <div className="nt-legend-title" style={{ marginBottom: 8 }}>Scan Settings</div>
+                <div className="stack gap-1" style={{ fontSize: 12 }}>
+                  <div className="row gap-2" style={{ justifyContent: "space-between" }}>
+                    <span className="muted">Concurrent threads</span><strong>{SCAN_CONCURRENCY}</strong>
+                  </div>
+                  <div className="row gap-2" style={{ justifyContent: "space-between" }}>
+                    <span className="muted">Max hosts per scan</span><strong>{MAX_HOSTS_PER_SCAN.toLocaleString()}</strong>
+                  </div>
+                </div>
+                <div className="nt-legend-section" style={{ marginTop: 10, marginBottom: 6 }}>Ports Scanned</div>
+                <div className="row gap-1 flex-wrap">
+                  {COMMON_PORTS.map((p) => (
+                    <span key={p.port} className="badge badge-neutral" title={p.label}>{p.port}</span>
+                  ))}
+                </div>
+                <div className="nt-legend-section" style={{ marginTop: 10, marginBottom: 6 }}>Hostname Resolution</div>
+                <p className="muted" style={{ fontSize: 11, margin: 0 }}>
+                  Reverse DNS → known Kynren agent devices → active NetBIOS query — so hostnames resolve even without DNS records or the agent installed.
+                </p>
+              </div>
+            )}
           </div>
-        </PermissionGate>
+        </div>
+
+        <div className="nt-toolbar-row" style={{ marginTop: 10 }}>
+          <PermissionGate
+            module="network"
+            action="create"
+            fallback={<span className="muted" style={{ fontSize: 12 }}>You don't have permission to start scans.</span>}
+          >
+            <button className="ips-start-btn" disabled={startMutation.isPending || scanning} onClick={() => startMutation.mutate()}>
+              <Icon name="radar" size={14} /> {scanning ? "Scanning..." : "Start"}
+            </button>
+          </PermissionGate>
+
+          {scan && (
+            <span className="muted" style={{ fontSize: 12 }}>
+              <strong className="text-ad-text">{scan.startIp}</strong> – <strong className="text-ad-text">{scan.endIp}</strong> · {scan.scannedHosts}/{scan.totalHosts} scanned · {scan.aliveHosts} alive
+            </span>
+          )}
+        </div>
       </div>
 
-      {scan && (
-        <div className="card">
-          <div className="row gap-3 flex-wrap" style={{ justifyContent: "space-between", marginBottom: 10 }}>
-            <div className="row gap-3 flex-wrap">
-              <span><strong>{scan.startIp}</strong> – <strong>{scan.endIp}</strong></span>
-              <span className="badge badge-primary">{scan.status}</span>
-              <span className="muted">{scan.scannedHosts}/{scan.totalHosts} scanned · {scan.aliveHosts} alive</span>
-            </div>
-            <label className="row gap-1" style={{ fontSize: 13, cursor: "pointer" }}>
-              <input type="checkbox" checked={aliveOnly} onChange={(e) => setAliveOnly(e.target.checked)} />
-              Show alive hosts only
-            </label>
+      {error && <div className="alert alert-danger" style={{ margin: "12px 18px 0" }}>{error}</div>}
+
+      {scanning && (
+        <div style={{ paddingTop: 12 }}>
+          <div className="ips-progress-track">
+            <div className="ips-progress-fill" style={{ width: `${progressPct}%` }} />
           </div>
-
-          {scan.status === "RUNNING" && (
-            <div style={{ height: 6, background: "var(--color-border)", borderRadius: 999, overflow: "hidden", marginBottom: 14 }}>
-              <div style={{ height: "100%", width: `${progressPct}%`, background: "var(--color-primary)", transition: "width 0.3s ease" }} />
-            </div>
-          )}
-
-          <DataTable
-            columns={resultColumns}
-            data={results}
-            clientPageSize={10}
-            emptyMessage={scan.status === "RUNNING" ? "Scanning..." : "No hosts found."}
-          />
         </div>
       )}
 
+      <div className="ips-table-wrap">
+        <DataTable
+          columns={resultColumns}
+          data={scan ? results : []}
+          clientPageSize={15}
+          emptyMessage={!scan ? "Enter a range above and click Start to scan." : scanning ? "Scanning..." : "No hosts found."}
+        />
+      </div>
+
+      <div className="ips-statusbar">
+        <span>{scanning ? `Scanning… ${progressPct}%` : scan ? "Scan complete" : "Ready"}</span>
+        <label className="nt-checkbox-pill">
+          <input type="checkbox" checked={aliveOnly} onChange={(e) => setAliveOnly(e.target.checked)} />
+          Display: Alive only
+        </label>
+        <span>Threads: {scanning ? SCAN_CONCURRENCY : 0}</span>
+      </div>
+
       {history && history.length > 0 && (
-        <div className="card">
+        <div className="card" style={{ margin: 18, marginTop: 0 }}>
           <h3 className="mt-0">Recent Scans</h3>
           <DataTable columns={historyColumns} data={history} clientPageSize={5} onRowClick={(s) => setActiveScanId(s.id)} />
+        </div>
+      )}
+
+      {statsScan && (
+        <div className="modal-overlay" onClick={() => setStatsScan(null)}>
+          <div className="modal" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="row gap-2">
+                <span className="ips-stats-icon"><Icon name="gauge" size={20} /></span>
+                <div>
+                  <h3 style={{ margin: 0 }}>Scanning completed</h3>
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setStatsScan(null)}><Icon name="close" size={16} /></button>
+            </div>
+
+            <dl className="ips-stats-grid">
+              {statsScan.completedAt && (
+                <>
+                  <dt>Total time</dt>
+                  <dd>{formatDuration((new Date(statsScan.completedAt).getTime() - new Date(statsScan.startedAt).getTime()) / 1000)}</dd>
+                  <dt>Average time per host</dt>
+                  <dd>{formatDuration((new Date(statsScan.completedAt).getTime() - new Date(statsScan.startedAt).getTime()) / 1000 / Math.max(1, statsScan.scannedHosts))}</dd>
+                </>
+              )}
+              <dt>IP Range</dt>
+              <dd>{statsScan.startIp} – {statsScan.endIp}</dd>
+              <dt>Hosts scanned</dt>
+              <dd>{statsScan.totalHosts}</dd>
+              <dt>Hosts alive</dt>
+              <dd>{statsScan.aliveHosts}</dd>
+              <dt>With open ports</dt>
+              <dd>{(statsScan.results ?? []).filter((r) => r.openPorts.length > 0).length}</dd>
+            </dl>
+
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={() => setStatsScan(null)}>Close</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
