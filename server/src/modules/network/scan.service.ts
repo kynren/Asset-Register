@@ -3,6 +3,7 @@ import { mapLimit } from "../../lib/concurrency";
 import { expandRange } from "../../lib/ipRange";
 import { getArpMac, getNetbiosName, pingHost, reverseDns, scanCommonPorts } from "../../lib/ping";
 import { guessDeviceType, lookupVendor, lookupVendorOnline } from "../../lib/macVendor";
+import { logAudit } from "../../lib/auditLogger";
 
 const MAX_HOSTS_PER_SCAN = 1024;
 const SCAN_CONCURRENCY = 24;
@@ -63,6 +64,25 @@ async function resolveHostname(ip: string, deviceHostnameByIp: Map<string, strin
   return getNetbiosName(ip);
 }
 
+// If a scanned host's resolved hostname matches an existing asset's name or asset tag (real IT
+// estates commonly name machines after one or the other — see pingAsset()'s comment), and that
+// asset has no static IP recorded yet and isn't already linked to a Device (which would carry its
+// own MAC/IP info), fill in the discovered IP. Best-effort and silent on no match — most scanned
+// hosts won't correspond to any inventory asset.
+async function fillAssetIpFromHostname(hostname: string, ip: string, scanId: number) {
+  const updated = await prisma.asset.updateMany({
+    where: {
+      staticIpAddress: null,
+      deviceId: null,
+      OR: [{ name: { equals: hostname, mode: "insensitive" } }, { assetTag: { equals: hostname, mode: "insensitive" } }],
+    },
+    data: { staticIpAddress: ip },
+  });
+  if (updated.count > 0) {
+    await logAudit({ action: "asset.auto_fill_ip_from_scan", entityType: "NetworkScan", entityId: scanId, metadata: { hostname, ip, assetsUpdated: updated.count } });
+  }
+}
+
 async function runScan(scanId: number, addresses: string[]) {
   let aliveCount = 0;
   let scannedCount = 0;
@@ -88,6 +108,7 @@ async function runScan(scanId: number, addresses: string[]) {
       vendor = lookupVendor(mac) ?? (await lookupVendorOnline(mac));
       deviceType = guessDeviceType(vendor, openPorts);
       aliveCount += 1;
+      if (hostname) await fillAssetIpFromHostname(hostname, ip, scanId).catch(() => undefined);
     }
 
     scannedCount += 1;
