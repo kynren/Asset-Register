@@ -362,6 +362,94 @@
   .quick-action:hover {
     @apply bg-primary-soft border-primary;
   }
+
+  /* ---------- Rich text (WYSIWYG) editor ---------- */
+
+  .rte {
+    @apply border border-border rounded overflow-hidden;
+  }
+  .rte-toolbar {
+    @apply flex items-center gap-0.5 flex-wrap px-1.5 py-1 border-b border-border bg-bg;
+  }
+  .rte-toolbar button {
+    @apply min-w-[26px] h-[26px] px-1.5 flex items-center justify-center rounded text-xs font-semibold text-text-muted bg-transparent border-none cursor-pointer;
+  }
+  .rte-toolbar button:hover {
+    @apply bg-border text-text;
+  }
+  .rte-toolbar button.active {
+    @apply bg-primary-soft text-primary;
+  }
+  .rte-divider {
+    @apply w-px h-4 bg-border mx-1;
+  }
+  .rte-content {
+    @apply px-3 py-2.5 text-[13px] text-text;
+  }
+  .rte-content :focus {
+    outline: none;
+  }
+  .rte-content p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    @apply text-text-muted float-left h-0 pointer-events-none;
+  }
+
+  /* Shared prose styling for rich-text content, used by both the live editor (.rte-content) and
+     the read-only SectionsView renderer — Tailwind's base reset strips default heading/list
+     styling, so it has to be reinstated explicitly for content built from arbitrary HTML. */
+  .doc-prose h2 {
+    @apply text-base font-bold mt-4 mb-2;
+  }
+  .doc-prose h2:first-child {
+    @apply mt-0;
+  }
+  .doc-prose h3 {
+    @apply text-[13px] font-bold mt-3 mb-1.5;
+  }
+  .doc-prose p {
+    @apply mb-2.5 leading-relaxed;
+  }
+  .doc-prose p:last-child {
+    @apply mb-0;
+  }
+  .doc-prose ul {
+    @apply list-disc pl-5 mb-2.5;
+  }
+  .doc-prose ol {
+    @apply list-decimal pl-5 mb-2.5;
+  }
+  .doc-prose li {
+    @apply mb-1;
+  }
+  .doc-prose blockquote {
+    @apply border-l-[3px] border-primary pl-3 my-2.5 text-text-muted italic;
+  }
+  .doc-prose a {
+    @apply text-primary underline;
+  }
+  .doc-prose img {
+    @apply max-w-full rounded my-2.5;
+  }
+  .doc-prose svg {
+    @apply max-w-full my-3;
+    height: auto;
+  }
+  .doc-prose table {
+    @apply w-full border-collapse my-2.5 text-[12px];
+  }
+  .doc-prose th,
+  .doc-prose td {
+    @apply border border-border px-2 py-1.5 text-left;
+  }
+  .doc-prose th {
+    @apply bg-bg font-semibold;
+  }
+  .doc-prose strong {
+    @apply font-bold;
+  }
+  .doc-prose code {
+    @apply bg-bg border border-border rounded px-1 py-0.5 text-[12px] font-mono;
+  }
 }
 
 @layer utilities {

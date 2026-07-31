@@ -16,6 +16,7 @@ export const systemConsoleNav: NavItem[] = [
   { label: "Helpdesk & Ticketing", path: "/helpdesk", icon: "helpdesk", module: "helpdesk" },
   { label: "Operations Tools", path: "/operations", icon: "operations", module: "operations" },
   { label: "NVRs & Cameras", path: "/nvr", icon: "nvr", module: "nvr" },
+  { label: "Docs & SOPs", path: "/docs", icon: "book", module: "docs" },
   { label: "Operational Context", path: "/operational-context", icon: "gauge", module: "assets" },
   { label: "Virtual Assistant", path: "/assistant", icon: "assistant", module: "virtual-assistant" },
 ];
