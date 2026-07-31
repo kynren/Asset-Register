@@ -235,6 +235,7 @@ model Location {
   nvrs        Nvr[]
   cameras     Camera[]
   accessControlDevices AccessControlDevice[]
+  lightingDevices      LightingDevice[]
 }
 
 enum AssetStatus {
@@ -999,6 +1000,98 @@ model AccessCredentialDoorRight {
   planTemplateNo String            @default("1")
 
   @@unique([credentialId, doorId])
+}
+
+// ───────────────────────── Lighting (local, web-controllable IoT devices) ─────────────────────────
+
+enum LightingDeviceKind {
+  SWITCH
+  LIGHT
+}
+
+// Which local driver controls this device (see server/src/lib/iotDeviceApi.ts, the dispatcher
+// every route goes through instead of calling a protocol-specific client directly):
+//   SHELLY       - Shelly's Gen1 REST / Gen2+3 JSON-RPC local API (server/src/lib/shellyApi.ts)
+//   TASMOTA      - Tasmota firmware's HTTP `/cm?cmnd=` API (server/src/lib/tasmotaApi.ts),
+//                  the other dominant open-source local-network IoT relay/light firmware
+//   GENERIC_HTTP - a universal escape hatch: the user supplies their own On/Off (and optional
+//                  status) URLs, so anything with *any* documented HTTP control endpoint can be
+//                  added without a dedicated driver — Home Assistant automations, IFTTT/webhook
+//                  proxies, ESPHome's REST API, self-rolled relays, etc. Cloud-account-only
+//                  ecosystems (Hue, LIFX, Govee, Tuya) aren't wired up as first-class drivers —
+//                  they need OAuth/cloud API keys, a different integration shape entirely from
+//                  every other "local network, no cloud" device this app already manages — but
+//                  a device's own local bridge/automation webhook can still be added as GENERIC_HTTP.
+enum LightingProtocol {
+  SHELLY
+  TASMOTA
+  GENERIC_HTTP
+}
+
+// One physical device (switch or dimmable light) controlled directly over the local network —
+// no cloud account required for any of the three drivers above. `gen`/`kind` are Shelly/Tasmota
+// concepts (null until first successful contact auto-detects them); `onUrl`/`offUrl`/`statusUrl`/
+// `statusOnPath` are GENERIC_HTTP-only, user-supplied at add time (see lighting.schema.ts).
+model LightingDevice {
+  id             Int                 @id @default(autoincrement())
+  name           String
+  protocol       LightingProtocol    @default(SHELLY)
+  ipAddress      String?
+  port           Int?
+  gen            Int?
+  kind           LightingDeviceKind?
+  channel        Int                 @default(0)
+  onUrl          String?
+  offUrl         String?
+  statusUrl      String?
+  statusOnPath   String?
+  locationId     Int?
+  location       Location?           @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  status         CameraStatus        @default(UNKNOWN)
+  isOn           Boolean             @default(false)
+  brightness     Int?
+  powerW         Float?
+  lastCheckedAt  DateTime?
+  createdAt      DateTime            @default(now())
+}
+
+enum LightingScanStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// One "Discover" sweep of a /24-sized range, same async job + poll pattern as the Network
+// Topology Map's IP Range Scanner (server/src/modules/network/scan.service.ts) — the scan
+// starts in the background, `scannedHosts` ticks up as each address is probed, and the client
+// polls GET /lighting/discover/:id until status leaves RUNNING. Unlike the network scanner,
+// only actual hits (Shelly or Tasmota — see shellyProbe.ts/tasmotaProbe.ts) are persisted as
+// LightingScanResult rows — a non-responsive or unrecognized host just advances the counter,
+// nothing is stored for it. GENERIC_HTTP devices have no fixed identifying signal to probe for,
+// so they're never auto-discovered — they're always added manually via the Add Device form.
+model LightingScan {
+  id           Int                  @id @default(autoincrement())
+  startIp      String
+  endIp        String
+  status       LightingScanStatus   @default(RUNNING)
+  totalHosts   Int
+  scannedHosts Int                  @default(0)
+  startedAt    DateTime             @default(now())
+  completedAt  DateTime?
+  results      LightingScanResult[]
+}
+
+model LightingScanResult {
+  id           Int                 @id @default(autoincrement())
+  scanId       Int
+  scan         LightingScan        @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  ipAddress    String
+  protocol     LightingProtocol    @default(SHELLY)
+  name         String?
+  model        String?
+  gen          Int?
+  alreadyAdded Boolean             @default(false)
+  discoveredAt DateTime            @default(now())
 }
 
 model AccessEvent {

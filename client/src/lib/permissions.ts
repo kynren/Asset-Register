@@ -7,6 +7,7 @@ export const MODULES = [
   "operations",
   "nvr",
   "access-control",
+  "lighting",
   "virtual-assistant",
   "docs",
   "admin",
