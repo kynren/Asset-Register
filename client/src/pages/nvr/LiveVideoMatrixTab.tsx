@@ -19,7 +19,7 @@ interface Camera {
   nvrId: number;
   name: string;
   channel: number | null;
-  location: string | null;
+  location: { id: number; name: string } | null;
   ipAddress: string | null;
   port: number | null;
   ptzEnabled: boolean;
@@ -99,7 +99,7 @@ export function LiveVideoMatrixTab() {
     const q = search.trim().toLowerCase();
     const set = new Set<number>();
     for (const c of allCameras) {
-      if (q && !`${c.name} ${c.ipAddress ?? ""} ${c.location ?? ""}`.toLowerCase().includes(q)) continue;
+      if (q && !`${c.name} ${c.ipAddress ?? ""} ${c.location?.name ?? ""}`.toLowerCase().includes(q)) continue;
       if (typeFilter === "PTZ" && !c.ptzEnabled) continue;
       if (typeFilter === "FIXED" && c.ptzEnabled) continue;
       if (subnetFilter !== "ALL" && subnetOf(c.ipAddress) !== subnetFilter) continue;

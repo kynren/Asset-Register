@@ -19,7 +19,7 @@ interface Camera {
   nvrId: number;
   name: string;
   channel: number | null;
-  location: string | null;
+  location: { id: number; name: string } | null;
   ipAddress: string | null;
   port: number | null;
   username: string | null;
@@ -35,7 +35,7 @@ interface Nvr {
   port: number | null;
   protocol: string | null;
   username: string | null;
-  location: string | null;
+  location: { id: number; name: string } | null;
   model: string | null;
   status: string;
   lastCheckedAt: string | null;
@@ -135,7 +135,7 @@ export function DeviceManagementTab() {
                   <StatusBadge status={nvr.status} />
                 </div>
                 <p className="muted" style={{ margin: "2px 0 0", fontSize: 12 }}>
-                  {nvr.ipAddress ?? "No IP set"}{nvr.port ? `:${nvr.port}` : ""} · {nvr.protocol ?? "—"} · {nvr.location ?? "No location"}
+                  {nvr.ipAddress ?? "No IP set"}{nvr.port ? `:${nvr.port}` : ""} · {nvr.protocol ?? "—"} · {nvr.location?.name ?? "No location"}
                   {nvr.lastCheckedAt && ` · checked ${dayjs(nvr.lastCheckedAt).format("HH:mm:ss")}`}
                 </p>
               </div>
@@ -166,7 +166,7 @@ export function DeviceManagementTab() {
                   <tr key={cam.id}>
                     <td>{cam.name}{cam.ptzEnabled && <span className="badge badge-primary" style={{ marginLeft: 6 }}>PTZ</span>}</td>
                     <td>{cam.channel ?? "—"}</td>
-                    <td>{cam.location ?? "—"}</td>
+                    <td>{cam.location?.name ?? "—"}</td>
                     <td style={{ fontFamily: "monospace" }}>{cam.ipAddress ?? "—"}</td>
                     <td><StatusBadge status={cam.status} /></td>
                     <td>
@@ -214,7 +214,7 @@ export function DeviceManagementTab() {
             protocol: editingNvr.protocol ?? "RTSP",
             username: editingNvr.username ?? "",
             password: "",
-            location: editingNvr.location ?? "",
+            locationId: editingNvr.location?.id ?? null,
             model: editingNvr.model ?? "",
           }}
           onClose={() => setEditingNvr(null)}
@@ -236,7 +236,7 @@ export function DeviceManagementTab() {
           initial={{
             name: editingCamera.name,
             channel: editingCamera.channel,
-            location: editingCamera.location ?? "",
+            locationId: editingCamera.location?.id ?? null,
             ipAddress: editingCamera.ipAddress ?? "",
             port: editingCamera.port,
             username: editingCamera.username ?? "",

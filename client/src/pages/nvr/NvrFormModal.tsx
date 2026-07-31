@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
+import { QuickAddSelect } from "../../components/QuickAddSelect";
 import { TestConnectionButton } from "./TestConnectionButton";
 import { DiscoverCamerasPanel } from "./DiscoverCamerasPanel";
 import { PasswordInput } from "../../components/PasswordInput";
@@ -11,7 +14,7 @@ export interface NvrFormValues {
   protocol: string;
   username: string;
   password: string;
-  location: string;
+  locationId: number | null;
   model: string;
 }
 
@@ -24,7 +27,7 @@ const emptyValues: NvrFormValues = {
   protocol: "RTSP",
   username: "",
   password: "",
-  location: "",
+  locationId: null,
   model: "",
 };
 
@@ -44,6 +47,7 @@ export function NvrFormModal({
   onCamerasImported?: () => void;
 }) {
   const [values, setValues] = useState<NvrFormValues>({ ...emptyValues, ...initial });
+  const { data: locations } = useQuery({ queryKey: ["locations"], queryFn: async () => (await axiosClient.get("/locations")).data });
 
   useEffect(() => {
     setValues({ ...emptyValues, ...initial });
@@ -59,7 +63,7 @@ export function NvrFormModal({
       <div className="grid grid-cols-3">
         <div className="field"><label>Name *</label><input className="input" value={values.name} onChange={(e) => update("name", e.target.value)} required placeholder="e.g. Main Perimeter NVR" /></div>
         <div className="field"><label>Model</label><input className="input" value={values.model} onChange={(e) => update("model", e.target.value)} /></div>
-        <div className="field"><label>Location</label><input className="input" value={values.location} onChange={(e) => update("location", e.target.value)} /></div>
+        <QuickAddSelect label="Location" value={values.locationId} onChange={(id) => update("locationId", id)} options={locations} createUrl="/locations" queryKey="locations" />
         <div className="field"><label>IP Address</label><input className="input" value={values.ipAddress} onChange={(e) => update("ipAddress", e.target.value)} placeholder="192.168.1.10" /></div>
         <div className="field"><label>Port</label><input className="input" type="number" value={values.port ?? ""} onChange={(e) => update("port", e.target.value ? Number(e.target.value) : null)} /></div>
         <div className="field">

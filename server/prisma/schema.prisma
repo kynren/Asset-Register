@@ -231,6 +231,8 @@ model Location {
   assets      Asset[]
   stockItems  StockItem[]
   stockLevels StockLevel[]
+  nvrs        Nvr[]
+  cameras     Camera[]
 }
 
 enum AssetStatus {
@@ -851,7 +853,8 @@ model Nvr {
   protocol          String?       @default("RTSP")
   username          String?
   encryptedPassword String?
-  location          String?
+  locationId        Int?
+  location          Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
   model             String?
   notes             String?
   status            CameraStatus  @default(UNKNOWN)
@@ -867,7 +870,8 @@ model Camera {
   nvr               Nvr               @relation(fields: [nvrId], references: [id], onDelete: Cascade)
   name              String
   channel           Int?
-  location          String?
+  locationId        Int?
+  location          Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
   ipAddress         String?
   port              Int?
   username          String?

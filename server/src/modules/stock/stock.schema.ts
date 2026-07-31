@@ -7,6 +7,7 @@ export const createStockItemSchema = z.object({
   unit: z.string().optional(),
   reorderLevel: z.number().int().min(0).optional(),
   unitCost: z.number().nullable().optional(),
+  locationId: z.number().int().nullable().optional(),
 });
 
 export const updateStockItemSchema = createStockItemSchema.partial();

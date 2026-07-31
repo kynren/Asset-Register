@@ -17,14 +17,26 @@ interface ListItem {
 function SimpleListManager({ title, url, queryKey, extraField }: { title: string; url: string; queryKey: string; extraField?: string }) {
   const [name, setName] = useState("");
   const [extra, setExtra] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<ListItem | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({ queryKey: [queryKey], queryFn: async () => (await axiosClient.get(url)).data as ListItem[] });
 
+  function resetForm() {
+    setName("");
+    setExtra("");
+    setEditingId(null);
+  }
+
   const createMutation = useMutation({
     mutationFn: () => axiosClient.post(url, extraField ? { name, [extraField]: extra } : { name }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [queryKey] }); setName(""); setExtra(""); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [queryKey] }); resetForm(); },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () => axiosClient.patch(`${url}/${editingId}`, extraField ? { name, [extraField]: extra } : { name }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [queryKey] }); resetForm(); },
   });
 
   const deleteMutation = useMutation({
@@ -32,10 +44,17 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [queryKey] }); setDeleting(null); },
   });
 
+  function startEdit(item: ListItem) {
+    setEditingId(item.id);
+    setName(item.name);
+    setExtra(item.address ?? "");
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    createMutation.mutate();
+    if (editingId != null) updateMutation.mutate();
+    else createMutation.mutate();
   }
 
   const columns: ColumnDef<ListItem, any>[] = [
@@ -44,12 +63,19 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
       header: "",
       id: "actions",
       cell: ({ row }) => (
-        <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
-          <Icon name="trash" size={13} />
-        </button>
+        <div className="row gap-1">
+          <button className="btn btn-secondary btn-sm btn-icon" onClick={() => startEdit(row.original)}>
+            <Icon name="edit" size={13} />
+          </button>
+          <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
+            <Icon name="trash" size={13} />
+          </button>
+        </div>
       ),
     },
   ];
+
+  const saving = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="card">
@@ -57,7 +83,12 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
       <form className="row gap-2" onSubmit={handleSubmit} style={{ marginBottom: 14 }}>
         <input className="input" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
         {extraField && <input className="input" placeholder={extraField} value={extra} onChange={(e) => setExtra(e.target.value)} />}
-        <button className="btn btn-primary btn-sm" type="submit" disabled={createMutation.isPending}><Icon name="plus" size={13} /> Add</button>
+        <button className="btn btn-primary btn-sm" type="submit" disabled={saving}>
+          {editingId != null ? <><Icon name="check" size={13} /> Save</> : <><Icon name="plus" size={13} /> Add</>}
+        </button>
+        {editingId != null && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>Cancel</button>
+        )}
       </form>
       <DataTable columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={5} emptyMessage="None added yet." />
 

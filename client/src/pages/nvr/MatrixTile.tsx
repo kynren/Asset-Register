@@ -41,6 +41,8 @@ export function MatrixTile({
   registerSnap: (index: number, fn: (() => void) | null) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const tileRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const isRtsp = /^rtsps?:\/\//i.test((camera.streamUrl ?? "").trim());
   const { status, error, start, stop } = useRtspStream(camera.streamUrl ?? "", videoRef);
 
@@ -96,6 +98,22 @@ export function MatrixTile({
     };
   }, [camera.id, camera.ipAddress]);
 
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setIsFullscreen(document.fullscreenElement === tileRef.current);
+    }
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement === tileRef.current) {
+      document.exitFullscreen();
+    } else {
+      tileRef.current?.requestFullscreen().catch(() => undefined);
+    }
+  }
+
   function snapFrame() {
     const video = videoRef.current;
     if (!video || video.readyState < 2) return;
@@ -130,7 +148,7 @@ export function MatrixTile({
     .join(" ");
 
   return (
-    <div className={`nvx-tile ${focused ? "focused" : ""}`} onClick={onFocus}>
+    <div ref={tileRef} className={`nvx-tile ${focused ? "focused" : ""}`} onClick={onFocus}>
       <div className="nvx-tile-header">
         <span>{slotIndex + 1} | {camera.name}</span>
         <div className="nvx-tile-actions">
@@ -139,6 +157,17 @@ export function MatrixTile({
               <span className="nvx-tile-rec-dot" /> REC
             </span>
           )}
+          <button
+            type="button"
+            className="nvx-tile-icon-btn"
+            title={isFullscreen ? "Exit full screen" : "Expand to full screen"}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFullscreen();
+            }}
+          >
+            <Icon name="maximize" size={11} />
+          </button>
           <button
             type="button"
             className="nvx-tile-icon-btn"
