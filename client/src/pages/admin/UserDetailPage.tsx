@@ -6,6 +6,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { StatusBadge } from "../../components/StatusBadge";
 import { FormModal } from "../../components/FormModal";
+import { QrCodeModal } from "../../components/QrCodeModal";
 import { Skeleton, SkeletonText } from "../../components/Skeleton";
 
 interface UserDetail {
@@ -35,6 +36,7 @@ export function UserDetailPage() {
   const [roleId, setRoleId] = useState<number | "">("");
   const [saved, setSaved] = useState(false);
   const [tempPasswordInfo, setTempPasswordInfo] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
 
   const { data: user, isLoading } = useQuery({
     queryKey: ["user", id],
@@ -118,6 +120,9 @@ export function UserDetailPage() {
         <div className="row gap-2">
           <StatusBadge status={user.role.name.toUpperCase().replace(/\s/g, "_")} />
           <StatusBadge status={user.isActive ? "ACTIVE" : "INACTIVE"} />
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowQr(true)}>
+            <Icon name="grid" size={13} /> QR Code
+          </button>
         </div>
       </div>
 
@@ -204,6 +209,16 @@ export function UserDetailPage() {
           </div>
           <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={() => setTempPasswordInfo(null)}>Done</button>
         </FormModal>
+      )}
+
+      {showQr && (
+        <QrCodeModal
+          title="User QR Code"
+          value={`${window.location.origin}/admin/users/${user.id}`}
+          label={`${user.firstName} ${user.lastName}`}
+          subLabel={user.email}
+          onClose={() => setShowQr(false)}
+        />
       )}
     </div>
   );

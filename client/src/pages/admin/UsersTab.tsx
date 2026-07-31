@@ -9,6 +9,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { Icon } from "../../components/Icon";
 import { FormModal } from "../../components/FormModal";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { QrCodeModal } from "../../components/QrCodeModal";
 
 interface UserRow {
   id: number;
@@ -25,6 +26,7 @@ export function UsersTab() {
   const [showCreate, setShowCreate] = useState(false);
   const [deactivating, setDeactivating] = useState<UserRow | null>(null);
   const [tempPasswordInfo, setTempPasswordInfo] = useState<{ email: string; password: string } | null>(null);
+  const [qrUser, setQrUser] = useState<UserRow | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -68,6 +70,7 @@ export function UsersTab() {
         <div className="row gap-1" onClick={(e) => e.stopPropagation()}>
           <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/admin/users/${row.original.id}`)}>View Profile</button>
           <button className="btn btn-secondary btn-sm" onClick={() => resetPasswordMutation.mutate(row.original.id)}>Reset Password</button>
+          <button className="btn btn-secondary btn-sm btn-icon" title="Print QR label" onClick={() => setQrUser(row.original)}><Icon name="grid" size={12} /></button>
           {row.original.isActive && (
             <button className="btn btn-danger btn-sm" onClick={() => setDeactivating(row.original)}>Deactivate</button>
           )}
@@ -119,6 +122,16 @@ export function UsersTab() {
           </div>
           <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={() => setTempPasswordInfo(null)}>Done</button>
         </FormModal>
+      )}
+
+      {qrUser && (
+        <QrCodeModal
+          title="User QR Code"
+          value={`${window.location.origin}/admin/users/${qrUser.id}`}
+          label={`${qrUser.firstName} ${qrUser.lastName}`}
+          subLabel={qrUser.email}
+          onClose={() => setQrUser(null)}
+        />
       )}
     </div>
   );

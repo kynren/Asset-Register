@@ -38,6 +38,7 @@ import procurementRoutes from "./modules/procurement/procurement.routes";
 import assetFormTemplatesRoutes from "./modules/assetFormTemplates/assetFormTemplates.routes";
 import emailTemplatesRoutes from "./modules/emailTemplates/emailTemplates.routes";
 import docsRoutes from "./modules/docs/docs.routes";
+import searchRoutes from "./modules/search/search.routes";
 import mcpRoutes from "./mcp/mcp.routes";
 import mcpKeysRoutes from "./mcp/mcpKeys.routes";
 
@@ -89,6 +90,7 @@ export function createApp() {
   app.use("/api/asset-form-templates", assetFormTemplatesRoutes);
   app.use("/api/email-templates", emailTemplatesRoutes);
   app.use("/api/docs", docsRoutes);
+  app.use("/api/search", searchRoutes);
   app.use("/api/mcp", mcpRoutes);
   app.use("/api/mcp-keys", mcpKeysRoutes);
 

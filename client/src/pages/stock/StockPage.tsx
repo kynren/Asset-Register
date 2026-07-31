@@ -9,6 +9,7 @@ import { SimpleBarChart } from "../../components/ChartWrapper";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { StockItemFormModal, StockItemFormValues } from "./StockItemFormModal";
 import { FormModal } from "../../components/FormModal";
+import { QrCodeModal } from "../../components/QrCodeModal";
 import { ProcurementTab } from "./ProcurementTab";
 
 interface StockItem {
@@ -28,6 +29,7 @@ export function StockPage() {
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [txItem, setTxItem] = useState<StockItem | null>(null);
+  const [qrItem, setQrItem] = useState<StockItem | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -65,9 +67,12 @@ export function StockPage() {
       header: "",
       id: "actions",
       cell: ({ row }) => (
-        <PermissionGate module="stock" action="edit">
-          <button className="btn btn-secondary btn-sm" onClick={() => setTxItem(row.original)}>Manage Stock</button>
-        </PermissionGate>
+        <div className="row gap-1">
+          <PermissionGate module="stock" action="edit">
+            <button className="btn btn-secondary btn-sm" onClick={() => setTxItem(row.original)}>Manage Stock</button>
+          </PermissionGate>
+          <button className="btn btn-secondary btn-sm btn-icon" title="Print QR label" onClick={() => setQrItem(row.original)}><Icon name="grid" size={12} /></button>
+        </div>
       ),
     },
   ];
@@ -130,6 +135,7 @@ export function StockPage() {
 
       {showForm && <StockItemFormModal onClose={() => setShowForm(false)} onSubmit={(v) => createMutation.mutate(v)} submitting={createMutation.isPending} />}
       {txItem && <StockLevelsModal item={txItem} onClose={() => setTxItem(null)} />}
+      {qrItem && <QrCodeModal title="Stock Item QR Label" value={qrItem.sku} label={qrItem.sku} subLabel={qrItem.name} onClose={() => setQrItem(null)} />}
     </div>
   );
 }
