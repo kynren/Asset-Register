@@ -131,6 +131,7 @@ export function Topbar() {
               <div className="topbar-user-name">{user?.firstName} {user?.lastName}</div>
               <div className="topbar-user-role">{user?.roleName?.toUpperCase()}</div>
             </div>
+            <Icon name="chevronDown" size={14} />
           </div>
           {menuOpen && (
             <div className="user-menu" onMouseLeave={() => setMenuOpen(false)}>
