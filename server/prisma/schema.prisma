@@ -71,6 +71,7 @@ model User {
   dashboardLayout   DashboardLayout?
   preferences       UserPreference[]
   mcpApiKeys        McpApiKey[]
+  accessCredentials AccessCredential[]
 
   projectCardsAssigned ProjectCard[]      @relation("ProjectCardAssignee")
   projectCardsCreated  ProjectCard[]      @relation("ProjectCardCreator")
@@ -233,6 +234,7 @@ model Location {
   stockLevels StockLevel[]
   nvrs        Nvr[]
   cameras     Camera[]
+  accessControlDevices AccessControlDevice[]
 }
 
 enum AssetStatus {
@@ -905,6 +907,93 @@ model CameraEvent {
   type      String
   message   String?
   createdAt DateTime @default(now())
+}
+
+// ───────────────────────── Access Control (Hikvision ISAPI) ─────────────────────────
+// A door controller talked to over the same Hikvision ISAPI family already used for camera
+// discovery (server/src/lib/hikvisionIsapi.ts), just a different endpoint set
+// (/ISAPI/AccessControl/*) — see that file for exactly which calls are real vs. best-effort
+// pending verification against physical hardware.
+
+enum DoorLockState {
+  LOCKED
+  UNLOCKED
+  UNKNOWN
+}
+
+enum AccessCredentialStatus {
+  ACTIVE
+  DISABLED
+}
+
+model AccessControlDevice {
+  id                Int              @id @default(autoincrement())
+  name              String
+  ipAddress         String?
+  port              Int?
+  username          String?
+  encryptedPassword String?
+  locationId        Int?
+  location          Location?        @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  model             String?
+  notes             String?
+  status            CameraStatus     @default(UNKNOWN)
+  lastCheckedAt     DateTime?
+  lastEventSyncAt   DateTime?
+  doors             Door[]
+  credentials       AccessCredential[]
+  events            AccessEvent[]
+  createdAt         DateTime         @default(now())
+}
+
+model Door {
+  id            Int                  @id @default(autoincrement())
+  deviceId      Int
+  device        AccessControlDevice  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  doorNumber    Int
+  name          String
+  lockState     DoorLockState        @default(UNKNOWN)
+  lastCheckedAt DateTime?
+  events        AccessEvent[]
+
+  @@unique([deviceId, doorNumber])
+}
+
+// One credential (card and/or PIN) enrolled on one physical controller for one app User.
+// Hikvision access control is per-device (there's no central directory unless a separate VMS
+// like HikCentral sits in front of it, which is out of scope here) — the same person needing
+// access on two controllers gets two AccessCredential rows, each with its own device-assigned
+// employeeNo.
+model AccessCredential {
+  id          Int                     @id @default(autoincrement())
+  deviceId    Int
+  device      AccessControlDevice     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeNo  String
+  cardNumber  String?
+  hasPin      Boolean                 @default(false)
+  status      AccessCredentialStatus  @default(ACTIVE)
+  validFrom   DateTime?
+  validTo     DateTime?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@unique([deviceId, employeeNo])
+}
+
+model AccessEvent {
+  id         Int                  @id @default(autoincrement())
+  deviceId   Int
+  device     AccessControlDevice  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  doorId     Int?
+  door       Door?                @relation(fields: [doorId], references: [id], onDelete: SetNull)
+  employeeNo String?
+  cardNumber String?
+  eventType  String
+  message    String?
+  occurredAt DateTime
+  createdAt  DateTime             @default(now())
 }
 
 // ───────────────────────── Cross-cutting ─────────────────────────
