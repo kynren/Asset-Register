@@ -3,6 +3,7 @@ import { env } from "./config/env";
 import { startMaintenanceAlertScheduler } from "./lib/maintenanceAlerts";
 import { startOverdueTaskScheduler } from "./lib/overdueTaskAlerts";
 import { startRetentionScheduler } from "./lib/recording";
+import { startNetworkMonitorScheduler } from "./lib/networkMonitor";
 
 const app = createApp();
 
@@ -12,4 +13,5 @@ app.listen(env.PORT, () => {
   startMaintenanceAlertScheduler();
   startOverdueTaskScheduler();
   startRetentionScheduler();
+  startNetworkMonitorScheduler();
 });

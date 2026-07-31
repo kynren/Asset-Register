@@ -171,6 +171,39 @@ best-effort category guess from the detected device type (using the `isComputerA
 `isSwitchingDevice` category flags where they apply, else a loose name match). The Switching tab's
 "Discovered on Network" list filters on the renamed `"Network Switching / Routing"` label.
 
+### 3.8a Network Topology Map: Continuous Monitoring (Domotz-style) — added 2026-07-31
+A sixth Network Topology Map tab, **Monitoring** (`client/src/pages/network/MonitoringTab.tsx`),
+adds background monitoring distinct from the on-demand IP Range Scanner: `NetworkMonitorSettings`
+(singleton row, `id=1`) holds `enabled`, `intervalMinutes`, and `ranges` (JSON array of
+`{startIp,endIp,label?}`). `server/src/lib/networkMonitor.ts`'s `startNetworkMonitorScheduler()`
+ticks every 60s (wired into `server/src/index.ts` alongside the other schedulers) but only actually
+runs a cycle once `intervalMinutes` has elapsed since `lastRunAt` — unlike the fixed-hours
+`setInterval` schedulers elsewhere in this codebase, this interval is admin-configurable at runtime
+via the UI, so it's re-checked against the DB every tick rather than baked into the `setInterval`
+call.
+
+Each cycle (`runNetworkMonitorCycle()`) calls a new `runScheduledScan()` in `scan.service.ts` — like
+`startScan()` but **awaited synchronously** (the scheduler isn't on a request/response cycle) and
+tagged `triggeredBy: "SCHEDULED"` with `startedById: null` (`NetworkScan.startedById` was relaxed to
+nullable for this). Results are diffed against `MonitoredNetworkDevice` (keyed by MAC when known,
+else `ip:<address>` — stable across a scan's own IP churn): a device's `status` only flips, and only
+then does it log a `NetworkDeviceStatusEvent` row and fire a notification — a device staying online
+or offline across cycles never re-alerts. Alerts go through the same `notifyUsers()`/event-email
+pattern as `maintenanceAlerts.ts`/`overdueTaskAlerts.ts`, to everyone with `network:canEdit`, via two
+new `EmailEventType` values: `DEVICE_OFFLINE` / `DEVICE_ONLINE`.
+
+Optional per-device SNMP polling (`server/src/lib/snmp.ts`, using the `net-snmp` package) walks
+standard MIB-II OIDs only — `sysDescr`, `sysUpTime`, and `ifTable` (name/admin+oper status/speed/
+octets) — deliberately no vendor-specific MIBs. The community string is encrypted at rest via the
+existing `encryptSecret()`/`decryptSecret()` (`server/src/lib/crypto.ts`, same AES-256-GCM helper as
+NVR/camera credentials) and is never returned to the client (`shapeMonitoredDevice()` in
+`network.routes.ts` strips it, exposing only a `snmpConfigured` boolean). A poll failure (timeout,
+wrong community, device doesn't speak SNMP) is fully soft — it sets `snmpLastError` and shows an
+"Error" badge in the UI rather than aborting the rest of the cycle. New routes, all under
+`/api/network/monitor/*`: `GET`/`PUT /settings`, `POST /run-now` (fire-and-forget, 202, since a full
+cycle across every configured range can take tens of seconds — the client polls `GET /devices`
+afterward), `GET /devices`, `POST /devices/:id/snmp`.
+
 ### 3.9 Layout Fix — Only Content Scrolls
 `.app-shell` and `.main-area` are now `height: 100vh; overflow: hidden`; `.page-content` is the
 only scrollable region (`overflow-y: auto`). The sidebar and top bar no longer move when scrolling
