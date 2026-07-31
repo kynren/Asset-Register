@@ -147,12 +147,29 @@ used real server-side pagination from Round 1 and are unchanged.
 ### 3.8 Network Topology Map: MAC Vendor + Device Type
 `server/src/lib/macVendor.ts` — an embedded (curated, non-exhaustive) OUI-prefix → vendor table
 covering common manufacturers (Dell, HP, Apple, Cisco, TP-Link, Hikvision, Dahua, Raspberry Pi,
-VMware, etc.), plus a `guessDeviceType()` heuristic combining vendor + open ports (e.g. port 554 →
-"IP Camera / NVR", port 3389 → "Windows PC / Server"). This is **local-only, no external API
-call** — deliberately avoids depending on internet access or a third-party lookup service.
-Applied in `scan.service.ts` (IP Range Scanner results now show Vendor + Device Type columns) and
+VMware, etc.), used first. **(Updated 2026-07-31)** When a scanned MAC's prefix isn't in that local
+table, `lookupVendorOnline()` falls back to the free api.macvendors.com lookup — calls are
+serialized through a single module-level queue (≥1.1s apart, respecting that API's ~1 req/sec
+unauthenticated limit) and cached by OUI prefix, and the whole thing fails soft (timeout + catch)
+so a slow/unreachable API never blocks a scan.
+
+`guessDeviceType()` classifies vendor + open ports into a broader taxonomy: **Computer**,
+**Network Switching / Routing** (merges what used to be split "switch" vs "router" signal — a
+single label so the Switching tab surfaces both), **Raspberry Pi**, **IoT Device**, **Lighting**,
+**Sound System**, plus the existing IP Camera / NVR, Printer, Virtual Machine, Networked Device,
+and Unclassified Device. Matching is by lowercase substring against the vendor string (not exact
+equality) since the online fallback returns full IEEE-registered legal names (e.g. "Sonos, Inc.")
+that wouldn't exact-match the short curated names.
+
+Applied in `scan.service.ts` (IP Range Scanner results show Vendor + Device Type columns) and
 carried through when a discovered host is "promoted" to the Topology Graph
-(`NetworkScanResult`/`NetworkNode` both gained `vendor`/`deviceType` columns).
+(`NetworkScanResult`/`NetworkNode` both have `vendor`/`deviceType` columns). **Any alive discovered
+host can now be adopted directly into Asset Inventory** from the IP Range Scanner (`Adopt into
+Inventory` button next to `Add to Topology`, gated on `assets:create`) — opens the standard
+`AssetFormModal` prefilled from the scan result (name/manufacturer/notes/`staticIpAddress`), with a
+best-effort category guess from the detected device type (using the `isComputerAsset`/
+`isSwitchingDevice` category flags where they apply, else a loose name match). The Switching tab's
+"Discovered on Network" list filters on the renamed `"Network Switching / Routing"` label.
 
 ### 3.9 Layout Fix — Only Content Scrolls
 `.app-shell` and `.main-area` are now `height: 100vh; overflow: hidden`; `.page-content` is the

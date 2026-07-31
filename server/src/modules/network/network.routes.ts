@@ -165,9 +165,10 @@ router.post("/scan-results/:resultId/promote", requirePermission("network", "edi
 // "Adopted" switches are real Assets in a category flagged isSwitchingDevice, with their port
 // counts. "Discovered" candidates come from the most recent completed IP range scan, filtered to
 // hosts the same real vendor/port heuristic used by the IP Range Scanner classified as
-// "Network Infrastructure" — no separate SNMP/fingerprinting pass, just the same signal already
-// shown there. A candidate already matching an adopted asset's recorded static IP is flagged so
-// the UI doesn't invite adopting it twice.
+// "Network Switching / Routing" — a single taxonomy label covering both switches and routers,
+// so this list is never missing routing gear. No separate SNMP/fingerprinting pass, just the
+// same signal already shown there. A candidate already matching an adopted asset's recorded
+// static IP is flagged so the UI doesn't invite adopting it twice.
 router.get("/switching", requirePermission("network", "view"), async (_req, res) => {
   const adopted = await prisma.asset.findMany({
     where: { category: { isSwitchingDevice: true } },
@@ -196,7 +197,7 @@ router.get("/switching", requirePermission("network", "view"), async (_req, res)
   const latestScan = await prisma.networkScan.findFirst({
     where: { status: "COMPLETED" },
     orderBy: { startedAt: "desc" },
-    include: { results: { where: { deviceType: "Network Infrastructure" }, orderBy: { ipAddress: "asc" } } },
+    include: { results: { where: { deviceType: "Network Switching / Routing" }, orderBy: { ipAddress: "asc" } } },
   });
 
   const adoptedIps = new Set(adopted.map((a) => a.staticIpAddress).filter((ip): ip is string => !!ip));

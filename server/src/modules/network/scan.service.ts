@@ -2,7 +2,7 @@ import { prisma } from "../../config/prisma";
 import { mapLimit } from "../../lib/concurrency";
 import { expandRange } from "../../lib/ipRange";
 import { getArpMac, getNetbiosName, pingHost, reverseDns, scanCommonPorts } from "../../lib/ping";
-import { guessDeviceType, lookupVendor } from "../../lib/macVendor";
+import { guessDeviceType, lookupVendor, lookupVendorOnline } from "../../lib/macVendor";
 
 const MAX_HOSTS_PER_SCAN = 1024;
 const SCAN_CONCURRENCY = 24;
@@ -64,7 +64,7 @@ async function runScan(scanId: number, addresses: string[]) {
 
     if (ping.alive) {
       [hostname, mac, openPorts] = await Promise.all([resolveHostname(ip, deviceHostnameByIp), getArpMac(ip), scanCommonPorts(ip)]);
-      vendor = lookupVendor(mac);
+      vendor = lookupVendor(mac) ?? (await lookupVendorOnline(mac));
       deviceType = guessDeviceType(vendor, openPorts);
       aliveCount += 1;
     }

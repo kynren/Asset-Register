@@ -80,18 +80,74 @@ export function lookupVendor(mac: string | null | undefined): string | null {
   return OUI_PREFIXES[prefix] ?? null;
 }
 
-const CAMERA_VENDORS = ["Hikvision", "Dahua Technology", "Axis Communications"];
-const NETWORKING_VENDORS = ["Cisco", "TP-Link", "Netgear", "Ubiquiti", "D-Link"];
-const VIRTUAL_VENDORS = ["VMware", "VirtualBox", "Microsoft (Hyper-V)", "QEMU/KVM Virtual Machine"];
+// Online fallback for MAC prefixes not in the curated table above, via the free (key-less)
+// api.macvendors.com lookup. That API caps unauthenticated callers at ~1 req/sec, so calls are
+// serialized through a single module-level queue (never parallelized, even across concurrent
+// scans) and cached by OUI prefix — a /24 sweep typically only has a handful of distinct
+// prefixes, so the cache does almost all the work after the first host of each vendor. Fails
+// soft on any error/timeout/rate-limit so a slow or unreachable API never blocks a scan.
+const onlineVendorCache = new Map<string, string | null>();
+let onlineLookupQueue: Promise<void> = Promise.resolve();
+let lastOnlineLookupAt = 0;
+const ONLINE_LOOKUP_MIN_INTERVAL_MS = 1100;
+const ONLINE_LOOKUP_TIMEOUT_MS = 2500;
+
+export async function lookupVendorOnline(mac: string | null | undefined): Promise<string | null> {
+  if (!mac) return null;
+  const prefix = mac.toUpperCase().slice(0, 8);
+  if (onlineVendorCache.has(prefix)) return onlineVendorCache.get(prefix) ?? null;
+
+  let result: string | null = null;
+  const task = onlineLookupQueue.then(async () => {
+    const wait = ONLINE_LOOKUP_MIN_INTERVAL_MS - (Date.now() - lastOnlineLookupAt);
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    lastOnlineLookupAt = Date.now();
+    try {
+      const res = await fetch(`https://api.macvendors.com/${prefix}`, { signal: AbortSignal.timeout(ONLINE_LOOKUP_TIMEOUT_MS) });
+      if (res.ok) {
+        const text = (await res.text()).trim();
+        result = text || null;
+      }
+    } catch {
+      result = null;
+    }
+  });
+  onlineLookupQueue = task.catch(() => undefined);
+  await task;
+
+  onlineVendorCache.set(prefix, result);
+  return result;
+}
+
+// Broad device-class taxonomy for the IP Range Scanner and Switching tab. Matching is done via
+// lowercase substring against the vendor string rather than exact equality, since the online
+// fallback above returns full IEEE-registered legal names (e.g. "Sonos, Inc.", "Raspberry Pi
+// Trading Ltd") that won't exact-match the short curated names in OUI_PREFIXES.
+const CAMERA_VENDORS = ["hikvision", "dahua", "axis communications"];
+const NETWORKING_VENDORS = ["cisco", "tp-link", "tp link", "netgear", "ubiquiti", "d-link", "mikrotik", "juniper", "aruba networks", "fortinet", "huawei technologies"];
+const VIRTUAL_VENDORS = ["vmware", "virtualbox", "hyper-v", "qemu", "kvm virtual machine", "xensource"];
+const RASPBERRY_PI_VENDORS = ["raspberry pi"];
+const LIGHTING_VENDORS = ["signify", "philips", "lifx", "lutron", "wiz connected"];
+const SOUND_VENDORS = ["sonos", "bose corporation", "yamaha corporation", "denon", "bang & olufsen", "harman"];
+const IOT_VENDORS = ["espressif", "nest labs", "tuya", "shelly", "particle industries", "xiaomi", "amazon technologies", "roborock", "ecobee", "google, inc", "google llc"];
+const COMPUTER_VENDORS = ["dell", "hewlett packard", "hp inc", "lenovo", "intel corporate", "apple", "microsoft surface", "asustek", "acer"];
+
+function vendorMatches(vendor: string, needles: string[]): boolean {
+  const v = vendor.toLowerCase();
+  return needles.some((n) => v.includes(n));
+}
 
 export function guessDeviceType(vendor: string | null, openPorts: number[] = []): string | null {
-  if (vendor && CAMERA_VENDORS.includes(vendor)) return "IP Camera / NVR";
-  if (vendor && NETWORKING_VENDORS.includes(vendor)) return "Network Infrastructure";
-  if (vendor && VIRTUAL_VENDORS.includes(vendor)) return "Virtual Machine";
-  if (vendor === "Raspberry Pi Foundation") return "Single-board Computer";
-  if (vendor === "Apple") return openPorts.includes(548) || openPorts.includes(5000) ? "Apple Device" : "Apple Device";
+  if (vendor && vendorMatches(vendor, CAMERA_VENDORS)) return "IP Camera / NVR";
+  if (vendor && vendorMatches(vendor, NETWORKING_VENDORS)) return "Network Switching / Routing";
+  if (vendor && vendorMatches(vendor, VIRTUAL_VENDORS)) return "Virtual Machine";
+  if (vendor && vendorMatches(vendor, RASPBERRY_PI_VENDORS)) return "Raspberry Pi";
+  if (vendor && vendorMatches(vendor, LIGHTING_VENDORS)) return "Lighting";
+  if (vendor && vendorMatches(vendor, SOUND_VENDORS)) return "Sound System";
+  if (vendor && vendorMatches(vendor, IOT_VENDORS)) return "IoT Device";
+  if (vendor && vendorMatches(vendor, COMPUTER_VENDORS)) return "Computer";
   if (openPorts.includes(554)) return "IP Camera / NVR";
-  if (openPorts.includes(3389)) return "Windows PC / Server";
+  if (openPorts.includes(3389)) return "Computer";
   if (openPorts.includes(631) || openPorts.includes(9100)) return "Printer";
   if (openPorts.includes(22) && !openPorts.includes(3389)) return "Linux / Network Device";
   if (openPorts.includes(80) || openPorts.includes(443)) return "Networked Device (Web Interface)";
