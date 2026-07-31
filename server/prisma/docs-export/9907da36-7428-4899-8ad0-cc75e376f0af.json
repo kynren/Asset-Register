@@ -1,0 +1,19 @@
+{
+  "externalKey": "9907da36-7428-4899-8ad0-cc75e376f0af",
+  "title": "Profile — User Manual",
+  "docType": "GENERAL",
+  "category": "Staff & HR",
+  "collectionName": "Asset Register SOPs",
+  "summary": "How to update your personal details, photo, theme color, password, and review your activity. (gitsynccheck)",
+  "sections": {
+    "body": "<h2>Overview</h2>\n<p>Profile holds your personal account settings: Your Details, Profile Photo, Accent Color, Change Password, your MCP connection info, My Devices, and My Activity.</p>\n<svg viewBox=\"0 0 566 74\" width=\"566\" height=\"74\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Update Details /\nPhoto / Color then Change Password\nif needed then Review My Devices\n&amp; Activity\">\n<defs><marker id=\"arrow-12\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L6,3 L0,6 Z\" fill=\"var(--color-text-muted)\"/></marker></defs>\n<rect x=\"12\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"91\" y=\"34\">Update Details /</tspan><tspan x=\"91\" y=\"48\">Photo / Color</tspan></text><rect x=\"204\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"283\" y=\"34\">Change Password</tspan><tspan x=\"283\" y=\"48\">if needed</tspan></text><rect x=\"396\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"475\" y=\"34\">Review My Devices</tspan><tspan x=\"475\" y=\"48\">&amp; Activity</tspan></text><line x1=\"174\" y1=\"37\" x2=\"197\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-12)\"/><line x1=\"366\" y1=\"37\" x2=\"389\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-12)\"/>\n</svg>\n<h2>Step-by-Step</h2>\n<ol><li>Edit <strong>Your Details</strong> and save to update your name/contact info.</li><li>Upload a new <strong>Profile Photo</strong>.</li><li>Pick an <strong>Accent Color</strong> to personalize your theme.</li><li>Use <strong>Change Password</strong> to update your login password.</li><li>Check <strong>My Devices</strong> for your active login sessions, and <strong>My Activity</strong> for your own audit trail.</li></ol>\n<h2>Tips</h2>\n<ul><li>To set up multi-factor authentication, see Password Management → Account Security.</li></ul>"
+  },
+  "tags": [
+    "manual",
+    "profile",
+    "readme"
+  ],
+  "isPublished": true,
+  "reviewDueDate": null,
+  "updatedAt": "2026-07-31T08:57:57.830Z"
+}
