@@ -122,17 +122,21 @@ export async function listCheckouts(req: Request, res: Response) {
   res.json(checkouts);
 }
 
-// Active heartbeat: looks the asset up on the network by its own asset tag (real IT estates
-// commonly name machines after their asset tag) and pings it directly. No DB write here — this
-// is polled continuously from the inventory table, so persisting every sample would spam the
-// audit trail for no benefit; the frontend keeps its own rolling sample history for the sparkline.
+// Active heartbeat: pings the asset directly by its recorded static IP when one is set (either
+// entered manually or auto-filled by the IP Range Scanner/monitor when it discovers a device
+// whose hostname matches this asset — see fillAssetIpFromHostname in scan.service.ts), falling
+// back to the asset tag as a hostname guess (real IT estates commonly name machines after their
+// asset tag). No DB write here — this is polled continuously from the inventory table, so
+// persisting every sample would spam the audit trail for no benefit; the frontend keeps its own
+// rolling sample history for the sparkline.
 export async function pingAsset(req: Request, res: Response) {
   const id = Number(req.params.id);
-  const asset = await prisma.asset.findUnique({ where: { id }, select: { assetTag: true } });
+  const asset = await prisma.asset.findUnique({ where: { id }, select: { assetTag: true, staticIpAddress: true } });
   if (!asset) throw new ApiError(404, "Asset not found");
 
-  const result = await pingHost(asset.assetTag);
-  res.json({ ...result, target: asset.assetTag });
+  const target = asset.staticIpAddress || asset.assetTag;
+  const result = await pingHost(target);
+  res.json({ ...result, target });
 }
 
 // "Show assets" are whatever categories an admin has flagged AssetCategory.isShowAsset on
@@ -142,13 +146,13 @@ export async function pingAsset(req: Request, res: Response) {
 export async function showStatus(_req: Request, res: Response) {
   const assets = await prisma.asset.findMany({
     where: { category: { isShowAsset: true } },
-    select: { id: true, assetTag: true, name: true },
+    select: { id: true, assetTag: true, name: true, staticIpAddress: true },
     orderBy: { assetTag: "asc" },
   });
 
   const results = await Promise.all(
     assets.map(async (asset) => {
-      const result = await pingHost(asset.assetTag);
+      const result = await pingHost(asset.staticIpAddress || asset.assetTag);
       return { id: asset.id, assetTag: asset.assetTag, name: asset.name, ...result };
     })
   );
