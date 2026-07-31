@@ -1,7 +1,8 @@
 import { prisma } from "../config/prisma";
 import { env } from "../config/env";
 import { mapLimit } from "./concurrency";
-import { runScheduledScan } from "../modules/network/scan.service";
+import { runScheduledScan, enqueueRelayScan, isNetworkRelayEnabled } from "../modules/network/scan.service";
+import { ipToLong } from "./ipRange";
 import { pollDevice } from "./snmp";
 import { decryptSecret } from "./crypto";
 import { notifyUsers, getUserIdsWithPermission } from "./notify";
@@ -56,6 +57,9 @@ async function notifyStatusChange(device: { hostname: string | null; ipAddress: 
   });
 }
 
+// Direct-mode SNMP polling only — the server does its own UDP polling here, which requires the
+// same LAN route as scanning. In relay mode the relay agent polls SNMP itself and submits results
+// alongside the scan (see relay.routes.ts), so this function is never called for relay scans.
 async function pollSnmpForAliveDevices(aliveKeys: Set<string>) {
   const candidates = await prisma.monitoredNetworkDevice.findMany({
     where: { snmpEnabled: true, snmpCommunity: { not: null } },
@@ -94,35 +98,29 @@ async function pollSnmpForAliveDevices(aliveKeys: Set<string>) {
 
 export interface MonitorCycleSummary {
   rangesScanned: number;
+  rangesQueuedForRelay: number;
   hostsAlive: number;
   wentOffline: number;
   cameOnline: number;
 }
 
 /**
- * One full Domotz-style monitoring pass: re-scans every configured range, diffs the alive set
- * against MonitoredNetworkDevice's current state (flipping status + logging a
- * NetworkDeviceStatusEvent + alerting only on actual transitions, not every cycle), then SNMP-
- * polls whichever alive devices have it enabled. Safe to call directly for a manual "Run Now",
- * or via the interval-gated scheduler below.
+ * Diffs one completed scan's alive hosts against MonitoredNetworkDevice's current state — status
+ * transitions only (not every cycle) get logged as a NetworkDeviceStatusEvent and alerted on.
+ * Scoped to devices whose IP falls within *this scan's* range (not globally) so relay scans that
+ * complete asynchronously and out of order across multiple configured ranges can't wrongly mark a
+ * device from a different, still-pending range as offline.
+ *
+ * Called both right after a direct-mode scheduled scan finishes, and from relay.routes.ts when a
+ * relay-executed scheduled scan reports its results back.
  */
-export async function runNetworkMonitorCycle(): Promise<MonitorCycleSummary | null> {
-  const settings = await prisma.networkMonitorSettings.findUnique({ where: { id: 1 } });
-  if (!settings) return null;
+export async function processCompletedMonitorScan(scanId: number, options: { skipSnmp?: boolean } = {}): Promise<{ hostsAlive: number; wentOffline: number; cameOnline: number }> {
+  const scan = await prisma.networkScan.findUnique({ where: { id: scanId }, include: { results: true } });
+  if (!scan) return { hostsAlive: 0, wentOffline: 0, cameOnline: 0 };
 
-  const ranges = (settings.ranges as unknown as MonitorRange[]) ?? [];
-  if (ranges.length === 0) {
-    await prisma.networkMonitorSettings.update({ where: { id: 1 }, data: { lastRunAt: new Date() } });
-    return { rangesScanned: 0, hostsAlive: 0, wentOffline: 0, cameOnline: 0 };
-  }
-
-  const alive: AliveHost[] = [];
-  for (const range of ranges) {
-    const { results } = await runScheduledScan(range.startIp, range.endIp);
-    for (const r of results) {
-      if (r.alive) alive.push({ ipAddress: r.ipAddress, macAddress: r.macAddress, hostname: r.hostname, vendor: r.vendor, deviceType: r.deviceType });
-    }
-  }
+  const alive: AliveHost[] = scan.results
+    .filter((r) => r.alive)
+    .map((r) => ({ ipAddress: r.ipAddress, macAddress: r.macAddress, hostname: r.hostname, vendor: r.vendor, deviceType: r.deviceType }));
 
   const now = new Date();
   const aliveKeys = new Set(alive.map((h) => deviceKey(h.macAddress, h.ipAddress)));
@@ -170,7 +168,15 @@ export async function runNetworkMonitorCycle(): Promise<MonitorCycleSummary | nu
     }
   }
 
-  const missing = await prisma.monitoredNetworkDevice.findMany({ where: { status: "ONLINE", key: { notIn: [...aliveKeys] } } });
+  const rangeStart = ipToLong(scan.startIp);
+  const rangeEnd = ipToLong(scan.endIp);
+  const onlineDevices = await prisma.monitoredNetworkDevice.findMany({ where: { status: "ONLINE" } });
+  const missing = onlineDevices.filter((d) => {
+    if (aliveKeys.has(d.key)) return false;
+    const ipValue = ipToLong(d.ipAddress);
+    return ipValue >= rangeStart && ipValue <= rangeEnd;
+  });
+
   for (const device of missing) {
     await prisma.monitoredNetworkDevice.update({ where: { id: device.id }, data: { status: "OFFLINE", lastChangedAt: now } });
     await prisma.networkDeviceStatusEvent.create({ data: { deviceId: device.id, status: "OFFLINE" } });
@@ -178,11 +184,50 @@ export async function runNetworkMonitorCycle(): Promise<MonitorCycleSummary | nu
     await notifyStatusChange({ hostname: device.hostname, ipAddress: device.ipAddress, deviceType: device.deviceType }, "OFFLINE", now);
   }
 
-  await pollSnmpForAliveDevices(aliveKeys);
+  if (!options.skipSnmp) {
+    await pollSnmpForAliveDevices(aliveKeys);
+  }
 
-  await prisma.networkMonitorSettings.update({ where: { id: 1 }, data: { lastRunAt: now } });
+  return { hostsAlive: alive.length, wentOffline, cameOnline };
+}
 
-  return { rangesScanned: ranges.length, hostsAlive: alive.length, wentOffline, cameOnline };
+/**
+ * One Domotz-style monitoring pass across every configured range. In direct mode this runs the
+ * scan and diffs it synchronously; in relay mode (System Settings → Network Relay Agent, needed
+ * whenever the server has no route into the LAN being monitored) it just enqueues a scan per
+ * range and returns — the diff happens later, in relay.routes.ts, once the relay agent reports
+ * that scan's results back.
+ */
+export async function runNetworkMonitorCycle(): Promise<MonitorCycleSummary | null> {
+  const settings = await prisma.networkMonitorSettings.findUnique({ where: { id: 1 } });
+  if (!settings) return null;
+
+  const ranges = (settings.ranges as unknown as MonitorRange[]) ?? [];
+  if (ranges.length === 0) {
+    await prisma.networkMonitorSettings.update({ where: { id: 1 }, data: { lastRunAt: new Date() } });
+    return { rangesScanned: 0, rangesQueuedForRelay: 0, hostsAlive: 0, wentOffline: 0, cameOnline: 0 };
+  }
+
+  const relay = await isNetworkRelayEnabled();
+  const summary: MonitorCycleSummary = { rangesScanned: 0, rangesQueuedForRelay: 0, hostsAlive: 0, wentOffline: 0, cameOnline: 0 };
+
+  for (const range of ranges) {
+    if (relay) {
+      await enqueueRelayScan(range.startIp, range.endIp, null, "SCHEDULED");
+      summary.rangesQueuedForRelay += 1;
+      continue;
+    }
+
+    const { id } = await runScheduledScan(range.startIp, range.endIp);
+    const result = await processCompletedMonitorScan(id);
+    summary.rangesScanned += 1;
+    summary.hostsAlive += result.hostsAlive;
+    summary.cameOnline += result.cameOnline;
+    summary.wentOffline += result.wentOffline;
+  }
+
+  await prisma.networkMonitorSettings.update({ where: { id: 1 }, data: { lastRunAt: new Date() } });
+  return summary;
 }
 
 let intervalHandle: NodeJS.Timeout | null = null;

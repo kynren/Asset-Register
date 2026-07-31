@@ -23,7 +23,8 @@ interface Scan {
   id: number;
   startIp: string;
   endIp: string;
-  status: "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+  viaRelay: boolean;
   totalHosts: number;
   aliveHosts: number;
   scannedHosts: number;
@@ -140,7 +141,7 @@ export function IpRangeScannerTab() {
     queryKey: ["network-scan", activeScanId],
     queryFn: async () => (await axiosClient.get(`/network/scan/${activeScanId}`)).data as Scan,
     enabled: activeScanId !== null,
-    refetchInterval: (query) => (query.state.data?.status === "RUNNING" ? 1000 : false),
+    refetchInterval: (query) => (query.state.data?.status === "RUNNING" || query.state.data?.status === "PENDING" ? 1000 : false),
   });
 
   useEffect(() => {
@@ -181,6 +182,8 @@ export function IpRangeScannerTab() {
   const results = (activeScan?.results ?? []).filter((r) => !aliveOnly || r.alive);
   const progressPct = scan && scan.totalHosts > 0 ? Math.round((scan.scannedHosts / scan.totalHosts) * 100) : 0;
   const scanning = scan?.status === "RUNNING";
+  const pending = scan?.status === "PENDING";
+  const busy = scanning || pending;
 
   function pickNetmask(value: string) {
     setNetmaskPick("");
@@ -239,12 +242,12 @@ export function IpRangeScannerTab() {
         <div className="nt-toolbar-row">
           <span className="ips-field-inline">
             <span className="ips-field-label">IP Range:</span>
-            <input className="ips-input" value={startIp} onChange={(e) => setStartIp(e.target.value)} disabled={scanning} />
+            <input className="ips-input" value={startIp} onChange={(e) => setStartIp(e.target.value)} disabled={busy} />
           </span>
           <span className="ips-to">to</span>
-          <input className="ips-input" value={endIp} onChange={(e) => setEndIp(e.target.value)} disabled={scanning} />
+          <input className="ips-input" value={endIp} onChange={(e) => setEndIp(e.target.value)} disabled={busy} />
 
-          <select className="ips-select" value={netmaskPick} onChange={(e) => pickNetmask(e.target.value)} disabled={scanning} title="Fill the range from a CIDR netmask">
+          <select className="ips-select" value={netmaskPick} onChange={(e) => pickNetmask(e.target.value)} disabled={busy} title="Fill the range from a CIDR netmask">
             <option value="">Netmask</option>
             {CIDR_PRESETS.map((p) => (
               <option key={p} value={p}>/{p} ({p >= 31 ? "2" : (2 ** (32 - p) - 2).toLocaleString()} hosts)</option>
@@ -287,20 +290,28 @@ export function IpRangeScannerTab() {
             action="create"
             fallback={<span className="muted" style={{ fontSize: 12 }}>You don't have permission to start scans.</span>}
           >
-            <button className="ips-start-btn" disabled={startMutation.isPending || scanning} onClick={() => startMutation.mutate()}>
-              <Icon name="radar" size={14} /> {scanning ? "Scanning..." : "Start"}
+            <button className="ips-start-btn" disabled={startMutation.isPending || busy} onClick={() => startMutation.mutate()}>
+              <Icon name="radar" size={14} /> {scanning ? "Scanning..." : pending ? "Queued..." : "Start"}
             </button>
           </PermissionGate>
 
           {scan && (
             <span className="muted" style={{ fontSize: 12 }}>
               <strong className="text-ad-text">{scan.startIp}</strong> – <strong className="text-ad-text">{scan.endIp}</strong> · {scan.scannedHosts}/{scan.totalHosts} scanned · {scan.aliveHosts} alive
+              {scan.viaRelay && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>via Relay</span>}
             </span>
           )}
         </div>
       </div>
 
       {error && <div className="alert alert-danger" style={{ margin: "12px 18px 0" }}>{error}</div>}
+
+      {pending && (
+        <div className="alert alert-primary" style={{ margin: "12px 18px 0" }}>
+          Waiting for the network relay agent to pick up this scan. Make sure <code>kynren_network_relay.py</code> is
+          running on a machine inside the target LAN — see Admin &amp; Setup → System Settings.
+        </div>
+      )}
 
       {scanning && (
         <div style={{ paddingTop: 12 }}>
@@ -315,12 +326,12 @@ export function IpRangeScannerTab() {
           columns={resultColumns}
           data={scan ? results : []}
           clientPageSize={15}
-          emptyMessage={!scan ? "Enter a range above and click Start to scan." : scanning ? "Scanning..." : "No hosts found."}
+          emptyMessage={!scan ? "Enter a range above and click Start to scan." : pending ? "Waiting for relay agent..." : scanning ? "Scanning..." : "No hosts found."}
         />
       </div>
 
       <div className="ips-statusbar">
-        <span>{scanning ? `Scanning… ${progressPct}%` : scan ? "Scan complete" : "Ready"}</span>
+        <span>{pending ? "Waiting for relay agent..." : scanning ? `Scanning… ${progressPct}%` : scan ? "Scan complete" : "Ready"}</span>
         <label className="nt-checkbox-pill">
           <input type="checkbox" checked={aliveOnly} onChange={(e) => setAliveOnly(e.target.checked)} />
           Display: Alive only

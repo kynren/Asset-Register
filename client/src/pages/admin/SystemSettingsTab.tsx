@@ -124,12 +124,37 @@ export function SystemSettingsTab() {
         </div>
       </div>
 
+      <div className="card" style={{ maxWidth: 640 }}>
+        <h3 className="mt-0">Network Relay Agent</h3>
+        <p className="muted" style={{ fontSize: 12, marginTop: -6 }}>
+          If this app is hosted on a cloud VPS, it has no network route into your office's private LAN — the IP Range
+          Scanner, ICMP Pinger, and continuous Monitoring can't reach local devices no matter what runs on the server.
+          Enable this once you have <code>agent/kynren_network_relay.py</code> running on a machine inside the LAN: scans
+          then queue up for that relay to actually execute, instead of running (and failing) directly on the server.
+          Not needed if this app is self-hosted on a machine already inside the LAN.
+        </p>
+        <div className="field">
+          <label className="row gap-2" style={{ cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={values.networkRelayEnabled === "true"}
+              onChange={(e) => setValues((v) => ({ ...v, networkRelayEnabled: e.target.checked ? "true" : "false" }))}
+            />
+            Route network scans through an on-prem relay agent
+          </label>
+        </div>
+        <button className="btn btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>Save</button>
+      </div>
+
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <h3 className="mt-0">Agent API Keys</h3>
           <button className="btn btn-secondary btn-sm" onClick={() => createKeyMutation.mutate("New Key")}><Icon name="plus" size={13} /> Generate Key</button>
         </div>
-        <p className="muted" style={{ fontSize: 12 }}>Use these keys in the device agent's <code>.env</code> file as <code>AGENT_API_KEY</code>.</p>
+        <p className="muted" style={{ fontSize: 12 }}>
+          Shared by both agents: the per-machine device agent's <code>.env</code> as <code>AGENT_API_KEY</code>, and the
+          network relay agent's <code>.env</code> as <code>AGENT_API_KEY</code> (above).
+        </p>
         <DataTable columns={agentKeyColumns} data={agentKeys ?? []} clientPageSize={5} />
       </div>
     </div>

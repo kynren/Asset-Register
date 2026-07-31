@@ -204,6 +204,65 @@ wrong community, device doesn't speak SNMP) is fully soft — it sets `snmpLastE
 cycle across every configured range can take tens of seconds — the client polls `GET /devices`
 afterward), `GET /devices`, `POST /devices/:id/snmp`.
 
+### 3.8b Network Relay Agent — added 2026-07-31
+
+A production deployment on a cloud VPS has no network route into the office's private LAN — no
+code running on the server, however written, can ping/ARP/SNMP-poll local devices, because there's
+no network path there at all. This adds an on-prem relay so scanning still works from a cloud
+deployment.
+
+**Schema**: `ScanStatus` gained a `PENDING` member (queued, waiting for a relay to claim it) and
+`NetworkScan.viaRelay Boolean`. `SystemSetting["networkRelayEnabled"]` (`"true"`/`"false"`, toggle
+in Admin & Setup → System Settings, reusing the existing generic settings key/value store) gates
+which path scans take.
+
+**Backend**: `scan.service.ts`'s `startScan()` checks `isNetworkRelayEnabled()`; when on, it calls
+the new `enqueueRelayScan()` (creates a `PENDING`/`viaRelay:true` scan, returns immediately) instead
+of running `runScan()` directly. A new `applyRelayResults(scanId, results)` centralizes the same
+per-host processing `runScan()` does inline — vendor classification, device-type guessing, the
+hostname-match asset IP auto-fill — so relay-sourced and direct-sourced scans are processed
+identically. New relay-facing routes, `server/src/modules/network/relay.routes.ts`, mounted at
+`/api/network-relay` and authenticated with the **same** `X-Agent-Key`/`AgentApiKey` mechanism the
+per-machine device agent uses (`verifyAgentKey` — one key type, two consumers): `GET /next-job`
+(atomically claims the oldest `PENDING` scan via a conditional `updateMany`, and includes
+`snmpTargets` — any `MonitoredNetworkDevice` with SNMP enabled whose IP falls in that scan's range,
+community string decrypted server-side for transport), `PATCH /jobs/:id/progress`, and
+`POST /jobs/:id/complete` (applies results via `applyRelayResults`, applies any `snmpResults`
+straight onto `MonitoredNetworkDevice`, and — only for `triggeredBy: "SCHEDULED"` scans — calls
+`processCompletedMonitorScan`).
+
+`networkMonitor.ts`'s per-cycle diff/alert logic was extracted from `runNetworkMonitorCycle()` into
+a standalone `processCompletedMonitorScan(scanId, {skipSnmp})`, scoped to devices whose IP falls
+within *that scan's own* range (not globally) — necessary once scans can complete asynchronously
+and out of order across multiple configured ranges via relay. In relay mode,
+`runNetworkMonitorCycle()` just enqueues one scan per range and returns; the diff happens later,
+triggered by `relay.routes.ts` when that scan's results come back. In direct mode, nothing about the
+timing changed — enqueue and diff still happen back-to-back in the same call.
+
+**Relay client**: `agent/kynren_network_relay.py` — a third script alongside the device agent,
+sharing its `.env` (`API_BASE_URL`/`AGENT_API_KEY`) but a long-running poll loop rather than a
+one-shot Task-Scheduler script. Re-implements `ping.ts`'s ping/ARP/reverse-DNS/NetBIOS/port-scan
+logic in Python stdlib (subprocess for ping/arp, hand-rolled raw-UDP NBSTAT query byte-for-byte
+matching the Node version) since it's the relay — not the server — that now has the real LAN route.
+SNMP support is a hand-rolled minimal SNMPv2c GET (BER/ASN.1 encode+decode from scratch, stdlib
+`socket`/`struct` only, no `pysnmp` dependency) for `sysDescr`+`sysUpTime` only — deliberately no
+`ifTable` walk (that needs GetBulk + a termination condition), a documented scope reduction versus
+`snmp.ts`'s fuller interface-table poll in direct mode.
+
+**Frontend**: `IpRangeScannerTab.tsx` treats `status === "PENDING"` as a distinct busy state
+("Queued...", a banner pointing at the relay setup, disabled inputs) alongside the existing
+`RUNNING` handling, and shows a "via Relay" badge when `viaRelay` is true. The relay toggle +
+explanation lives in `SystemSettingsTab.tsx` next to Agent API Keys (same keys, both scripts).
+
+**Verified locally**: enabled the relay setting, ran `kynren_network_relay.py` against the local
+dev server (which itself has real LAN access, so this exercises the full protocol even though it
+can't simulate the actual VPS-to-LAN gap), started a scan from the UI — it went `PENDING` →
+picked up by the relay within a few seconds → completed with real ping/vendor results and a "via
+Relay" badge. A configured SNMP target was polled by the relay's hand-rolled client and correctly
+reported a real timeout (no SNMP agent at that test address) end-to-end through
+`snmpResults` → `POST /complete` → `MonitoredNetworkDevice.snmpLastError` → the "Error" badge in
+the Monitoring tab — proving the SNMP-via-relay path is genuinely live, not a stub.
+
 ### 3.9 Layout Fix — Only Content Scrolls
 `.app-shell` and `.main-area` are now `height: 100vh; overflow: hidden`; `.page-content` is the
 only scrollable region (`overflow-y: auto`). The sidebar and top bar no longer move when scrolling

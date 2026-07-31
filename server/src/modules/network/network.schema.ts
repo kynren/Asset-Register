@@ -39,3 +39,32 @@ export const updateSnmpConfigSchema = z.object({
   snmpCommunity: z.string().min(1).nullable().optional(),
   snmpPort: z.number().int().min(1).max(65535).optional(),
 });
+
+// ───────────────────────── Network relay agent ─────────────────────────
+
+export const relayProgressSchema = z.object({
+  scannedHosts: z.number().int().min(0),
+  aliveHosts: z.number().int().min(0),
+});
+
+const relayHostResultSchema = z.object({
+  ipAddress: z.string().min(1),
+  alive: z.boolean(),
+  hostname: z.string().nullable().default(null),
+  macAddress: z.string().nullable().default(null),
+  openPorts: z.array(z.number().int()).default([]),
+  responseTimeMs: z.number().nullable().default(null),
+});
+
+const relaySnmpResultSchema = z.object({
+  deviceId: z.number().int(),
+  sysDescr: z.string().nullable().default(null),
+  upTimeTicks: z.number().nullable().default(null),
+  interfaces: z.array(z.record(z.any())).default([]),
+  error: z.string().nullable().default(null),
+});
+
+export const relayCompleteSchema = z.object({
+  results: z.array(relayHostResultSchema),
+  snmpResults: z.array(relaySnmpResultSchema).default([]),
+});
