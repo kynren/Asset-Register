@@ -79,16 +79,17 @@ model User {
   savedQueries         SavedQuery[]
   resourceSchedules    ResourceSchedule[]
 
-  refreshSessions      RefreshSession[]
-  passwordResetTokens  PasswordResetToken[]
-  passwordHistory      PasswordHistory[]
-  checkoutsReceived    AssetCheckout[]      @relation("CheckoutRecipient")
-  checkoutsIssued      AssetCheckout[]      @relation("CheckoutIssuer")
-  checkoutsProcessed   AssetCheckout[]      @relation("CheckoutReceiver")
-  licenseAssignments   LicenseAssignment[]
-  purchaseOrdersCreated PurchaseOrder[]
-  emailTemplatesCreated EmailTemplate[]
-  documentsCreated      Document[]
+  refreshSessions               RefreshSession[]
+  passwordResetTokens           PasswordResetToken[]
+  passwordHistory               PasswordHistory[]
+  checkoutsReceived             AssetCheckout[]          @relation("CheckoutRecipient")
+  checkoutsIssued               AssetCheckout[]          @relation("CheckoutIssuer")
+  checkoutsProcessed            AssetCheckout[]          @relation("CheckoutReceiver")
+  licenseAssignments            LicenseAssignment[]
+  purchaseOrdersCreated         PurchaseOrder[]
+  emailTemplatesCreated         EmailTemplate[]
+  documentsCreated              Document[]
+  networkMonitorSettingsUpdates NetworkMonitorSettings[]
 }
 
 model RefreshSession {
@@ -167,14 +168,14 @@ model UserPreference {
 // ───────────────────────── Assets ─────────────────────────
 
 model AssetCategory {
-  id              Int                @id @default(autoincrement())
-  name            String             @unique
-  isComputerAsset    Boolean         @default(false)
-  isShowAsset        Boolean         @default(false)
-  isSwitchingDevice  Boolean         @default(false)
-  formTemplateId  Int?
-  formTemplate    AssetFormTemplate? @relation(fields: [formTemplateId], references: [id])
-  assets          Asset[]
+  id                Int                @id @default(autoincrement())
+  name              String             @unique
+  isComputerAsset   Boolean            @default(false)
+  isShowAsset       Boolean            @default(false)
+  isSwitchingDevice Boolean            @default(false)
+  formTemplateId    Int?
+  formTemplate      AssetFormTemplate? @relation(fields: [formTemplateId], references: [id])
+  assets            Asset[]
 }
 
 model AssetFormTemplate {
@@ -197,17 +198,17 @@ enum AssetFormFieldType {
 }
 
 model AssetFormField {
-  id         Int                      @id @default(autoincrement())
+  id         Int                     @id @default(autoincrement())
   templateId Int
-  template   AssetFormTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  template   AssetFormTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
   label      String
   fieldKey   String
-  fieldType  AssetFormFieldType       @default(TEXT)
-  required   Boolean                  @default(false)
+  fieldType  AssetFormFieldType      @default(TEXT)
+  required   Boolean                 @default(false)
   options    Json?
-  order      Int                      @default(0)
+  order      Int                     @default(0)
   values     AssetCustomFieldValue[]
-  createdAt  DateTime                 @default(now())
+  createdAt  DateTime                @default(now())
 
   @@unique([templateId, fieldKey])
 }
@@ -224,11 +225,11 @@ model AssetCustomFieldValue {
 }
 
 model Location {
-  id         Int          @id @default(autoincrement())
-  name       String       @unique
-  address    String?
-  assets     Asset[]
-  stockItems StockItem[]
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  address     String?
+  assets      Asset[]
+  stockItems  StockItem[]
   stockLevels StockLevel[]
 }
 
@@ -269,10 +270,10 @@ model Asset {
   device            Device?        @relation(fields: [deviceId], references: [id])
   tickets           Ticket[]
 
-  featuredImageUrl  String?
-  gridPowered       Boolean        @default(true)
+  featuredImageUrl String?
+  gridPowered      Boolean @default(true)
 
-  remoteManagementEnabled  Boolean  @default(false)
+  remoteManagementEnabled  Boolean @default(false)
   remoteManagementProtocol String?
   remoteManagementUrl      String?
 
@@ -289,20 +290,20 @@ model Asset {
   antivirusStatus     String?
   antivirusLastScanAt DateTime?
 
-  photos       AssetPhoto[]
-  components   AssetComponent[]
-  volumes      AssetVolume[]
-  connections  AssetConnection[]
-  networkPorts AssetNetworkPort[]
-  sockets      AssetSocket[]
-  contracts    AssetContract[]
-  documents    AssetDocument[]
-  bookings     AssetBooking[]
-  checkouts    AssetCheckout[]
+  photos             AssetPhoto[]
+  components         AssetComponent[]
+  volumes            AssetVolume[]
+  connections        AssetConnection[]
+  networkPorts       AssetNetworkPort[]
+  sockets            AssetSocket[]
+  contracts          AssetContract[]
+  documents          AssetDocument[]
+  bookings           AssetBooking[]
+  checkouts          AssetCheckout[]
   licenseAssignments LicenseAssignment[]
-  customFieldValues AssetCustomFieldValue[]
-  switchPorts        SwitchPort[]        @relation("SwitchOwnedPorts")
-  connectedViaPorts  SwitchPort[]        @relation("SwitchPortConnectedAsset")
+  customFieldValues  AssetCustomFieldValue[]
+  switchPorts        SwitchPort[]            @relation("SwitchOwnedPorts")
+  connectedViaPorts  SwitchPort[]            @relation("SwitchPortConnectedAsset")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -317,17 +318,17 @@ enum PortStatus {
 }
 
 model SwitchPort {
-  id               Int         @id @default(autoincrement())
+  id               Int        @id @default(autoincrement())
   assetId          Int
-  asset            Asset       @relation("SwitchOwnedPorts", fields: [assetId], references: [id], onDelete: Cascade)
+  asset            Asset      @relation("SwitchOwnedPorts", fields: [assetId], references: [id], onDelete: Cascade)
   portNumber       Int
   label            String?
-  status           PortStatus  @default(DOWN)
+  status           PortStatus @default(DOWN)
   vlan             String?
   connectedAssetId Int?
-  connectedAsset   Asset?      @relation("SwitchPortConnectedAsset", fields: [connectedAssetId], references: [id], onDelete: SetNull)
+  connectedAsset   Asset?     @relation("SwitchPortConnectedAsset", fields: [connectedAssetId], references: [id], onDelete: SetNull)
   notes            String?
-  updatedAt        DateTime    @updatedAt
+  updatedAt        DateTime   @updatedAt
 
   @@unique([assetId, portNumber])
 }
@@ -349,17 +350,17 @@ model AssetCheckout {
 }
 
 model License {
-  id           Int      @id @default(autoincrement())
+  id           Int                 @id @default(autoincrement())
   name         String
   vendor       String?
   licenseKey   String?
-  seats        Int      @default(1)
+  seats        Int                 @default(1)
   purchaseDate DateTime?
   expiresAt    DateTime?
-  cost         Decimal? @db.Decimal(12, 2)
+  cost         Decimal?            @db.Decimal(12, 2)
   notes        String?
   assignments  LicenseAssignment[]
-  createdAt    DateTime @default(now())
+  createdAt    DateTime            @default(now())
 }
 
 model LicenseAssignment {
@@ -459,27 +460,27 @@ model AssetDocument {
 // ───────────────────────── Devices (agent-reported) ─────────────────────────
 
 model Device {
-  id                 Int       @id @default(autoincrement())
-  hostname           String
-  macAddress         String    @unique
-  ipAddresses        String[]
-  os                 String?
-  osVersion          String?
-  cpu                String?
-  ramGb              Float?
-  diskInfo           String?
-  manufacturer       String?
-  model              String?
-  serialNumber       String?
-  agentVersion       String?
-  loggedInUser       String?
-  lastLoginAt        DateTime?
-  installedSoftware  Json?
-  batteryPresent     Boolean?
-  batteryPercent     Int?
-  batteryCharging    Boolean?
-  lastSeen           DateTime  @default(now())
-  createdAt          DateTime  @default(now())
+  id                Int       @id @default(autoincrement())
+  hostname          String
+  macAddress        String    @unique
+  ipAddresses       String[]
+  os                String?
+  osVersion         String?
+  cpu               String?
+  ramGb             Float?
+  diskInfo          String?
+  manufacturer      String?
+  model             String?
+  serialNumber      String?
+  agentVersion      String?
+  loggedInUser      String?
+  lastLoginAt       DateTime?
+  installedSoftware Json?
+  batteryPresent    Boolean?
+  batteryPercent    Int?
+  batteryCharging   Boolean?
+  lastSeen          DateTime  @default(now())
+  createdAt         DateTime  @default(now())
 
   asset       Asset?
   networkNode NetworkNode?
@@ -539,19 +540,26 @@ enum ScanStatus {
   CANCELLED
 }
 
+enum NetworkScanTrigger {
+  MANUAL
+  SCHEDULED
+}
+
 model NetworkScan {
-  id          Int                 @id @default(autoincrement())
-  startIp     String
-  endIp       String
-  status      ScanStatus          @default(RUNNING)
-  totalHosts  Int
-  aliveHosts  Int                 @default(0)
-  scannedHosts Int                @default(0)
-  startedById Int
-  startedBy   User                @relation(fields: [startedById], references: [id])
-  startedAt   DateTime            @default(now())
-  completedAt DateTime?
-  results     NetworkScanResult[]
+  id           Int                 @id @default(autoincrement())
+  startIp      String
+  endIp        String
+  status       ScanStatus          @default(RUNNING)
+  totalHosts   Int
+  aliveHosts   Int                 @default(0)
+  scannedHosts Int                 @default(0)
+  triggeredBy  NetworkScanTrigger  @default(MANUAL)
+  // Null for scheduled scans kicked off by the continuous network monitor rather than a person.
+  startedById  Int?
+  startedBy    User?               @relation(fields: [startedById], references: [id])
+  startedAt    DateTime            @default(now())
+  completedAt  DateTime?
+  results      NetworkScanResult[]
 }
 
 model NetworkScanResult {
@@ -569,6 +577,69 @@ model NetworkScanResult {
   discoveredAt   DateTime    @default(now())
 }
 
+// Domotz-style continuous monitoring: a single settings row (id is always 1) drives a background
+// scheduler (server/src/lib/networkMonitor.ts) that periodically re-scans the configured ranges,
+// tracks each device's online/offline status over time, and can optionally poll SNMP-enabled
+// devices for basic interface stats. Separate from the on-demand IP Range Scanner, which stays
+// purely manual/click-to-run.
+model NetworkMonitorSettings {
+  id              Int       @id @default(1)
+  enabled         Boolean   @default(false)
+  intervalMinutes Int       @default(15)
+  // Array of { startIp: string, endIp: string, label?: string }.
+  ranges          Json      @default("[]")
+  lastRunAt       DateTime?
+  updatedById     Int?
+  updatedBy       User?     @relation(fields: [updatedById], references: [id])
+  updatedAt       DateTime  @updatedAt
+}
+
+enum DeviceLiveStatus {
+  ONLINE
+  OFFLINE
+}
+
+// Current state of every host the monitor has ever seen alive, keyed by MAC address when known
+// (stable across DHCP IP changes) or by IP address when not. Distinct from Device (agent-reported
+// hardware inventory) and NetworkScanResult (one row per host per scan) — this is the "latest
+// known status" table the Monitoring tab reads from.
+model MonitoredNetworkDevice {
+  id               Int              @id @default(autoincrement())
+  key              String           @unique
+  ipAddress        String
+  macAddress       String?
+  hostname         String?
+  vendor           String?
+  deviceType       String?
+  status           DeviceLiveStatus @default(ONLINE)
+  firstSeenAt      DateTime         @default(now())
+  lastSeenAt       DateTime         @default(now())
+  lastChangedAt    DateTime         @default(now())
+  snmpEnabled      Boolean          @default(false)
+  // AES-256-GCM encrypted at rest via server/src/lib/crypto.ts encryptSecret(), same as NVR
+  // credentials — never stored or returned in plaintext.
+  snmpCommunity    String?
+  snmpPort         Int              @default(161)
+  snmpSysDescr     String?
+  snmpUpTimeTicks  BigInt?
+  // Array of { index, name, adminStatus, operStatus, speedMbps, inOctets, outOctets }.
+  snmpInterfaces   Json?
+  snmpLastPolledAt DateTime?
+  snmpLastError    String?
+
+  statusEvents NetworkDeviceStatusEvent[]
+}
+
+model NetworkDeviceStatusEvent {
+  id         Int                    @id @default(autoincrement())
+  deviceId   Int
+  device     MonitoredNetworkDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  status     DeviceLiveStatus
+  occurredAt DateTime               @default(now())
+
+  @@index([deviceId, occurredAt])
+}
+
 // ───────────────────────── Stock ─────────────────────────
 
 enum StockTxType {
@@ -578,21 +649,21 @@ enum StockTxType {
 }
 
 model StockItem {
-  id             Int                @id @default(autoincrement())
-  sku            String             @unique
-  name           String
-  category       String?
-  unit           String             @default("pcs")
-  quantityOnHand Int                @default(0)
-  reorderLevel   Int                @default(0)
-  unitCost       Decimal?           @db.Decimal(12, 2)
-  locationId     Int?
-  location       Location?          @relation(fields: [locationId], references: [id])
-  stockLevels    StockLevel[]
-  transactions   StockTransaction[]
+  id                 Int                 @id @default(autoincrement())
+  sku                String              @unique
+  name               String
+  category           String?
+  unit               String              @default("pcs")
+  quantityOnHand     Int                 @default(0)
+  reorderLevel       Int                 @default(0)
+  unitCost           Decimal?            @db.Decimal(12, 2)
+  locationId         Int?
+  location           Location?           @relation(fields: [locationId], references: [id])
+  stockLevels        StockLevel[]
+  transactions       StockTransaction[]
   purchaseOrderItems PurchaseOrderItem[]
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }
 
 // Per-location quantity breakdown for a StockItem. StockItem.quantityOnHand
@@ -694,29 +765,29 @@ model TicketCategory {
 }
 
 model Ticket {
-  id                   Int                @id @default(autoincrement())
-  ticketNumber         String             @unique
-  title                String
-  description          String
-  status               TicketStatus       @default(OPEN)
-  priority             TicketPriority     @default(MEDIUM)
-  categoryId           Int?
-  category             TicketCategory?    @relation(fields: [categoryId], references: [id])
-  assetId              Int?
-  asset                Asset?             @relation(fields: [assetId], references: [id])
-  requesterId          Int
-  requester            User               @relation("TicketRequester", fields: [requesterId], references: [id])
-  assigneeId           Int?
-  assignee             User?              @relation("TicketAssignee", fields: [assigneeId], references: [id])
-  dueAt                DateTime?
-  satisfactionRating   Int?
-  satisfactionComment  String?
-  comments             TicketComment[]
-  attachments          TicketAttachment[]
-  watchers             TicketWatcher[]
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  resolvedAt           DateTime?
+  id                  Int                @id @default(autoincrement())
+  ticketNumber        String             @unique
+  title               String
+  description         String
+  status              TicketStatus       @default(OPEN)
+  priority            TicketPriority     @default(MEDIUM)
+  categoryId          Int?
+  category            TicketCategory?    @relation(fields: [categoryId], references: [id])
+  assetId             Int?
+  asset               Asset?             @relation(fields: [assetId], references: [id])
+  requesterId         Int
+  requester           User               @relation("TicketRequester", fields: [requesterId], references: [id])
+  assigneeId          Int?
+  assignee            User?              @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  dueAt               DateTime?
+  satisfactionRating  Int?
+  satisfactionComment String?
+  comments            TicketComment[]
+  attachments         TicketAttachment[]
+  watchers            TicketWatcher[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  resolvedAt          DateTime?
 }
 
 model TicketComment {
@@ -761,27 +832,27 @@ enum CameraStatus {
 }
 
 model Nvr {
-  id                Int          @id @default(autoincrement())
+  id                Int           @id @default(autoincrement())
   name              String
   ipAddress         String?
   port              Int?
-  protocol          String?      @default("RTSP")
+  protocol          String?       @default("RTSP")
   username          String?
   encryptedPassword String?
   location          String?
   model             String?
   notes             String?
-  status            CameraStatus @default(UNKNOWN)
+  status            CameraStatus  @default(UNKNOWN)
   lastCheckedAt     DateTime?
   cameras           Camera[]
   events            CameraEvent[]
-  createdAt         DateTime     @default(now())
+  createdAt         DateTime      @default(now())
 }
 
 model Camera {
-  id                Int           @id @default(autoincrement())
+  id                Int               @id @default(autoincrement())
   nvrId             Int
-  nvr               Nvr           @relation(fields: [nvrId], references: [id], onDelete: Cascade)
+  nvr               Nvr               @relation(fields: [nvrId], references: [id], onDelete: Cascade)
   name              String
   channel           Int?
   location          String?
@@ -790,8 +861,8 @@ model Camera {
   username          String?
   encryptedPassword String?
   streamUrl         String?
-  ptzEnabled        Boolean       @default(false)
-  status            CameraStatus  @default(UNKNOWN)
+  ptzEnabled        Boolean           @default(false)
+  status            CameraStatus      @default(UNKNOWN)
   lastCheckedAt     DateTime?
   events            CameraEvent[]
   recordings        CameraRecording[]
@@ -851,6 +922,8 @@ enum EmailEventType {
   PASSWORD_RESET
   TASK_OVERDUE
   LOW_STOCK
+  DEVICE_OFFLINE
+  DEVICE_ONLINE
 }
 
 // Blocks is an ordered array of { id, type, ...type-specific fields } — rendered to HTML by
@@ -1009,24 +1082,24 @@ model DocCollection {
 // (see lib/docsGitSync.ts) — it's the upsert key the VPS's import script matches on, since the
 // auto-increment `id` isn't portable between separate databases.
 model Document {
-  id            Int       @id @default(autoincrement())
-  externalKey   String?   @unique
+  id            Int                  @id @default(autoincrement())
+  externalKey   String?              @unique
   title         String
   docType       DocType
   category      String
   collectionId  Int
-  collection    DocCollection @relation(fields: [collectionId], references: [id])
+  collection    DocCollection        @relation(fields: [collectionId], references: [id])
   summary       String?
   sections      Json
-  tags          String[]  @default([])
+  tags          String[]             @default([])
   searchText    String
-  isPublished   Boolean   @default(true)
+  isPublished   Boolean              @default(true)
   reviewDueDate DateTime?
   createdById   Int
-  createdBy     User      @relation(fields: [createdById], references: [id])
+  createdBy     User                 @relation(fields: [createdById], references: [id])
   attachments   DocumentAttachment[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
   @@index([docType])
   @@index([category])

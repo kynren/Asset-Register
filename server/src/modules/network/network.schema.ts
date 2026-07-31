@@ -21,3 +21,21 @@ export const createEdgeSchema = z.object({
   label: z.string().optional(),
   bandwidthMbps: z.number().nullable().optional(),
 });
+
+export const monitorRangeSchema = z.object({
+  startIp: z.string().min(1),
+  endIp: z.string().min(1),
+  label: z.string().optional(),
+});
+
+export const updateMonitorSettingsSchema = z.object({
+  enabled: z.boolean(),
+  intervalMinutes: z.number().int().min(1).max(1440),
+  ranges: z.array(monitorRangeSchema),
+});
+
+export const updateSnmpConfigSchema = z.object({
+  snmpEnabled: z.boolean(),
+  snmpCommunity: z.string().min(1).nullable().optional(),
+  snmpPort: z.number().int().min(1).max(65535).optional(),
+});

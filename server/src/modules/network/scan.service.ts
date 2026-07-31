@@ -2,7 +2,7 @@ import { prisma } from "../../config/prisma";
 import { mapLimit } from "../../lib/concurrency";
 import { expandRange } from "../../lib/ipRange";
 import { getArpMac, getNetbiosName, pingHost, reverseDns, scanCommonPorts } from "../../lib/ping";
-import { guessDeviceType, lookupVendor } from "../../lib/macVendor";
+import { guessDeviceType, lookupVendor, lookupVendorOnline } from "../../lib/macVendor";
 
 const MAX_HOSTS_PER_SCAN = 1024;
 const SCAN_CONCURRENCY = 24;
@@ -11,11 +11,11 @@ export function validateRange(startIp: string, endIp: string) {
   return expandRange(startIp, endIp, MAX_HOSTS_PER_SCAN);
 }
 
-export async function startScan(startIp: string, endIp: string, userId: number) {
+export async function startScan(startIp: string, endIp: string, userId: number | null, triggeredBy: "MANUAL" | "SCHEDULED" = "MANUAL") {
   const addresses = validateRange(startIp, endIp);
 
   const scan = await prisma.networkScan.create({
-    data: { startIp, endIp, totalHosts: addresses.length, startedById: userId },
+    data: { startIp, endIp, totalHosts: addresses.length, startedById: userId, triggeredBy },
   });
 
   runScan(scan.id, addresses).catch(async () => {
@@ -23,6 +23,27 @@ export async function startScan(startIp: string, endIp: string, userId: number) 
   });
 
   return scan;
+}
+
+// Used by the continuous network monitor (server/src/lib/networkMonitor.ts) — unlike startScan()
+// above (fire-and-forget, returns immediately with status RUNNING for the UI to poll), this
+// awaits the full scan synchronously since the monitor already runs off the request/response
+// cycle and needs the finished results to diff against known device state.
+export async function runScheduledScan(startIp: string, endIp: string): Promise<{ id: number; results: Awaited<ReturnType<typeof prisma.networkScanResult.findMany>> }> {
+  const addresses = validateRange(startIp, endIp);
+
+  const scan = await prisma.networkScan.create({
+    data: { startIp, endIp, totalHosts: addresses.length, startedById: null, triggeredBy: "SCHEDULED" },
+  });
+
+  try {
+    await runScan(scan.id, addresses);
+  } catch {
+    await prisma.networkScan.update({ where: { id: scan.id }, data: { status: "FAILED", completedAt: new Date() } }).catch(() => undefined);
+  }
+
+  const results = await prisma.networkScanResult.findMany({ where: { scanId: scan.id } });
+  return { id: scan.id, results };
 }
 
 // Resolves a scanned IP's hostname through three fallbacks, in order of cost/reliability:
@@ -64,7 +85,7 @@ async function runScan(scanId: number, addresses: string[]) {
 
     if (ping.alive) {
       [hostname, mac, openPorts] = await Promise.all([resolveHostname(ip, deviceHostnameByIp), getArpMac(ip), scanCommonPorts(ip)]);
-      vendor = lookupVendor(mac);
+      vendor = lookupVendor(mac) ?? (await lookupVendorOnline(mac));
       deviceType = guessDeviceType(vendor, openPorts);
       aliveCount += 1;
     }

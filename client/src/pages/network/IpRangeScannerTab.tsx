@@ -5,6 +5,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { DataTable } from "../../components/DataTable";
 import { PermissionGate } from "../../auth/PermissionGate";
+import { AssetFormModal, AssetFormValues } from "../assets/AssetFormModal";
 
 interface ScanResult {
   id: number;
@@ -78,6 +79,33 @@ function statusTone(r: ScanResult): "dead" | "info" | "alive" {
   return "alive";
 }
 
+// Best-effort category prefill for the adopt-into-inventory modal — the picker is always
+// editable, this just saves a click when a matching category already exists. Prefers the
+// dedicated isComputerAsset/isSwitchingDevice flags where they apply (same flags Admin & Setup
+// uses elsewhere), and falls back to a loose name match for the newer taxonomy labels that have
+// no dedicated flag (Raspberry Pi, IoT, Lighting, Sound System, etc).
+const CATEGORY_NAME_KEYWORDS: Record<string, string[]> = {
+  "Raspberry Pi": ["raspberry", "single-board", "sbc"],
+  "IoT Device": ["iot", "smart"],
+  Lighting: ["light"],
+  "Sound System": ["sound", "audio", "speaker"],
+  "IP Camera / NVR": ["camera", "nvr"],
+  Printer: ["printer"],
+  "Virtual Machine": ["virtual"],
+};
+
+function guessCategoryId(
+  deviceType: string | null,
+  categories: { id: number; name: string; isComputerAsset?: boolean; isSwitchingDevice?: boolean }[] | undefined
+): number | null {
+  if (!categories || !deviceType) return null;
+  if (deviceType === "Computer") return categories.find((c) => c.isComputerAsset)?.id ?? null;
+  if (deviceType === "Network Switching / Routing") return categories.find((c) => c.isSwitchingDevice)?.id ?? null;
+  const keywords = CATEGORY_NAME_KEYWORDS[deviceType];
+  if (!keywords) return null;
+  return categories.find((c) => keywords.some((k) => c.name.toLowerCase().includes(k)))?.id ?? null;
+}
+
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds.toFixed(2)} sec`;
   const mins = Math.floor(seconds / 60);
@@ -95,11 +123,17 @@ export function IpRangeScannerTab() {
   const [showSettings, setShowSettings] = useState(false);
   const [statsScan, setStatsScan] = useState<Scan | null>(null);
   const statsShownFor = useRef<number | null>(null);
+  const [adopting, setAdopting] = useState<ScanResult | null>(null);
   const queryClient = useQueryClient();
 
   const { data: history } = useQuery({
     queryKey: ["network-scans"],
     queryFn: async () => (await axiosClient.get("/network/scan")).data as Scan[],
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ["asset-categories"],
+    queryFn: async () => (await axiosClient.get("/asset-categories")).data as { id: number; name: string; isComputerAsset: boolean; isSwitchingDevice: boolean }[],
   });
 
   const { data: activeScan } = useQuery({
@@ -134,6 +168,15 @@ export function IpRangeScannerTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["network-graph"] }),
   });
 
+  const adoptMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => axiosClient.post("/assets", payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-stats"] });
+      setAdopting(null);
+    },
+  });
+
   const scan = activeScan ?? history?.find((s) => s.id === activeScanId);
   const results = (activeScan?.results ?? []).filter((r) => !aliveOnly || r.alive);
   const progressPct = scan && scan.totalHosts > 0 ? Math.round((scan.scannedHosts / scan.totalHosts) * 100) : 0;
@@ -166,11 +209,18 @@ export function IpRangeScannerTab() {
       enableSorting: false,
       cell: ({ row }) =>
         row.original.alive && (
-          <PermissionGate module="network" action="edit">
-            <button className="btn btn-secondary btn-sm" onClick={() => promoteMutation.mutate(row.original.id)}>
-              Add to Topology
-            </button>
-          </PermissionGate>
+          <div className="row gap-1">
+            <PermissionGate module="network" action="edit">
+              <button className="btn btn-secondary btn-sm" onClick={() => promoteMutation.mutate(row.original.id)}>
+                Add to Topology
+              </button>
+            </PermissionGate>
+            <PermissionGate module="assets" action="create">
+              <button className="btn btn-primary btn-sm" onClick={() => setAdopting(row.original)}>
+                <Icon name="plus" size={12} /> Adopt into Inventory
+              </button>
+            </PermissionGate>
+          </div>
         ),
     },
   ];
@@ -322,6 +372,32 @@ export function IpRangeScannerTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {adopting && (
+        <AssetFormModal
+          title={`Adopt "${adopting.hostname || adopting.ipAddress}" into Asset Inventory`}
+          initial={{
+            assetTag: adopting.macAddress ? adopting.macAddress.replace(/:/g, "").toUpperCase() : adopting.ipAddress.replace(/\./g, "-"),
+            name: adopting.hostname || adopting.ipAddress,
+            manufacturer: adopting.vendor ?? "",
+            categoryId: guessCategoryId(adopting.deviceType, categories),
+            notes: [
+              "Discovered via IP Range Scanner.",
+              adopting.deviceType ? `Detected type: ${adopting.deviceType}.` : null,
+              adopting.macAddress ? `MAC: ${adopting.macAddress}.` : null,
+            ].filter(Boolean).join(" "),
+          }}
+          onClose={() => setAdopting(null)}
+          submitting={adoptMutation.isPending}
+          onSubmit={(values: AssetFormValues) => {
+            adoptMutation.mutate({
+              ...values,
+              nextServiceDate: values.nextServiceDate ? new Date(values.nextServiceDate).toISOString() : null,
+              staticIpAddress: adopting.ipAddress,
+            });
+          }}
+        />
       )}
     </div>
   );

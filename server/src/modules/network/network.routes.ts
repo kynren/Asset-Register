@@ -9,7 +9,9 @@ import { logAudit } from "../../lib/auditLogger";
 import { isOnline } from "../../lib/network";
 import { pingHost } from "../../lib/ping";
 import { streamPing } from "../../lib/pingStream";
-import { createEdgeSchema, createNodeSchema, updateNodeSchema } from "./network.schema";
+import { encryptSecret } from "../../lib/crypto";
+import { runNetworkMonitorCycle } from "../../lib/networkMonitor";
+import { createEdgeSchema, createNodeSchema, updateMonitorSettingsSchema, updateNodeSchema, updateSnmpConfigSchema } from "./network.schema";
 import { startScan } from "./scan.service";
 
 const router = Router();
@@ -165,9 +167,10 @@ router.post("/scan-results/:resultId/promote", requirePermission("network", "edi
 // "Adopted" switches are real Assets in a category flagged isSwitchingDevice, with their port
 // counts. "Discovered" candidates come from the most recent completed IP range scan, filtered to
 // hosts the same real vendor/port heuristic used by the IP Range Scanner classified as
-// "Network Infrastructure" — no separate SNMP/fingerprinting pass, just the same signal already
-// shown there. A candidate already matching an adopted asset's recorded static IP is flagged so
-// the UI doesn't invite adopting it twice.
+// "Network Switching / Routing" — a single taxonomy label covering both switches and routers,
+// so this list is never missing routing gear. No separate SNMP/fingerprinting pass, just the
+// same signal already shown there. A candidate already matching an adopted asset's recorded
+// static IP is flagged so the UI doesn't invite adopting it twice.
 router.get("/switching", requirePermission("network", "view"), async (_req, res) => {
   const adopted = await prisma.asset.findMany({
     where: { category: { isSwitchingDevice: true } },
@@ -196,7 +199,7 @@ router.get("/switching", requirePermission("network", "view"), async (_req, res)
   const latestScan = await prisma.networkScan.findFirst({
     where: { status: "COMPLETED" },
     orderBy: { startedAt: "desc" },
-    include: { results: { where: { deviceType: "Network Infrastructure" }, orderBy: { ipAddress: "asc" } } },
+    include: { results: { where: { deviceType: "Network Switching / Routing" }, orderBy: { ipAddress: "asc" } } },
   });
 
   const adoptedIps = new Set(adopted.map((a) => a.staticIpAddress).filter((ip): ip is string => !!ip));
@@ -216,5 +219,78 @@ router.get("/switching", requirePermission("network", "view"), async (_req, res)
     scannedAt: latestScan?.completedAt ?? null,
   });
 });
+
+// ───────────────────────── Continuous monitoring (Domotz-style) ─────────────────────────
+
+// Never surfaced to the client — SNMP community strings are write-only from the API's
+// perspective, same treatment as NVR/camera passwords elsewhere in this app.
+function shapeMonitoredDevice(d: Awaited<ReturnType<typeof prisma.monitoredNetworkDevice.findMany>>[number]) {
+  const { snmpCommunity, ...rest } = d;
+  return { ...rest, snmpUpTimeTicks: rest.snmpUpTimeTicks != null ? rest.snmpUpTimeTicks.toString() : null, snmpConfigured: Boolean(snmpCommunity) };
+}
+
+router.get("/monitor/settings", requirePermission("network", "view"), async (_req, res) => {
+  const settings = await prisma.networkMonitorSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1 },
+  });
+  res.json(settings);
+});
+
+router.put(
+  "/monitor/settings",
+  requirePermission("network", "edit"),
+  validateBody(updateMonitorSettingsSchema),
+  async (req, res) => {
+    const settings = await prisma.networkMonitorSettings.upsert({
+      where: { id: 1 },
+      update: { ...req.body, updatedById: req.user!.id },
+      create: { id: 1, ...req.body, updatedById: req.user!.id },
+    });
+    await logAudit({ userId: req.user!.id, action: "network.monitor_settings_update", entityType: "NetworkMonitorSettings", entityId: 1, metadata: req.body });
+    res.json(settings);
+  }
+);
+
+// Fire-and-forget, same pattern as the manual IP Range Scanner — a full monitoring pass across
+// every configured range can take tens of seconds, so this returns immediately and the client
+// polls GET /monitor/devices to watch results land.
+router.post("/monitor/run-now", requirePermission("network", "edit"), async (req, res) => {
+  runNetworkMonitorCycle().catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error("Manual network monitor run failed:", err);
+  });
+  await logAudit({ userId: req.user!.id, action: "network.monitor_run_now", entityType: "NetworkMonitorSettings", entityId: 1 });
+  res.status(202).json({ started: true });
+});
+
+router.get("/monitor/devices", requirePermission("network", "view"), async (_req, res) => {
+  const devices = await prisma.monitoredNetworkDevice.findMany({
+    orderBy: [{ status: "asc" }, { hostname: "asc" }],
+  });
+  res.json(devices.map(shapeMonitoredDevice));
+});
+
+router.post(
+  "/monitor/devices/:id/snmp",
+  requirePermission("network", "edit"),
+  validateBody(updateSnmpConfigSchema),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const { snmpEnabled, snmpCommunity, snmpPort } = req.body as z.infer<typeof updateSnmpConfigSchema>;
+
+    const device = await prisma.monitoredNetworkDevice.update({
+      where: { id },
+      data: {
+        snmpEnabled,
+        snmpPort: snmpPort ?? undefined,
+        ...(snmpCommunity ? { snmpCommunity: encryptSecret(snmpCommunity) } : {}),
+      },
+    });
+    await logAudit({ userId: req.user!.id, action: "network.monitor_snmp_config", entityType: "MonitoredNetworkDevice", entityId: id });
+    res.json(shapeMonitoredDevice(device));
+  }
+);
 
 export default router;

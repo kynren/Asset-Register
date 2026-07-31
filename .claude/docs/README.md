@@ -147,12 +147,62 @@ used real server-side pagination from Round 1 and are unchanged.
 ### 3.8 Network Topology Map: MAC Vendor + Device Type
 `server/src/lib/macVendor.ts` — an embedded (curated, non-exhaustive) OUI-prefix → vendor table
 covering common manufacturers (Dell, HP, Apple, Cisco, TP-Link, Hikvision, Dahua, Raspberry Pi,
-VMware, etc.), plus a `guessDeviceType()` heuristic combining vendor + open ports (e.g. port 554 →
-"IP Camera / NVR", port 3389 → "Windows PC / Server"). This is **local-only, no external API
-call** — deliberately avoids depending on internet access or a third-party lookup service.
-Applied in `scan.service.ts` (IP Range Scanner results now show Vendor + Device Type columns) and
+VMware, etc.), used first. **(Updated 2026-07-31)** When a scanned MAC's prefix isn't in that local
+table, `lookupVendorOnline()` falls back to the free api.macvendors.com lookup — calls are
+serialized through a single module-level queue (≥1.1s apart, respecting that API's ~1 req/sec
+unauthenticated limit) and cached by OUI prefix, and the whole thing fails soft (timeout + catch)
+so a slow/unreachable API never blocks a scan.
+
+`guessDeviceType()` classifies vendor + open ports into a broader taxonomy: **Computer**,
+**Network Switching / Routing** (merges what used to be split "switch" vs "router" signal — a
+single label so the Switching tab surfaces both), **Raspberry Pi**, **IoT Device**, **Lighting**,
+**Sound System**, plus the existing IP Camera / NVR, Printer, Virtual Machine, Networked Device,
+and Unclassified Device. Matching is by lowercase substring against the vendor string (not exact
+equality) since the online fallback returns full IEEE-registered legal names (e.g. "Sonos, Inc.")
+that wouldn't exact-match the short curated names.
+
+Applied in `scan.service.ts` (IP Range Scanner results show Vendor + Device Type columns) and
 carried through when a discovered host is "promoted" to the Topology Graph
-(`NetworkScanResult`/`NetworkNode` both gained `vendor`/`deviceType` columns).
+(`NetworkScanResult`/`NetworkNode` both have `vendor`/`deviceType` columns). **Any alive discovered
+host can now be adopted directly into Asset Inventory** from the IP Range Scanner (`Adopt into
+Inventory` button next to `Add to Topology`, gated on `assets:create`) — opens the standard
+`AssetFormModal` prefilled from the scan result (name/manufacturer/notes/`staticIpAddress`), with a
+best-effort category guess from the detected device type (using the `isComputerAsset`/
+`isSwitchingDevice` category flags where they apply, else a loose name match). The Switching tab's
+"Discovered on Network" list filters on the renamed `"Network Switching / Routing"` label.
+
+### 3.8a Network Topology Map: Continuous Monitoring (Domotz-style) — added 2026-07-31
+A sixth Network Topology Map tab, **Monitoring** (`client/src/pages/network/MonitoringTab.tsx`),
+adds background monitoring distinct from the on-demand IP Range Scanner: `NetworkMonitorSettings`
+(singleton row, `id=1`) holds `enabled`, `intervalMinutes`, and `ranges` (JSON array of
+`{startIp,endIp,label?}`). `server/src/lib/networkMonitor.ts`'s `startNetworkMonitorScheduler()`
+ticks every 60s (wired into `server/src/index.ts` alongside the other schedulers) but only actually
+runs a cycle once `intervalMinutes` has elapsed since `lastRunAt` — unlike the fixed-hours
+`setInterval` schedulers elsewhere in this codebase, this interval is admin-configurable at runtime
+via the UI, so it's re-checked against the DB every tick rather than baked into the `setInterval`
+call.
+
+Each cycle (`runNetworkMonitorCycle()`) calls a new `runScheduledScan()` in `scan.service.ts` — like
+`startScan()` but **awaited synchronously** (the scheduler isn't on a request/response cycle) and
+tagged `triggeredBy: "SCHEDULED"` with `startedById: null` (`NetworkScan.startedById` was relaxed to
+nullable for this). Results are diffed against `MonitoredNetworkDevice` (keyed by MAC when known,
+else `ip:<address>` — stable across a scan's own IP churn): a device's `status` only flips, and only
+then does it log a `NetworkDeviceStatusEvent` row and fire a notification — a device staying online
+or offline across cycles never re-alerts. Alerts go through the same `notifyUsers()`/event-email
+pattern as `maintenanceAlerts.ts`/`overdueTaskAlerts.ts`, to everyone with `network:canEdit`, via two
+new `EmailEventType` values: `DEVICE_OFFLINE` / `DEVICE_ONLINE`.
+
+Optional per-device SNMP polling (`server/src/lib/snmp.ts`, using the `net-snmp` package) walks
+standard MIB-II OIDs only — `sysDescr`, `sysUpTime`, and `ifTable` (name/admin+oper status/speed/
+octets) — deliberately no vendor-specific MIBs. The community string is encrypted at rest via the
+existing `encryptSecret()`/`decryptSecret()` (`server/src/lib/crypto.ts`, same AES-256-GCM helper as
+NVR/camera credentials) and is never returned to the client (`shapeMonitoredDevice()` in
+`network.routes.ts` strips it, exposing only a `snmpConfigured` boolean). A poll failure (timeout,
+wrong community, device doesn't speak SNMP) is fully soft — it sets `snmpLastError` and shows an
+"Error" badge in the UI rather than aborting the rest of the cycle. New routes, all under
+`/api/network/monitor/*`: `GET`/`PUT /settings`, `POST /run-now` (fire-and-forget, 202, since a full
+cycle across every configured range can take tens of seconds — the client polls `GET /devices`
+afterward), `GET /devices`, `POST /devices/:id/snmp`.
 
 ### 3.9 Layout Fix — Only Content Scrolls
 `.app-shell` and `.main-area` are now `height: 100vh; overflow: hidden`; `.page-content` is the

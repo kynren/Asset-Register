@@ -81,6 +81,8 @@ const SAMPLE_VARIABLES: Record<EmailEventType, Record<string, string>> = {
   PASSWORD_RESET: { firstName: "Jordan", resetUrl: "https://app-assets.kynren.com/reset-password/sample-token" },
   TASK_OVERDUE: { firstName: "Jordan", taskType: "Asset Checkout", taskName: "Dell Latitude 5440 (KYN-0142)", dueDate: "12 Jul 2026", taskUrl: "https://app-assets.kynren.com/assets/142" },
   LOW_STOCK: { itemName: "HDMI Cable 2m", quantityOnHand: "3", reorderLevel: "10", stockUrl: "https://app-assets.kynren.com/stock" },
+  DEVICE_OFFLINE: { deviceName: "core-switch-01 (192.168.1.10)", ipAddress: "192.168.1.10", deviceType: "Network Switching / Routing", sinceTime: "12 Jul 2026, 14:32", monitorUrl: "https://app-assets.kynren.com/network" },
+  DEVICE_ONLINE: { deviceName: "core-switch-01 (192.168.1.10)", ipAddress: "192.168.1.10", deviceType: "Network Switching / Routing", sinceTime: "12 Jul 2026, 14:47", monitorUrl: "https://app-assets.kynren.com/network" },
 };
 
 export async function sendTest(req: Request, res: Response) {
