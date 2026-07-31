@@ -8,6 +8,7 @@ import { Icon } from "../../components/Icon";
 import { PermissionGate, usePermission } from "../../auth/PermissionGate";
 import { useAuth } from "../../auth/AuthContext";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { QrCodeModal } from "../../components/QrCodeModal";
 import { Skeleton, SkeletonText } from "../../components/Skeleton";
 
 const STATUS_FLOW = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
@@ -30,6 +31,7 @@ export function TicketDetailPage() {
   const [ratingComment, setRatingComment] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [deletingAttachment, setDeletingAttachment] = useState<{ id: number; filename: string } | null>(null);
+  const [showQr, setShowQr] = useState(false);
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ["ticket", id],
@@ -133,6 +135,9 @@ export function TicketDetailPage() {
           <StatusBadge status={ticket.status} />
           <button className={`btn btn-sm ${ticket.isWatching ? "btn-primary" : "btn-secondary"}`} onClick={() => watchMutation.mutate()}>
             <Icon name="bell" size={13} /> {ticket.isWatching ? "Watching" : "Watch"}
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowQr(true)}>
+            <Icon name="grid" size={13} /> QR Code
           </button>
         </div>
       </div>
@@ -268,6 +273,16 @@ export function TicketDetailPage() {
           loading={deleteAttachmentMutation.isPending}
           onCancel={() => setDeletingAttachment(null)}
           onConfirm={() => deleteAttachmentMutation.mutate(deletingAttachment.id)}
+        />
+      )}
+
+      {showQr && (
+        <QrCodeModal
+          title="Ticket QR Code"
+          value={`${window.location.origin}/helpdesk/${ticket.id}`}
+          label={ticket.ticketNumber}
+          subLabel={ticket.title}
+          onClose={() => setShowQr(false)}
         />
       )}
     </div>

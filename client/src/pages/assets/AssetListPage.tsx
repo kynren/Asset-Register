@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -65,6 +65,18 @@ export function AssetListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const canEdit = usePermission("assets", "edit");
+
+  // Topbar search (and any other cross-page link) navigates to /assets?search=... via SPA
+  // routing, which reuses this already-mounted component and only changes the query string —
+  // the useState initializers above never re-run in that case, so without this the filter bar
+  // stays stuck on whatever it showed before the second search.
+  useEffect(() => {
+    setSearch(searchParams.get("search") ?? "");
+    setStatus(searchParams.get("status") ?? "");
+    setCategoryId(searchParams.get("categoryId") ? Number(searchParams.get("categoryId")) : null);
+    setAssignedToId(searchParams.get("assignedToId") ?? "");
+    setPage(1);
+  }, [searchParams]);
 
   const filters = { search: search || undefined, status: status || undefined, categoryId: categoryId ?? undefined, assignedToId: assignedToId || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined };
 
