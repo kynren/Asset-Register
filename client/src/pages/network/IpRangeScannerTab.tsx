@@ -15,6 +15,7 @@ interface ScanResult {
   macAddress: string | null;
   vendor: string | null;
   deviceType: string | null;
+  loggedInUser: string | null;
   responseTimeMs: number | null;
   openPorts: number[];
 }
@@ -207,6 +208,19 @@ export function IpRangeScannerTab() {
     { header: "MAC Address", enableSorting: false, cell: ({ row }) => <span className="muted" style={{ fontFamily: "monospace", fontSize: 12 }}>{row.original.macAddress ?? "—"}</span> },
     { header: "Vendor / Type", enableSorting: false, accessorFn: (r) => [r.vendor, r.deviceType].filter(Boolean).join(" · ") || "—" },
     {
+      header: "Logged-in User",
+      enableSorting: false,
+      accessorFn: (r) => r.loggedInUser ?? "",
+      cell: ({ row }) =>
+        row.original.loggedInUser ? (
+          <span className="row gap-1" style={{ alignItems: "center", fontSize: 12 }}>
+            <Icon name="profile" size={12} /> {row.original.loggedInUser}
+          </span>
+        ) : (
+          <span className="muted" title="Only known for hosts running the Kynren device agent">—</span>
+        ),
+    },
+    {
       header: "",
       id: "actions",
       enableSorting: false,
@@ -397,6 +411,7 @@ export function IpRangeScannerTab() {
               "Discovered via IP Range Scanner.",
               adopting.deviceType ? `Detected type: ${adopting.deviceType}.` : null,
               adopting.macAddress ? `MAC: ${adopting.macAddress}.` : null,
+              adopting.loggedInUser ? `Logged in as "${adopting.loggedInUser}" at time of discovery.` : null,
             ].filter(Boolean).join(" "),
           }}
           onClose={() => setAdopting(null)}

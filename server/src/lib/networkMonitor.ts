@@ -19,6 +19,7 @@ interface AliveHost {
   hostname: string | null;
   vendor: string | null;
   deviceType: string | null;
+  loggedInUser: string | null;
 }
 
 function deviceKey(mac: string | null, ip: string): string {
@@ -120,7 +121,7 @@ export async function processCompletedMonitorScan(scanId: number, options: { ski
 
   const alive: AliveHost[] = scan.results
     .filter((r) => r.alive)
-    .map((r) => ({ ipAddress: r.ipAddress, macAddress: r.macAddress, hostname: r.hostname, vendor: r.vendor, deviceType: r.deviceType }));
+    .map((r) => ({ ipAddress: r.ipAddress, macAddress: r.macAddress, hostname: r.hostname, vendor: r.vendor, deviceType: r.deviceType, loggedInUser: r.loggedInUser }));
 
   const now = new Date();
   const aliveKeys = new Set(alive.map((h) => deviceKey(h.macAddress, h.ipAddress)));
@@ -140,6 +141,7 @@ export async function processCompletedMonitorScan(scanId: number, options: { ski
           hostname: host.hostname,
           vendor: host.vendor,
           deviceType: host.deviceType,
+          loggedInUser: host.loggedInUser,
           status: "ONLINE",
         },
       });
@@ -155,6 +157,7 @@ export async function processCompletedMonitorScan(scanId: number, options: { ski
         hostname: host.hostname ?? existing.hostname,
         vendor: host.vendor ?? existing.vendor,
         deviceType: host.deviceType ?? existing.deviceType,
+        loggedInUser: host.loggedInUser ?? existing.loggedInUser,
         status: "ONLINE",
         lastSeenAt: now,
         lastChangedAt: wasOffline ? now : existing.lastChangedAt,

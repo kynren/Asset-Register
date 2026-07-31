@@ -578,6 +578,10 @@ model NetworkScanResult {
   macAddress     String?
   vendor         String?
   deviceType     String?
+  // Cross-referenced from Device (the Python agent's own hardware self-report) by MAC/IP match —
+  // never guessed for hosts the agent isn't installed on. Real remote "who's logged in" discovery
+  // would need admin credentials on every target machine (WMI/RPC), which this app doesn't have.
+  loggedInUser   String?
   responseTimeMs Int?
   openPorts      Int[]
   discoveredAt   DateTime    @default(now())
@@ -617,6 +621,8 @@ model MonitoredNetworkDevice {
   hostname         String?
   vendor           String?
   deviceType       String?
+  // Cross-referenced from Device by MAC/IP match, same as NetworkScanResult.loggedInUser above.
+  loggedInUser     String?
   status           DeviceLiveStatus @default(ONLINE)
   firstSeenAt      DateTime         @default(now())
   lastSeenAt       DateTime         @default(now())

@@ -171,6 +171,18 @@ best-effort category guess from the detected device type (using the `isComputerA
 `isSwitchingDevice` category flags where they apply, else a loose name match). The Switching tab's
 "Discovered on Network" list filters on the renamed `"Network Switching / Routing"` label.
 
+**Logged-in User (added 2026-07-31)**: both `NetworkScanResult` and `MonitoredNetworkDevice` gained
+a `loggedInUser` column. `scan.service.ts`'s new `buildDeviceLookup()` cross-references every
+scanned host's MAC (preferred, stable across DHCP) or IP against `Device` — the Python device
+agent's own hardware self-report, which already knows who's logged in via `psutil.users()` when
+installed. A host without the agent simply gets no match; there's no attempt to remotely determine
+a logged-in user for machines the agent isn't on (that would need admin credentials — WMI/RPC —
+against every target, which this app doesn't do). Shown as a "Logged-in User" column in the IP
+Range Scanner and under the device name in the Monitoring tab; included in the auto-generated notes
+when adopting a discovered host into Asset Inventory. Applied identically in both direct-mode
+(`runScan()`) and relay-mode (`applyRelayResults()`) scans, since the lookup runs server-side after
+results come back either way.
+
 ### 3.8a Network Topology Map: Continuous Monitoring (Domotz-style) — added 2026-07-31
 A sixth Network Topology Map tab, **Monitoring** (`client/src/pages/network/MonitoringTab.tsx`),
 adds background monitoring distinct from the on-demand IP Range Scanner: `NetworkMonitorSettings`
