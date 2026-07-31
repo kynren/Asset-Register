@@ -1,7 +1,7 @@
 @layer components {
   .sidebar {
     @apply w-sidebar min-w-sidebar text-sidebar-text flex flex-col h-full overflow-y-auto transition-all duration-[180ms] ease-in-out;
-    background: linear-gradient(165deg, var(--color-primary) 0%, var(--color-primary-hover) 130%);
+    background: var(--color-sidebar-bg);
     scrollbar-width: none;
     -ms-overflow-style: none;
   }

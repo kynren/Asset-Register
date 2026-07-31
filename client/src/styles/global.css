@@ -14,7 +14,7 @@
     --color-warning-soft: #fef3e2;
     --color-danger: #d92d20;
     --color-danger-soft: #fdeceb;
-    --color-sidebar-bg: #101828;
+    --color-sidebar-bg: #1b2b4b;
     --color-sidebar-text: #dbe4ff;
     --color-sidebar-text-active: #ffffff;
     --color-sidebar-hover: rgba(255, 255, 255, 0.14);
@@ -48,7 +48,7 @@
       --color-warning-soft: rgba(251, 191, 36, 0.14);
       --color-danger: #f87171;
       --color-danger-soft: rgba(248, 113, 113, 0.14);
-      --color-sidebar-bg: #0a0e16;
+      --color-sidebar-bg: #1b2b4b;
       --color-sidebar-hover: rgba(255, 255, 255, 0.1);
       --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
       --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
@@ -73,7 +73,7 @@
     --color-warning-soft: rgba(251, 191, 36, 0.14);
     --color-danger: #f87171;
     --color-danger-soft: rgba(248, 113, 113, 0.14);
-    --color-sidebar-bg: #0a0e16;
+    --color-sidebar-bg: #1b2b4b;
     --color-sidebar-hover: rgba(255, 255, 255, 0.1);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
