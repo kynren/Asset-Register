@@ -26,7 +26,7 @@ export const patterns: Pattern[] = [
     handler: async (req) => callInternalTool(req.user!.id, "asset_stats", {}).then((r) => pickStatusAnswer(r, "IN_REPAIR", "in repair")),
   },
   {
-    regex: /how many assets?( do we have)?$|total assets/i,
+    regex: /how many assets?( do we have)?( in total)?\??$|total assets/i,
     quickLabel: "How many assets do we have in total?",
     handler: async (req) => callInternalTool(req.user!.id, "asset_stats", {}),
   },
@@ -89,27 +89,27 @@ export const patterns: Pattern[] = [
     },
   },
   {
-    regex: /low stock/i,
+    regex: /low (on )?stock/i,
     quickLabel: "What items are low on stock?",
     handler: async (req) => callInternalTool(req.user!.id, "low_stock_items", {}),
   },
   {
-    regex: /devices (offline|not seen|missing)/i,
+    regex: /devices (are |is )?(offline|not seen|missing)/i,
     quickLabel: "Which devices are offline?",
     handler: async (req) => callInternalTool(req.user!.id, "offline_devices", {}),
   },
   {
-    regex: /maintenance due|service due/i,
+    regex: /maintenance (is )?due|service (is )?due/i,
     quickLabel: "What maintenance is due?",
     handler: async (req) => callInternalTool(req.user!.id, "maintenance_due", {}),
   },
   {
-    regex: /licen[sc]es? expir/i,
+    regex: /licen[sc]es? (are |is )?expir/i,
     quickLabel: "Which licenses are expiring soon?",
     handler: async (req) => callInternalTool(req.user!.id, "licenses_expiring", { withinDays: 30 }),
   },
   {
-    regex: /warrant(y|ies) expir/i,
+    regex: /warrant(y|ies) (are |is )?expir/i,
     quickLabel: "Which warranties are expiring soon?",
     handler: async (req) => callInternalTool(req.user!.id, "warranties_expiring", { withinDays: 30 }),
   },
