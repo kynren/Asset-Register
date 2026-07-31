@@ -1,0 +1,19 @@
+{
+  "externalKey": "0e05a2dd-98f9-4a23-b456-6ae2bb37bde5",
+  "title": "Virtual Assistant — User Manual",
+  "docType": "GENERAL",
+  "category": "IT & Computing Systems",
+  "collectionName": "Asset Register SOPs",
+  "summary": "How to ask the Virtual Assistant questions about live app data.",
+  "sections": {
+    "body": "<h2>Overview</h2>\n<p>The Virtual Assistant answers plain-language questions about live app data — assets, tickets, stock, and more — by querying the app directly (via an in-process MCP tool server), not by guessing. It's available both as a dedicated page and as a floating widget on every page.</p>\n<svg viewBox=\"0 0 566 74\" width=\"566\" height=\"74\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Ask a question then Assistant queries\nlive app data then Get a real answer\">\n<defs><marker id=\"arrow-11\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L6,3 L0,6 Z\" fill=\"var(--color-text-muted)\"/></marker></defs>\n<rect x=\"12\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"91\" y=\"41\">Ask a question</tspan></text><rect x=\"204\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"283\" y=\"34\">Assistant queries</tspan><tspan x=\"283\" y=\"48\">live app data</tspan></text><rect x=\"396\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"475\" y=\"41\">Get a real answer</tspan></text><line x1=\"174\" y1=\"37\" x2=\"197\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-11)\"/><line x1=\"366\" y1=\"37\" x2=\"389\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-11)\"/>\n</svg>\n<h2>Step-by-Step</h2>\n<ol><li>Type a question in the \"Ask something...\" box (for example, \"how many assets are in repair\") and click <strong>Send</strong>.</li><li>Or click one of the quick-action buttons for a common question.</li><li>Use the floating assistant icon from any page for a quick lookup without leaving what you're doing.</li></ol>\n<h2>Tips</h2>\n<ul><li>Since it queries live data, answers reflect the exact current state of the database, not a cached snapshot.</li></ul>"
+  },
+  "tags": [
+    "manual",
+    "assistant",
+    "readme"
+  ],
+  "isPublished": true,
+  "reviewDueDate": null,
+  "updatedAt": "2026-07-31T08:46:51.810Z"
+}

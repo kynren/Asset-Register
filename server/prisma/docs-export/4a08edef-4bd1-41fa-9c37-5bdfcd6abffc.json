@@ -1,0 +1,19 @@
+{
+  "externalKey": "4a08edef-4bd1-41fa-9c37-5bdfcd6abffc",
+  "title": "Operational Context — User Manual",
+  "docType": "GENERAL",
+  "category": "Shows & Production",
+  "collectionName": "Asset Register SOPs",
+  "summary": "How to read the live Active Show Assets gauge and Show Assets table.",
+  "sections": {
+    "body": "<h2>Overview</h2>\n<p>Operational Context is a live show-day status view: an <strong>ACTIVE SHOW ASSETS</strong> gauge (the percentage of show-flagged assets currently online) and a <strong>Show Assets</strong> table (Asset Tag, Name, Status, Latency).</p>\n<svg viewBox=\"0 0 566 74\" width=\"566\" height=\"74\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Open before/during\nshow then Check gauge\n% online then Investigate any\ndegraded row\">\n<defs><marker id=\"arrow-10\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L6,3 L0,6 Z\" fill=\"var(--color-text-muted)\"/></marker></defs>\n<rect x=\"12\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"91\" y=\"34\">Open before/during</tspan><tspan x=\"91\" y=\"48\">show</tspan></text><rect x=\"204\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"283\" y=\"34\">Check gauge</tspan><tspan x=\"283\" y=\"48\">% online</tspan></text><rect x=\"396\" y=\"12\" width=\"158\" height=\"50\" rx=\"9\" fill=\"var(--color-primary-soft)\" stroke=\"var(--color-primary)\" stroke-width=\"1.5\"/>\n    <text text-anchor=\"middle\" font-size=\"12\" font-family=\"system-ui,sans-serif\" font-weight=\"600\" fill=\"var(--color-text)\"><tspan x=\"475\" y=\"34\">Investigate any</tspan><tspan x=\"475\" y=\"48\">degraded row</tspan></text><line x1=\"174\" y1=\"37\" x2=\"197\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-10)\"/><line x1=\"366\" y1=\"37\" x2=\"389\" y2=\"37\" stroke=\"var(--color-text-muted)\" stroke-width=\"2\" marker-end=\"url(#arrow-10)\"/>\n</svg>\n<h2>Step-by-Step</h2>\n<ol><li>Open Operational Context before or during a show day to see how many show-critical assets are currently online.</li><li>Scan the Show Assets table for per-device status and live latency.</li><li>Follow up directly on anything showing degraded or offline status.</li></ol>\n<h2>Tips</h2>\n<ul><li>Only assets whose category is flagged \"Show Asset\" appear here — mark a category that way in Admin & Setup → Categories & Locations if a device is missing.</li></ul>"
+  },
+  "tags": [
+    "manual",
+    "operational context",
+    "readme"
+  ],
+  "isPublished": true,
+  "reviewDueDate": null,
+  "updatedAt": "2026-07-31T08:46:51.808Z"
+}
