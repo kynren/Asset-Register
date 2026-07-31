@@ -38,6 +38,7 @@ const MODULE_INFO: Record<ModuleName, { label: string; description: string }> = 
   operations: { label: "Operations Tools", description: "IT Projects Kanban, Knowledge Base, Asset Bookings, Saved Queries, Resource Scheduling, Bulk & Reports — and Software Licenses." },
   nvr: { label: "NVRs & Cameras", description: "Device management, live view, event log, ONVIF PTZ control, recording & retention, motion detection alerts." },
   "virtual-assistant": { label: "Virtual Assistant", description: "In-app assistant chat and quick actions." },
+  docs: { label: "Docs & SOPs", description: "Manuals, SOPs, runbooks, and other documents — collections, full-text search, attachments." },
   admin: { label: "Admin & Setup", description: "Users, Roles & Permissions, Categories & Locations, Asset Form Templates, System Settings, Audit Log." },
 };
 
