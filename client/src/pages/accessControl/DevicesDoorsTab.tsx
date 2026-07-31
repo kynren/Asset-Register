@@ -35,6 +35,14 @@ interface Device {
 
 const LOCK_TONE: Record<Door["lockState"], string> = { LOCKED: "badge-neutral", UNLOCKED: "badge-warning", UNKNOWN: "badge-neutral" };
 
+type DoorAction = "open" | "close" | "alwaysOpen" | "alwaysClose" | "resume";
+
+const MORE_DOOR_ACTIONS: { value: DoorAction; label: string }[] = [
+  { value: "alwaysOpen", label: "Always Unlock" },
+  { value: "alwaysClose", label: "Always Lock" },
+  { value: "resume", label: "Resume Schedule" },
+];
+
 export function DevicesDoorsTab() {
   const [showDeviceForm, setShowDeviceForm] = useState(false);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
@@ -93,7 +101,7 @@ export function DevicesDoorsTab() {
   });
 
   const controlDoorMutation = useMutation({
-    mutationFn: ({ doorId, action }: { doorId: number; action: "open" | "close" }) => axiosClient.post(`/access-control/doors/${doorId}/control`, { action }),
+    mutationFn: ({ doorId, action }: { doorId: number; action: DoorAction }) => axiosClient.post(`/access-control/doors/${doorId}/control`, { action }),
     onSuccess: invalidate,
   });
 
@@ -180,6 +188,21 @@ export function DevicesDoorsTab() {
                           >
                             Close
                           </button>
+                          <select
+                            className="select"
+                            style={{ width: "auto", fontSize: 12, padding: "4px 8px" }}
+                            value=""
+                            disabled={controlDoorMutation.isPending}
+                            title="Always-unlock / always-lock override, or resume the door's own schedule"
+                            onChange={(e) => {
+                              if (!e.target.value) return;
+                              controlDoorMutation.mutate({ doorId: door.id, action: e.target.value as DoorAction });
+                              e.target.value = "";
+                            }}
+                          >
+                            <option value="">More...</option>
+                            {MORE_DOOR_ACTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                          </select>
                         </PermissionGate>
                         <PermissionGate module="access-control" action="delete">
                           <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeletingDoor(door)} title="Delete door">

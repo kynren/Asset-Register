@@ -947,14 +947,15 @@ model AccessControlDevice {
 }
 
 model Door {
-  id            Int                  @id @default(autoincrement())
-  deviceId      Int
-  device        AccessControlDevice  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  doorNumber    Int
-  name          String
-  lockState     DoorLockState        @default(UNKNOWN)
-  lastCheckedAt DateTime?
-  events        AccessEvent[]
+  id             Int                          @id @default(autoincrement())
+  deviceId       Int
+  device         AccessControlDevice          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  doorNumber     Int
+  name           String
+  lockState      DoorLockState                @default(UNKNOWN)
+  lastCheckedAt  DateTime?
+  events         AccessEvent[]
+  credentialRights AccessCredentialDoorRight[]
 
   @@unique([deviceId, doorNumber])
 }
@@ -965,21 +966,39 @@ model Door {
 // access on two controllers gets two AccessCredential rows, each with its own device-assigned
 // employeeNo.
 model AccessCredential {
-  id          Int                     @id @default(autoincrement())
+  id          Int                          @id @default(autoincrement())
   deviceId    Int
-  device      AccessControlDevice     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  device      AccessControlDevice          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   userId      Int
-  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
   employeeNo  String
   cardNumber  String?
-  hasPin      Boolean                 @default(false)
-  status      AccessCredentialStatus  @default(ACTIVE)
+  hasPin      Boolean                      @default(false)
+  status      AccessCredentialStatus       @default(ACTIVE)
   validFrom   DateTime?
   validTo     DateTime?
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+  doorRights  AccessCredentialDoorRight[]
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
 
   @@unique([deviceId, employeeNo])
+}
+
+// Mirrors Hikvision's own UserInfo.RightPlan array (one {doorNo, planTemplateNo} entry per
+// door a person may use) — planTemplateNo references a schedule template already configured
+// on the controller itself (e.g. "1" = All-day, "2" = Weekday, per that device's own admin UI);
+// this app doesn't author templates, only assigns a template number per door. An
+// AccessCredential with no rows here was provisioned without a RightPlan at all, which leaves
+// the controller's own default access behavior in effect for that person.
+model AccessCredentialDoorRight {
+  id             Int               @id @default(autoincrement())
+  credentialId   Int
+  credential     AccessCredential  @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  doorId         Int
+  door           Door              @relation(fields: [doorId], references: [id], onDelete: Cascade)
+  planTemplateNo String            @default("1")
+
+  @@unique([credentialId, doorId])
 }
 
 model AccessEvent {

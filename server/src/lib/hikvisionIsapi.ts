@@ -205,14 +205,22 @@ function jsonUrl(hostname: string, port: number | null | undefined, path: string
   return `${baseUrl(hostname, port)}${path}?format=json`;
 }
 
-/** PUT /ISAPI/AccessControl/RemoteControl/door/{doorNumber} — momentarily open/close one door. */
+export type DoorControlAction = "open" | "close" | "alwaysOpen" | "alwaysClose" | "resume";
+
+/**
+ * PUT /ISAPI/AccessControl/RemoteControl/door/{doorNumber} — remote door control. Hikvision's
+ * `cmd` field supports five values: `open`/`close` are momentary (the door re-locks per its own
+ * configured relock delay), `alwaysOpen`/`alwaysClose` override the door into a held state until
+ * explicitly changed, and `resume` cancels an always-open/always-close override and returns the
+ * door to its normal schedule-driven behavior.
+ */
 export async function controlDoor(
   hostname: string,
   port: number | null | undefined,
   username: string,
   password: string,
   doorNumber: number,
-  action: "open" | "close"
+  action: DoorControlAction
 ): Promise<{ ok: boolean; message: string }> {
   const url = `${baseUrl(hostname, port)}/ISAPI/AccessControl/RemoteControl/door/${doorNumber}`;
   const body = `<RemoteControlDoor><cmd>${action}</cmd></RemoteControlDoor>`;
@@ -265,13 +273,26 @@ export async function getDoorStatus(
  * the controller under employeeNo, with an optional validity window enforced by the device
  * itself. This is the same call Hikvision's own iVMS-4200 "Person" screen makes when adding
  * someone to a door controller.
+ *
+ * `rightPlan`, when given, mirrors Hikvision's own per-door schedule assignment: each entry is
+ * one door this person may use plus a `planTemplateNo` referencing a schedule template already
+ * configured on the controller (device-side, not something this app authors). `doorRight` (a
+ * comma-joined list of door numbers) is set alongside it, matching the field Hikvision's own
+ * UserInfo/Record body carries next to RightPlan. Omitting `rightPlan` entirely (undefined, not
+ * an empty array) leaves the controller's own default access behavior for that person in place.
  */
 export async function createOrUpdateAcsUser(
   hostname: string,
   port: number | null | undefined,
   username: string,
   password: string,
-  params: { employeeNo: string; name: string; validFrom?: Date | null; validTo?: Date | null }
+  params: {
+    employeeNo: string;
+    name: string;
+    validFrom?: Date | null;
+    validTo?: Date | null;
+    rightPlan?: { doorNumber: number; planTemplateNo: string }[];
+  }
 ): Promise<{ ok: boolean; message: string }> {
   const url = jsonUrl(hostname, port, "/ISAPI/AccessControl/UserInfo/Record");
   const hasValidity = Boolean(params.validFrom || params.validTo);
@@ -285,6 +306,12 @@ export async function createOrUpdateAcsUser(
         beginTime: (params.validFrom ?? new Date()).toISOString(),
         endTime: (params.validTo ?? new Date("2037-12-31T23:59:59")).toISOString(),
       },
+      ...(params.rightPlan && params.rightPlan.length > 0
+        ? {
+            doorRight: params.rightPlan.map((r) => r.doorNumber).join(","),
+            RightPlan: params.rightPlan.map((r) => ({ doorNo: r.doorNumber, planTemplateNo: r.planTemplateNo })),
+          }
+        : {}),
     },
   });
   try {
