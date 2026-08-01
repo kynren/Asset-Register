@@ -238,6 +238,27 @@
     @apply text-nvx-cyan font-semibold;
   }
 
+  /* Below tablet width the sidebar (270px) + ptz column (260px) alone exceed the viewport,
+     leaving no room at all for .nvx-main — the camera grid was being pushed almost entirely
+     off-screen with only a horizontally-scrolled sliver reachable. Stack the three columns
+     instead, with the grid shown first (it's what someone opening this page actually wants to
+     see) followed by the channel list/matrix controls, then the PTZ panel last. */
+  @media (max-width: 900px) {
+    .nvx-body {
+      @apply flex-col;
+    }
+    .nvx-sidebar,
+    .nvx-ptz-col {
+      @apply w-full;
+    }
+    .nvx-main {
+      order: -2;
+    }
+    .nvx-sidebar {
+      order: -1;
+    }
+  }
+
   /* ── PTZ Alignment Panel ──────────────────────────────────────────── */
   .nvx-ptz-panel {
     @apply bg-ad-surface border border-ad-border rounded-lg p-3.5 sticky top-3;

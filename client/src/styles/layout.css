@@ -264,6 +264,25 @@
       flex-wrap: wrap;
       row-gap: 8px;
     }
+    /* The DAY MODE / Export Briefing pills and the user name+role+chevron block are the widest
+       things in this row — at drawer-nav widths there isn't room for their text labels without
+       wrapping the whole action row across two or three lines (the original "not nice on mobile"
+       complaint). Collapse them to icon-only, matching the existing icon-button pattern already
+       used for the assistant/settings/logout buttons; the tooltip/title and the user dropdown
+       (opened by tapping the avatar) still carry the full text. */
+    .topbar-pill-label {
+      display: none;
+    }
+    .topbar-pill {
+      @apply w-[38px] h-[38px] p-0 justify-center;
+    }
+    .topbar-user-info,
+    .topbar-user-chevron {
+      display: none;
+    }
+    .topbar-user {
+      @apply p-0 w-[38px] h-[38px] justify-center;
+    }
   }
 
   @media (max-width: 640px) {

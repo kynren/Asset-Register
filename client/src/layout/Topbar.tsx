@@ -194,14 +194,14 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
 
         <NotificationBell />
 
-        <button className="topbar-pill" onClick={toggleTheme}>
+        <button className="topbar-pill" onClick={toggleTheme} title={theme === "dark" ? "Switch to day mode" : "Switch to night mode"}>
           <Icon name={theme === "dark" ? "sun" : "moon"} size={14} />
-          {theme === "dark" ? "DAY MODE" : "NIGHT MODE"}
+          <span className="topbar-pill-label">{theme === "dark" ? "DAY MODE" : "NIGHT MODE"}</span>
         </button>
 
-        <button className="topbar-pill topbar-pill-primary" onClick={handleExportBriefing} disabled={exporting}>
+        <button className="topbar-pill topbar-pill-primary" onClick={handleExportBriefing} disabled={exporting} title="Export Briefing">
           <Icon name="fileText" size={14} />
-          {exporting ? "Exporting..." : "Export Briefing"}
+          <span className="topbar-pill-label">{exporting ? "Exporting..." : "Export Briefing"}</span>
         </button>
 
         <button className="topbar-icon-btn" onClick={() => navigate("/assistant")} title="Virtual Assistant console">
@@ -213,15 +213,15 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
         </button>
 
         <div style={{ position: "relative" }}>
-          <div className="topbar-user" onClick={() => setMenuOpen((o) => !o)}>
+          <div className="topbar-user" onClick={() => setMenuOpen((o) => !o)} title={`${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim()}>
             <div className="topbar-avatar">
               {user?.avatarUrl ? <img src={user.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : user ? initials(user.firstName, user.lastName) : "?"}
             </div>
-            <div>
+            <div className="topbar-user-info">
               <div className="topbar-user-name">{user?.firstName} {user?.lastName}</div>
               <div className="topbar-user-role">{user?.roleName?.toUpperCase()}</div>
             </div>
-            <Icon name="chevronDown" size={14} />
+            <span className="topbar-user-chevron"><Icon name="chevronDown" size={14} /></span>
           </div>
           {menuOpen && (
             <div className="user-menu" onMouseLeave={() => setMenuOpen(false)}>
