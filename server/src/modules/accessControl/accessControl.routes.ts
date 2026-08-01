@@ -7,6 +7,7 @@ import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { decryptSecret, encryptSecret } from "../../lib/crypto";
 import { pingHost } from "../../lib/ping";
+import { attemptConnect, getCoordinator, listDevices, updateCoordinatorConfig } from "../../lib/zigbeeCoordinator";
 import {
   controlDoor,
   createOrUpdateAcsUser,
@@ -17,15 +18,23 @@ import {
   searchAcsEvents,
 } from "../../lib/hikvisionIsapi";
 import {
+  createAccessGroupSchema,
   createCredentialSchema,
   createDeviceSchema,
   createDoorSchema,
+  createOrganizationSchema,
+  createPersonCardSchema,
+  createPersonSchema,
   doorControlSchema,
   isapiConnectionSchema,
   syncEventsSchema,
+  updateAccessGroupSchema,
   updateCredentialSchema,
   updateDeviceSchema,
   updateDoorSchema,
+  updateOrganizationSchema,
+  updatePersonSchema,
+  updateZigbeeCoordinatorSchema,
 } from "./accessControl.schema";
 
 const router = Router();
@@ -45,7 +54,7 @@ const deviceSelect = {
   lastCheckedAt: true,
   lastEventSyncAt: true,
   createdAt: true,
-  doors: { select: { id: true, deviceId: true, doorNumber: true, name: true, lockState: true, lastCheckedAt: true }, orderBy: { doorNumber: "asc" as const } },
+  doors: { select: { id: true, deviceId: true, doorNumber: true, name: true, lockState: true, doorState: true, lastCheckedAt: true }, orderBy: { doorNumber: "asc" as const } },
   credentials: {
     select: {
       id: true,
@@ -57,7 +66,7 @@ const deviceSelect = {
       validFrom: true,
       validTo: true,
       createdAt: true,
-      user: { select: { id: true, firstName: true, lastName: true, email: true } },
+      person: { select: { id: true, personId: true, name: true, email: true } },
       doorRights: { select: { doorId: true, planTemplateNo: true, door: { select: { id: true, name: true, doorNumber: true } } } },
     },
   },
@@ -92,6 +101,31 @@ function devicePassword(device: { encryptedPassword: string | null }): string {
   return device.encryptedPassword ? decryptSecret(device.encryptedPassword) : "";
 }
 
+// A Hikvision access controller comes with one or more physical doors wired to it — this reads
+// them straight from the device (ISAPI /AccessControl/Door/status reports one entry per door)
+// and upserts a Door row per doorNumber the device reports, so the user doesn't have to know or
+// manually enter how many doors a given controller has. Existing doors get their doorState (and
+// lockState, if the device actually reported one — see IsapiDoorStatus) refreshed; a doorNumber
+// never seen before gets created with a default name ("Door N") the user can rename. Called both
+// right after a device is added and from the "Refresh Doors" button.
+async function discoverDoors(deviceId: number, ipAddress: string, port: number | null, username: string, password: string) {
+  const result = await getDoorStatus(ipAddress, port, username, password);
+  if (!result.ok) return result;
+  for (const d of result.doors) {
+    const doorState = d.doorState === "open" ? "OPEN" : d.doorState === "closed" ? "CLOSED" : "UNKNOWN";
+    // Only touch lockState when the device actually reported one — most firmware doesn't
+    // include lock-relay state alongside door-contact state, and overwriting a value set by a
+    // real control command (see the /doors/:doorId/control route) with "unknown" would regress it.
+    const lockState = d.lockState === "unlocked" ? "UNLOCKED" : d.lockState === "locked" ? "LOCKED" : undefined;
+    await prisma.door.upsert({
+      where: { deviceId_doorNumber: { deviceId, doorNumber: d.doorNumber } },
+      update: { doorState, ...(lockState ? { lockState } : {}), lastCheckedAt: new Date() },
+      create: { deviceId, doorNumber: d.doorNumber, name: `Door ${d.doorNumber}`, doorState, lockState: lockState ?? "UNKNOWN", lastCheckedAt: new Date() },
+    });
+  }
+  return result;
+}
+
 // ───────────────────────── Devices ─────────────────────────
 
 router.get("/devices", requirePermission("access-control", "view"), async (_req, res) => {
@@ -102,7 +136,16 @@ router.post("/devices", requirePermission("access-control", "create"), validateB
   const { rest, encryptedPassword } = splitCredentials(req.body);
   const device = await prisma.accessControlDevice.create({ data: { ...rest, encryptedPassword } as any, select: deviceSelect });
   await logAudit({ userId: req.user!.id, action: "accessControlDevice.create", entityType: "AccessControlDevice", entityId: device.id });
-  res.status(201).json(device);
+
+  // Best-effort immediate door discovery so the card shows its real doors right away instead
+  // of "No doors added yet" until someone clicks Refresh Doors — a failure here (unreachable
+  // device) is fine, Refresh Doors retries the same discovery once it's reachable.
+  if (device.ipAddress) {
+    await discoverDoors(device.id, device.ipAddress, device.port, device.username ?? "", encryptedPassword ? decryptSecret(encryptedPassword) : "").catch(() => undefined);
+  }
+
+  const withDoors = await prisma.accessControlDevice.findUnique({ where: { id: device.id }, select: deviceSelect });
+  res.status(201).json(withDoors ?? device);
 });
 
 router.patch("/devices/:id", requirePermission("access-control", "edit"), validateBody(updateDeviceSchema), async (req, res) => {
@@ -152,15 +195,7 @@ router.post("/devices/:id/refresh-doors", requirePermission("access-control", "e
   const device = await loadDeviceWithSecret(Number(req.params.id));
   if (!device.ipAddress) throw new ApiError(400, "This device has no IP address set");
 
-  const result = await getDoorStatus(device.ipAddress, device.port, device.username ?? "", devicePassword(device));
-  if (result.ok) {
-    for (const d of result.doors) {
-      await prisma.door.updateMany({
-        where: { deviceId: device.id, doorNumber: d.doorNumber },
-        data: { lockState: d.state === "open" ? "UNLOCKED" : d.state === "closed" ? "LOCKED" : "UNKNOWN", lastCheckedAt: new Date() },
-      });
-    }
-  }
+  const result = await discoverDoors(device.id, device.ipAddress, device.port, device.username ?? "", devicePassword(device));
   res.json(result);
 });
 
@@ -223,20 +258,20 @@ router.post("/devices/:id/credentials", requirePermission("access-control", "cre
   const device = await loadDeviceWithSecret(Number(req.params.id));
   if (!device.ipAddress) throw new ApiError(400, "This device has no IP address set");
 
-  const user = await prisma.user.findUnique({ where: { id: req.body.userId } });
-  if (!user) throw new ApiError(404, "User not found");
+  const person = await prisma.person.findUnique({ where: { id: req.body.personId } });
+  if (!person) throw new ApiError(404, "Person not found");
 
   // employeeNo is the controller's own identifier for this person — device-scoped, so it just
-  // needs to be unique per device, not globally; the app User's own id is stable and human-
-  // traceable in an audit trail, so it's reused directly rather than minting a separate id.
-  const employeeNo = String(user.id);
+  // needs to be unique per device, not globally; the directory Person's own id is stable and
+  // human-traceable in an audit trail, so it's reused directly rather than minting a separate id.
+  const employeeNo = String(person.id);
   const validFrom = req.body.validFrom ? new Date(req.body.validFrom) : null;
   const validTo = req.body.validTo ? new Date(req.body.validTo) : null;
   const rightPlan = await resolveRightPlan(device.id, req.body.doorRights ?? []);
 
   const provision = await createOrUpdateAcsUser(device.ipAddress, device.port, device.username ?? "", devicePassword(device), {
     employeeNo,
-    name: `${user.firstName} ${user.lastName}`,
+    name: person.name,
     validFrom,
     validTo,
     rightPlan,
@@ -251,7 +286,7 @@ router.post("/devices/:id/credentials", requirePermission("access-control", "cre
   const credential = await prisma.accessCredential.create({
     data: {
       deviceId: device.id,
-      userId: user.id,
+      personId: person.id,
       employeeNo,
       cardNumber: req.body.cardNumber ?? null,
       hasPin: Boolean(req.body.hasPin),
@@ -261,12 +296,12 @@ router.post("/devices/:id/credentials", requirePermission("access-control", "cre
     },
     include: { doorRights: { select: { doorId: true, planTemplateNo: true } } },
   });
-  await logAudit({ userId: req.user!.id, action: "accessCredential.create", entityType: "AccessCredential", entityId: credential.id, metadata: { targetUserId: user.id } });
+  await logAudit({ userId: req.user!.id, action: "accessCredential.create", entityType: "AccessCredential", entityId: credential.id, metadata: { targetPersonId: person.id } });
   res.status(201).json(credential);
 });
 
 router.patch("/credentials/:credentialId", requirePermission("access-control", "edit"), validateBody(updateCredentialSchema), async (req, res) => {
-  const existing = await prisma.accessCredential.findUnique({ where: { id: Number(req.params.credentialId) }, include: { device: true, user: true } });
+  const existing = await prisma.accessCredential.findUnique({ where: { id: Number(req.params.credentialId) }, include: { device: true, person: true } });
   if (!existing) throw new ApiError(404, "Credential not found");
 
   const validFrom = req.body.validFrom !== undefined ? (req.body.validFrom ? new Date(req.body.validFrom) : null) : existing.validFrom;
@@ -281,7 +316,7 @@ router.patch("/credentials/:credentialId", requirePermission("access-control", "
     const rightPlan = await resolveRightPlan(existing.deviceId, req.body.doorRights);
     const provision = await createOrUpdateAcsUser(existing.device.ipAddress, existing.device.port, existing.device.username ?? "", devicePassword(existing.device), {
       employeeNo: existing.employeeNo,
-      name: `${existing.user.firstName} ${existing.user.lastName}`,
+      name: existing.person.name,
       validFrom,
       validTo,
       rightPlan,
@@ -374,6 +409,229 @@ router.post("/devices/:id/sync-events", requirePermission("access-control", "edi
 
   await prisma.accessControlDevice.update({ where: { id: device.id }, data: { lastEventSyncAt: endTime } });
   res.json({ ok: lastResult.ok, saved: totalSaved, message: lastResult.ok ? `Synced ${totalSaved} event(s).` : lastResult.message });
+});
+
+// ───────────────────────── ZigBee (scaffold — see server/src/lib/zigbeeCoordinator.ts) ─────────────────────────
+// For standalone ZigBee door/window contact sensors and locks — Hikvision controllers
+// themselves are never ZigBee, so this is entirely separate from the /devices routes above.
+
+router.get("/zigbee/coordinator", requirePermission("access-control", "view"), async (_req, res) => {
+  res.json(await getCoordinator("ACCESS_CONTROL"));
+});
+
+router.patch("/zigbee/coordinator", requirePermission("access-control", "edit"), validateBody(updateZigbeeCoordinatorSchema), async (req, res) => {
+  res.json(await updateCoordinatorConfig("ACCESS_CONTROL", req.body.serialPort));
+});
+
+router.post("/zigbee/coordinator/connect", requirePermission("access-control", "edit"), async (_req, res) => {
+  res.json(await attemptConnect("ACCESS_CONTROL"));
+});
+
+router.get("/zigbee/devices", requirePermission("access-control", "view"), async (_req, res) => {
+  res.json(await listDevices("ACCESS_CONTROL"));
+});
+
+// ───────────────────────── Organizations (Person directory tree) ─────────────────────────
+
+router.get("/organizations", requirePermission("access-control", "view"), async (_req, res) => {
+  res.json(await prisma.organization.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }));
+});
+
+router.post("/organizations", requirePermission("access-control", "create"), validateBody(createOrganizationSchema), async (req, res) => {
+  const org = await prisma.organization.create({ data: req.body });
+  await logAudit({ userId: req.user!.id, action: "organization.create", entityType: "Organization", entityId: org.id });
+  res.status(201).json(org);
+});
+
+router.patch("/organizations/:id", requirePermission("access-control", "edit"), validateBody(updateOrganizationSchema), async (req, res) => {
+  const org = await prisma.organization.update({ where: { id: Number(req.params.id) }, data: req.body });
+  await logAudit({ userId: req.user!.id, action: "organization.update", entityType: "Organization", entityId: org.id });
+  res.json(org);
+});
+
+router.delete("/organizations/:id", requirePermission("access-control", "delete"), async (req, res) => {
+  await prisma.organization.delete({ where: { id: Number(req.params.id) } });
+  await logAudit({ userId: req.user!.id, action: "organization.delete", entityType: "Organization", entityId: Number(req.params.id) });
+  res.json({ ok: true });
+});
+
+// ───────────────────────── Persons ─────────────────────────
+
+const personSelect = {
+  id: true,
+  personId: true,
+  name: true,
+  gender: true,
+  email: true,
+  phone: true,
+  organizationId: true,
+  organization: { select: { id: true, name: true } },
+  validFrom: true,
+  validTo: true,
+  longTermEffective: true,
+  remark: true,
+  photoUrl: true,
+  cards: { select: { id: true, cardNumber: true, cardType: true }, orderBy: { createdAt: "asc" as const } },
+  createdAt: true,
+};
+
+router.get("/persons", requirePermission("access-control", "view"), async (req, res) => {
+  const organizationId = req.query.organizationId ? Number(req.query.organizationId) : undefined;
+  const search = typeof req.query.search === "string" && req.query.search.trim() ? req.query.search.trim() : undefined;
+  res.json(
+    await prisma.person.findMany({
+      where: {
+        ...(organizationId ? { organizationId } : {}),
+        ...(search
+          ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { personId: { contains: search, mode: "insensitive" } }] }
+          : {}),
+      },
+      select: personSelect,
+      orderBy: { name: "asc" },
+    })
+  );
+});
+
+router.post("/persons", requirePermission("access-control", "create"), validateBody(createPersonSchema), async (req, res) => {
+  const { validFrom, validTo, ...rest } = req.body;
+  const person = await prisma.person.create({
+    data: { ...rest, validFrom: validFrom ? new Date(validFrom) : null, validTo: validTo ? new Date(validTo) : null },
+    select: personSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "person.create", entityType: "Person", entityId: person.id });
+  res.status(201).json(person);
+});
+
+router.patch("/persons/:id", requirePermission("access-control", "edit"), validateBody(updatePersonSchema), async (req, res) => {
+  const { validFrom, validTo, ...rest } = req.body;
+  const person = await prisma.person.update({
+    where: { id: Number(req.params.id) },
+    data: { ...rest, ...(validFrom !== undefined ? { validFrom: validFrom ? new Date(validFrom) : null } : {}), ...(validTo !== undefined ? { validTo: validTo ? new Date(validTo) : null } : {}) },
+    select: personSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "person.update", entityType: "Person", entityId: person.id });
+  res.json(person);
+});
+
+router.delete("/persons/:id", requirePermission("access-control", "delete"), async (req, res) => {
+  await prisma.person.delete({ where: { id: Number(req.params.id) } });
+  await logAudit({ userId: req.user!.id, action: "person.delete", entityType: "Person", entityId: Number(req.params.id) });
+  res.json({ ok: true });
+});
+
+router.post("/persons/:id/cards", requirePermission("access-control", "edit"), validateBody(createPersonCardSchema), async (req, res) => {
+  const personId = Number(req.params.id);
+  const card = await prisma.personCard.create({ data: { personId, cardNumber: req.body.cardNumber, cardType: req.body.cardType ?? "Normal Card" } });
+  await logAudit({ userId: req.user!.id, action: "personCard.create", entityType: "PersonCard", entityId: card.id });
+  res.status(201).json(card);
+});
+
+router.delete("/persons/:personId/cards/:cardId", requirePermission("access-control", "edit"), async (req, res) => {
+  await prisma.personCard.delete({ where: { id: Number(req.params.cardId) } });
+  await logAudit({ userId: req.user!.id, action: "personCard.delete", entityType: "PersonCard", entityId: Number(req.params.cardId) });
+  res.json({ ok: true });
+});
+
+// ───────────────────────── Access Groups ─────────────────────────
+
+const accessGroupSelect = {
+  id: true,
+  name: true,
+  planTemplateNo: true,
+  lastAppliedAt: true,
+  createdAt: true,
+  members: { select: { id: true, personId: true, person: { select: { id: true, personId: true, name: true, organization: { select: { id: true, name: true } } } } } },
+  doors: { select: { id: true, doorId: true, door: { select: { id: true, name: true, doorNumber: true, device: { select: { id: true, name: true } } } } } },
+};
+
+router.get("/groups", requirePermission("access-control", "view"), async (_req, res) => {
+  res.json(await prisma.accessGroup.findMany({ select: accessGroupSelect, orderBy: { name: "asc" } }));
+});
+
+router.post("/groups", requirePermission("access-control", "create"), validateBody(createAccessGroupSchema), async (req, res) => {
+  const { personIds, doorIds, ...rest } = req.body;
+  const group = await prisma.accessGroup.create({
+    data: {
+      ...rest,
+      members: { create: personIds.map((personId: number) => ({ personId })) },
+      doors: { create: doorIds.map((doorId: number) => ({ doorId })) },
+    },
+    select: accessGroupSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "accessGroup.create", entityType: "AccessGroup", entityId: group.id });
+  res.status(201).json(group);
+});
+
+router.patch("/groups/:id", requirePermission("access-control", "edit"), validateBody(updateAccessGroupSchema), async (req, res) => {
+  const id = Number(req.params.id);
+  const { personIds, doorIds, ...rest } = req.body;
+  const group = await prisma.accessGroup.update({
+    where: { id },
+    data: {
+      ...rest,
+      ...(personIds !== undefined ? { members: { deleteMany: {}, create: personIds.map((personId: number) => ({ personId })) } } : {}),
+      ...(doorIds !== undefined ? { doors: { deleteMany: {}, create: doorIds.map((doorId: number) => ({ doorId })) } } : {}),
+    },
+    select: accessGroupSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "accessGroup.update", entityType: "AccessGroup", entityId: group.id });
+  res.json(group);
+});
+
+router.delete("/groups/:id", requirePermission("access-control", "delete"), async (req, res) => {
+  await prisma.accessGroup.delete({ where: { id: Number(req.params.id) } });
+  await logAudit({ userId: req.user!.id, action: "accessGroup.delete", entityType: "AccessGroup", entityId: Number(req.params.id) });
+  res.json({ ok: true });
+});
+
+// Pushes this group's RightPlan (its doors, on its schedule template) to every member's
+// UserInfo record on each door's controller — the same createOrUpdateAcsUser call Credentials
+// uses, just applied to every person×device pair in the group in one action instead of one at a
+// time. Best-effort per pair: one unreachable controller doesn't abort the rest of the group.
+router.post("/groups/:id/apply", requirePermission("access-control", "edit"), async (req, res) => {
+  const group = await prisma.accessGroup.findUnique({
+    where: { id: Number(req.params.id) },
+    include: {
+      members: { include: { person: { include: { cards: true } } } },
+      doors: { include: { door: { include: { device: true } } } },
+    },
+  });
+  if (!group) throw new ApiError(404, "Access group not found");
+
+  const doorsByDevice = new Map<number, { device: (typeof group.doors)[number]["door"]["device"]; doorNumbers: number[] }>();
+  for (const gd of group.doors) {
+    const entry = doorsByDevice.get(gd.door.deviceId) ?? { device: gd.door.device, doorNumbers: [] };
+    entry.doorNumbers.push(gd.door.doorNumber);
+    doorsByDevice.set(gd.door.deviceId, entry);
+  }
+
+  const results: { personId: number; deviceId: number; ok: boolean; message: string }[] = [];
+  for (const member of group.members) {
+    for (const [deviceId, { device, doorNumbers }] of doorsByDevice) {
+      if (!device.ipAddress) {
+        results.push({ personId: member.personId, deviceId, ok: false, message: "Device has no IP address set." });
+        continue;
+      }
+      const employeeNo = String(member.personId);
+      const rightPlan = doorNumbers.map((doorNumber) => ({ doorNumber, planTemplateNo: group.planTemplateNo }));
+      const provision = await createOrUpdateAcsUser(device.ipAddress, device.port, device.username ?? "", devicePassword(device), {
+        employeeNo,
+        name: member.person.name,
+        validFrom: member.person.validFrom,
+        validTo: member.person.validTo,
+        rightPlan,
+      });
+      if (provision.ok && member.person.cards[0]) {
+        await enrollCard(device.ipAddress, device.port, device.username ?? "", devicePassword(device), employeeNo, member.person.cards[0].cardNumber).catch(() => undefined);
+      }
+      results.push({ personId: member.personId, deviceId, ok: provision.ok, message: provision.message });
+    }
+  }
+
+  const successCount = results.filter((r) => r.ok).length;
+  await prisma.accessGroup.update({ where: { id: group.id }, data: { lastAppliedAt: new Date() } });
+  await logAudit({ userId: req.user!.id, action: "accessGroup.apply", entityType: "AccessGroup", entityId: group.id, metadata: { total: results.length, success: successCount } });
+  res.json({ ok: results.length === 0 || results.every((r) => r.ok), results, message: `Applied to ${successCount}/${results.length} person-device pair(s).` });
 });
 
 export default router;

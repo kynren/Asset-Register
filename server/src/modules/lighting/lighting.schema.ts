@@ -51,3 +51,84 @@ export const discoverSchema = z.object({
   startIp: z.string().min(1),
   endIp: z.string().min(1),
 });
+
+// ───────────────────────── Dashboard: Groups/Areas ─────────────────────────
+
+export const createGroupSchema = z.object({
+  name: z.string().min(1),
+  icon: z.string().optional(),
+});
+
+export const updateGroupSchema = createGroupSchema.partial();
+
+export const reorderGroupsSchema = z.object({
+  ids: z.array(z.number().int()),
+});
+
+export const moveDeviceSchema = z.object({
+  groupId: z.number().int().nullable(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const updateDeviceIconSchema = z.object({
+  icon: z.string().nullable(),
+});
+
+// ───────────────────────── Scenes ─────────────────────────
+
+const sceneActionSchema = z.object({
+  deviceId: z.number().int(),
+  turnOn: z.boolean(),
+  brightness: z.number().int().min(0).max(100).nullable().optional(),
+});
+
+export const createSceneSchema = z.object({
+  name: z.string().min(1),
+  icon: z.string().optional(),
+  actions: z.array(sceneActionSchema).default([]),
+});
+
+export const updateSceneSchema = z.object({
+  name: z.string().min(1).optional(),
+  icon: z.string().optional(),
+  actions: z.array(sceneActionSchema).optional(),
+});
+
+// ───────────────────────── Automations ─────────────────────────
+
+export const createAutomationSchema = z
+  .object({
+    name: z.string().min(1),
+    isEnabled: z.boolean().optional(),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1),
+    timeOfDay: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Use 24-hour HH:mm"),
+    actionType: z.enum(["DEVICE", "SCENE"]),
+    targetDeviceId: z.number().int().nullable().optional(),
+    targetSceneId: z.number().int().nullable().optional(),
+    turnOn: z.boolean().nullable().optional(),
+  })
+  .refine((v) => v.actionType !== "DEVICE" || (v.targetDeviceId != null && v.turnOn != null), {
+    message: "A device action needs a target device and an on/off value.",
+    path: ["targetDeviceId"],
+  })
+  .refine((v) => v.actionType !== "SCENE" || v.targetSceneId != null, {
+    message: "A scene action needs a target scene.",
+    path: ["targetSceneId"],
+  });
+
+// ───────────────────────── ZigBee (scaffold) ─────────────────────────
+
+export const updateZigbeeCoordinatorSchema = z.object({
+  serialPort: z.string().nullable(),
+});
+
+export const updateAutomationSchema = z.object({
+  name: z.string().min(1).optional(),
+  isEnabled: z.boolean().optional(),
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1).optional(),
+  timeOfDay: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Use 24-hour HH:mm").optional(),
+  actionType: z.enum(["DEVICE", "SCENE"]).optional(),
+  targetDeviceId: z.number().int().nullable().optional(),
+  targetSceneId: z.number().int().nullable().optional(),
+  turnOn: z.boolean().nullable().optional(),
+});

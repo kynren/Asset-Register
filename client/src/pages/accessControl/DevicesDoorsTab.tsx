@@ -16,6 +16,7 @@ interface Door {
   doorNumber: number;
   name: string;
   lockState: "LOCKED" | "UNLOCKED" | "UNKNOWN";
+  doorState: "OPEN" | "CLOSED" | "UNKNOWN";
   lastCheckedAt: string | null;
 }
 interface Device {
@@ -161,12 +162,13 @@ export function DevicesDoorsTab() {
             <div className="muted" style={{ fontSize: 13 }}>No doors added yet.</div>
           ) : (
             <table className="data-table">
-              <thead><tr><th>Door #</th><th>Name</th><th>Lock State</th><th>Last Checked</th><th></th></tr></thead>
+              <thead><tr><th>Door #</th><th>Name</th><th>Door State</th><th>Lock State</th><th>Last Checked</th><th></th></tr></thead>
               <tbody>
                 {device.doors.map((door) => (
                   <tr key={door.id}>
                     <td>{door.doorNumber}</td>
                     <td>{door.name}</td>
+                    <td><span className={`badge ${door.doorState === "OPEN" ? "badge-warning" : "badge-neutral"}`}>{door.doorState}</span></td>
                     <td><span className={`badge ${LOCK_TONE[door.lockState]}`}>{door.lockState}</span></td>
                     <td className="muted">{door.lastCheckedAt ? dayjs(door.lastCheckedAt).format("DD MMM, HH:mm:ss") : "—"}</td>
                     <td>

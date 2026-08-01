@@ -23,7 +23,7 @@ interface Credential {
   validFrom: string | null;
   validTo: string | null;
   createdAt: string;
-  user: { id: number; firstName: string; lastName: string; email: string };
+  person: { id: number; personId: string; name: string; email: string | null };
   doorRights: DoorRight[];
 }
 interface DeviceDoor {
@@ -38,10 +38,10 @@ interface Device {
   doors: DeviceDoor[];
   credentials: Credential[];
 }
-interface DirectoryUser {
+interface DirectoryPerson {
   id: number;
-  firstName: string;
-  lastName: string;
+  personId: string;
+  name: string;
 }
 
 export function CredentialsTab() {
@@ -92,7 +92,7 @@ export function CredentialsTab() {
               <tbody>
                 {device.credentials.map((c) => (
                   <tr key={c.id}>
-                    <td>{c.user.firstName} {c.user.lastName}<div className="muted" style={{ fontSize: 11 }}>{c.user.email}</div></td>
+                    <td>{c.person.name}<div className="muted" style={{ fontSize: 11 }}>{c.person.personId}</div></td>
                     <td style={{ fontFamily: "monospace" }}>{c.cardNumber ?? "—"}</td>
                     <td>{c.hasPin ? "Yes" : "—"}</td>
                     <td className="muted" style={{ fontSize: 12 }}>
@@ -136,7 +136,7 @@ export function CredentialsTab() {
       {deleting && (
         <ConfirmDialog
           title="Revoke credential"
-          message={`Remove ${deleting.user.firstName} ${deleting.user.lastName}'s access from this controller? This cannot be undone.`}
+          message={`Remove ${deleting.person.name}'s access from this controller? This cannot be undone.`}
           danger
           loading={deleteMutation.isPending}
           onCancel={() => setDeleting(null)}
@@ -148,7 +148,7 @@ export function CredentialsTab() {
 }
 
 function AddCredentialModal({ device, onClose, onCreated }: { device: Device; onClose: () => void; onCreated: () => void }) {
-  const [userId, setUserId] = useState<number | "">("");
+  const [personId, setPersonId] = useState<number | "">("");
   const [cardNumber, setCardNumber] = useState("");
   const [hasPin, setHasPin] = useState(false);
   const [validFrom, setValidFrom] = useState("");
@@ -158,7 +158,7 @@ function AddCredentialModal({ device, onClose, onCreated }: { device: Device; on
   // e.g. "1" = All-day, "2" = Weekday — this app only assigns a template number per door).
   const [doorTemplates, setDoorTemplates] = useState<Record<number, string>>({});
 
-  const { data: users } = useQuery({ queryKey: ["users-directory"], queryFn: async () => (await axiosClient.get("/users/directory")).data as DirectoryUser[] });
+  const { data: persons } = useQuery({ queryKey: ["access-control-persons", null, ""], queryFn: async () => (await axiosClient.get("/access-control/persons")).data as DirectoryPerson[] });
 
   function toggleDoor(doorId: number, checked: boolean) {
     setDoorTemplates((prev) => {
@@ -172,7 +172,7 @@ function AddCredentialModal({ device, onClose, onCreated }: { device: Device; on
   const mutation = useMutation({
     mutationFn: () =>
       axiosClient.post(`/access-control/devices/${device.id}/credentials`, {
-        userId: Number(userId),
+        personId: Number(personId),
         cardNumber: cardNumber || undefined,
         hasPin,
         validFrom: validFrom ? new Date(validFrom).toISOString() : undefined,
@@ -182,8 +182,8 @@ function AddCredentialModal({ device, onClose, onCreated }: { device: Device; on
     onSuccess: () => { onCreated(); onClose(); },
   });
 
-  const alreadyEnrolled = new Set(device.credentials.map((c) => c.user.id));
-  const availableUsers = users?.filter((u) => !alreadyEnrolled.has(u.id));
+  const alreadyEnrolled = new Set(device.credentials.map((c) => c.person.id));
+  const availablePersons = persons?.filter((p) => !alreadyEnrolled.has(p.id));
 
   return (
     <FormModal
@@ -191,15 +191,16 @@ function AddCredentialModal({ device, onClose, onCreated }: { device: Device; on
       onClose={onClose}
       onSubmit={() => mutation.mutate()}
       submitting={mutation.isPending}
-      submitDisabled={!userId}
+      submitDisabled={!personId}
     >
       {mutation.isError && <div className="alert alert-danger">{(mutation.error as any)?.response?.data?.error ?? "Could not provision this credential on the controller."}</div>}
       <div className="field">
         <label>Person *</label>
-        <select className="select" value={userId} onChange={(e) => setUserId(e.target.value ? Number(e.target.value) : "")}>
-          <option value="">Select a user...</option>
-          {availableUsers?.map((u) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+        <select className="select" value={personId} onChange={(e) => setPersonId(e.target.value ? Number(e.target.value) : "")}>
+          <option value="">Select a person...</option>
+          {availablePersons?.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.personId})</option>)}
         </select>
+        {persons?.length === 0 && <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>No persons in the directory yet — add one under "Persons" first.</p>}
       </div>
       <div className="field"><label>Card Number</label><input className="input" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="Optional — scan or enter the card's number" /></div>
       <label className="row gap-1" style={{ fontSize: 13, cursor: "pointer", marginBottom: 12 }}>

@@ -7,7 +7,7 @@
 import { detectShelly, getShellyStatus, setShellyBrightness, setShellyPower } from "./shellyApi";
 import { detectTasmota, getTasmotaStatus, setTasmotaBrightness, setTasmotaPower } from "./tasmotaApi";
 
-export type LightingProtocolName = "SHELLY" | "TASMOTA" | "GENERIC_HTTP";
+export type LightingProtocolName = "SHELLY" | "TASMOTA" | "GENERIC_HTTP" | "ZIGBEE";
 export type LightingKindName = "SWITCH" | "LIGHT";
 
 export interface IotDeviceLike {
@@ -32,24 +32,36 @@ export interface IotStatus {
 export interface IotDetection {
   gen: number | null;
   kind: LightingKindName;
+  /** Independently-controllable outputs on the physical device (Shelly only, e.g. 2 for a
+   * Shelly 2PM). Always 1 for TASMOTA/GENERIC_HTTP — see createShellyOutputDevices in
+   * lighting.routes.ts for how a multi-output Shelly becomes one LightingDevice per output. */
+  outputs: number;
 }
 
+// ZIGBEE devices are paired (not IP-probed) — see zigbeeCoordinator.ts. Every dispatcher
+// function below throws the same clear "coordinator not connected" error for ZIGBEE until a
+// real coordinator integration lands; this is NOT hardware-verified, there being no ZigBee
+// coordinator available in this environment.
+const ZIGBEE_NOT_CONNECTED = "ZigBee coordinator is not connected. Configure and connect a coordinator under the ZigBee tab first.";
+
 /** Whether this device still needs a detection pass before it can be polled/controlled.
- * GENERIC_HTTP never does — its "kind" is just whatever the user picked at add time. */
+ * GENERIC_HTTP never does — its "kind" is just whatever the user picked at add time. ZIGBEE
+ * devices are already fully known once paired, so they never need a separate detection pass. */
 export function needsDetection(protocol: LightingProtocolName, gen: number | null, kind: LightingKindName | null): boolean {
-  if (protocol === "GENERIC_HTTP") return false;
+  if (protocol === "GENERIC_HTTP" || protocol === "ZIGBEE") return false;
   if (protocol === "SHELLY") return gen === null || kind === null;
   return kind === null; // TASMOTA has no "gen" concept
 }
 
 export async function detectIotDevice(device: IotDeviceLike): Promise<IotDetection> {
+  if (device.protocol === "ZIGBEE") throw new Error(ZIGBEE_NOT_CONNECTED);
   if (!device.ipAddress) throw new Error("This device has no IP address set.");
   if (device.protocol === "SHELLY") return detectShelly(device.ipAddress, device.port);
   if (device.protocol === "TASMOTA") {
     const d = await detectTasmota(device.ipAddress, device.port);
-    return { gen: null, kind: d.kind };
+    return { gen: null, kind: d.kind, outputs: 1 };
   }
-  return { gen: null, kind: device.kind ?? "SWITCH" };
+  return { gen: null, kind: device.kind ?? "SWITCH", outputs: 1 };
 }
 
 /** Returns `null` when there's genuinely nothing to poll (a GENERIC_HTTP device with no
@@ -71,6 +83,8 @@ export async function getIotStatus(device: IotDeviceLike): Promise<IotStatus | n
       const on = await fetchGenericStatus(device.statusUrl, device.statusOnPath);
       return { on, brightness: null, powerW: null };
     }
+    case "ZIGBEE":
+      throw new Error(ZIGBEE_NOT_CONNECTED);
   }
 }
 
@@ -92,6 +106,8 @@ export async function setIotPower(device: IotDeviceLike, on: boolean): Promise<v
       await fetchGenericControl(url);
       return;
     }
+    case "ZIGBEE":
+      throw new Error(ZIGBEE_NOT_CONNECTED);
   }
 }
 
@@ -109,6 +125,8 @@ export async function setIotBrightness(device: IotDeviceLike, value: number): Pr
     }
     case "GENERIC_HTTP":
       throw new Error("Brightness control isn't supported for Generic HTTP devices.");
+    case "ZIGBEE":
+      throw new Error(ZIGBEE_NOT_CONNECTED);
   }
 }
 

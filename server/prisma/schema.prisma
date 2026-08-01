@@ -71,7 +71,6 @@ model User {
   dashboardLayout   DashboardLayout?
   preferences       UserPreference[]
   mcpApiKeys        McpApiKey[]
-  accessCredentials AccessCredential[]
 
   projectCardsAssigned ProjectCard[]      @relation("ProjectCardAssignee")
   projectCardsCreated  ProjectCard[]      @relation("ProjectCardCreator")
@@ -236,6 +235,7 @@ model Location {
   cameras     Camera[]
   accessControlDevices AccessControlDevice[]
   lightingDevices      LightingDevice[]
+  zigbeeDevices        ZigbeeDevice[]
 }
 
 enum AssetStatus {
@@ -922,6 +922,15 @@ enum DoorLockState {
   UNKNOWN
 }
 
+// The physical door-contact position (is the door itself sitting open or closed) — distinct
+// from DoorLockState (is the electric lock/strike engaged). A door can be CLOSED but UNLOCKED
+// (someone could push it open any moment), or OPEN while LOCKED was the last command sent.
+enum DoorState {
+  OPEN
+  CLOSED
+  UNKNOWN
+}
+
 enum AccessCredentialStatus {
   ACTIVE
   DISABLED
@@ -954,9 +963,11 @@ model Door {
   doorNumber     Int
   name           String
   lockState      DoorLockState                @default(UNKNOWN)
+  doorState      DoorState                    @default(UNKNOWN)
   lastCheckedAt  DateTime?
   events         AccessEvent[]
   credentialRights AccessCredentialDoorRight[]
+  groupDoors     AccessGroupDoor[]
 
   @@unique([deviceId, doorNumber])
 }
@@ -970,8 +981,8 @@ model AccessCredential {
   id          Int                          @id @default(autoincrement())
   deviceId    Int
   device      AccessControlDevice          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  userId      Int
-  user        User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  personId    Int
+  person      Person                       @relation(fields: [personId], references: [id], onDelete: Cascade)
   employeeNo  String
   cardNumber  String?
   hasPin      Boolean                      @default(false)
@@ -1002,6 +1013,96 @@ model AccessCredentialDoorRight {
   @@unique([credentialId, doorId])
 }
 
+// ───────────────────────── Person / Organization directory (Access Control) ─────────────────────────
+// A physical building occupant (staff, contractor, visitor) enrolled for door access — distinct
+// from the app's own User accounts (login/RBAC), since most access-control persons never log
+// into this app at all. Mirrors Hikvision's own Person/Organization directory: a self-referencing
+// department tree, and a Person with a controller-facing personId (not this table's own `id`),
+// credential cards, and a validity window.
+
+model Organization {
+  id        Int            @id @default(autoincrement())
+  name      String
+  parentId  Int?
+  parent    Organization?  @relation("OrgTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Organization[] @relation("OrgTree")
+  persons   Person[]
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+}
+
+enum PersonGender {
+  MALE
+  FEMALE
+}
+
+model Person {
+  id                Int                 @id @default(autoincrement())
+  personId          String              @unique
+  name              String
+  gender            PersonGender        @default(MALE)
+  email             String?
+  phone             String?
+  organizationId    Int?
+  organization      Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  validFrom         DateTime?
+  validTo           DateTime?
+  longTermEffective Boolean             @default(false)
+  remark            String?
+  photoUrl          String?
+  cards             PersonCard[]
+  credentials       AccessCredential[]
+  groupMemberships  AccessGroupMember[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+model PersonCard {
+  id         Int      @id @default(autoincrement())
+  personId   Int
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  cardNumber String   @unique
+  cardType   String   @default("Normal Card")
+  createdAt  DateTime @default(now())
+}
+
+// ───────────────────────── Access Group (Access Control) ─────────────────────────
+// A named bundle of {persons + doors + schedule template} — matches Hikvision's own "Access
+// Group" screen: every person in the group is granted access to every door in the group, on the
+// assigned schedule template, in one "Apply to Device" push instead of provisioning each
+// person/door pair individually via Credentials.
+
+model AccessGroup {
+  id             Int                 @id @default(autoincrement())
+  name           String
+  planTemplateNo String              @default("1")
+  lastAppliedAt  DateTime?
+  members        AccessGroupMember[]
+  doors          AccessGroupDoor[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+}
+
+model AccessGroupMember {
+  id       Int         @id @default(autoincrement())
+  groupId  Int
+  group    AccessGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  personId Int
+  person   Person      @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, personId])
+}
+
+model AccessGroupDoor {
+  id      Int         @id @default(autoincrement())
+  groupId Int
+  group   AccessGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  doorId  Int
+  door    Door        @relation(fields: [doorId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, doorId])
+}
+
 // ───────────────────────── Lighting (local, web-controllable IoT devices) ─────────────────────────
 
 enum LightingDeviceKind {
@@ -1026,6 +1127,7 @@ enum LightingProtocol {
   SHELLY
   TASMOTA
   GENERIC_HTTP
+  ZIGBEE
 }
 
 // One physical device (switch or dimmable light) controlled directly over the local network —
@@ -1045,6 +1147,13 @@ model LightingDevice {
   offUrl         String?
   statusUrl      String?
   statusOnPath   String?
+  // ZIGBEE-protocol devices only — set once paired via the coordinator (see ZigbeeCoordinator).
+  zigbeeIeeeAddress    String?
+  zigbeeNetworkAddress Int?
+  icon           String?
+  sortOrder      Int                 @default(0)
+  groupId        Int?
+  group          LightingGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
   locationId     Int?
   location       Location?           @relation(fields: [locationId], references: [id], onDelete: SetNull)
   status         CameraStatus        @default(UNKNOWN)
@@ -1053,6 +1162,122 @@ model LightingDevice {
   powerW         Float?
   lastCheckedAt  DateTime?
   createdAt      DateTime            @default(now())
+  sceneActions   LightingSceneAction[]
+  automations    LightingAutomation[]
+}
+
+// A user-defined grouping of lighting devices, shown as a card on the Lighting Dashboard —
+// either a physical "Area" (Kitchen, Garage) or any custom name. Purely organizational: has no
+// effect on how a device is controlled, only how it's presented and dragged around.
+model LightingGroup {
+  id        Int              @id @default(autoincrement())
+  name      String
+  icon      String?
+  sortOrder Int              @default(0)
+  devices   LightingDevice[]
+  createdAt DateTime         @default(now())
+}
+
+// A saved snapshot of desired on/off (and brightness, where supported) states across a set of
+// devices, applied all at once via "Activate" — e.g. "Movie Night" dims the lounge and switches
+// off the hallway in one click.
+model LightingScene {
+  id          Int                    @id @default(autoincrement())
+  name        String
+  icon        String?
+  actions     LightingSceneAction[]
+  automations LightingAutomation[]
+  createdAt   DateTime               @default(now())
+}
+
+model LightingSceneAction {
+  id         Int            @id @default(autoincrement())
+  sceneId    Int
+  scene      LightingScene  @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  deviceId   Int
+  device     LightingDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  turnOn     Boolean
+  brightness Int?
+
+  @@unique([sceneId, deviceId])
+}
+
+enum LightingAutomationActionType {
+  DEVICE
+  SCENE
+}
+
+// A recurring schedule ("Mon-Fri at 18:00, turn on Porch Light") — the calendar view on the
+// Automations tab projects daysOfWeek/timeOfDay onto a month grid rather than storing one-off
+// calendar events, since every automation here repeats weekly by design.
+model LightingAutomation {
+  id             Int                           @id @default(autoincrement())
+  name           String
+  isEnabled      Boolean                       @default(true)
+  daysOfWeek     Int[]
+  timeOfDay      String
+  actionType     LightingAutomationActionType
+  targetDeviceId Int?
+  targetDevice   LightingDevice?               @relation(fields: [targetDeviceId], references: [id], onDelete: Cascade)
+  targetSceneId  Int?
+  targetScene    LightingScene?                @relation(fields: [targetSceneId], references: [id], onDelete: Cascade)
+  turnOn         Boolean?
+  // "YYYY-MM-DD" of the last date this fired — the scheduler ticks every minute but this dedup
+  // key stops it from re-firing the same automation more than once on the same day.
+  lastRunDate    String?
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+}
+
+// ───────────────────────── ZigBee (shared scaffold: Lighting + Access Control) ─────────────────────────
+// NOT hardware-verified — no ZigBee coordinator has been available in this environment. Modeled
+// after the zigbee-herdsman/zigbee2mqtt shape (a coordinator dongle bridging a PAN of paired end
+// devices) so a real integration can be dropped in behind these same models later. Lighting's own
+// ZigBee bulbs/switches become ordinary LightingDevice rows (protocol: ZIGBEE) once paired, so
+// they participate in Groups/Scenes/Automations like any other device — ZigbeeDevice below is
+// only for end devices that don't fit LightingDevice, e.g. Access Control's door/window contact
+// sensors and standalone ZigBee locks.
+enum ZigbeeModule {
+  LIGHTING
+  ACCESS_CONTROL
+}
+
+enum ZigbeeCoordinatorStatus {
+  DISCONNECTED
+  CONNECTED
+  ERROR
+}
+
+model ZigbeeCoordinator {
+  id         Int                     @id @default(autoincrement())
+  module     ZigbeeModule            @unique
+  serialPort String?
+  status     ZigbeeCoordinatorStatus @default(DISCONNECTED)
+  lastError  String?
+  panId      String?
+  updatedAt  DateTime                @updatedAt
+}
+
+enum ZigbeeDeviceType {
+  CONTACT_SENSOR
+  LOCK
+  MOTION_SENSOR
+  OTHER
+}
+
+model ZigbeeDevice {
+  id           Int              @id @default(autoincrement())
+  module       ZigbeeModule
+  ieeeAddress  String           @unique
+  friendlyName String
+  deviceType   ZigbeeDeviceType @default(OTHER)
+  isOn         Boolean?
+  contactOpen  Boolean?
+  batteryPct   Int?
+  lastSeenAt   DateTime?
+  locationId   Int?
+  location     Location?        @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  createdAt    DateTime         @default(now())
 }
 
 enum LightingScanStatus {
