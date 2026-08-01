@@ -5,6 +5,7 @@ import { startOverdueTaskScheduler } from "./lib/overdueTaskAlerts";
 import { startRetentionScheduler } from "./lib/recording";
 import { startNetworkMonitorScheduler } from "./lib/networkMonitor";
 import { startLightingAutomationScheduler } from "./lib/lightingAutomationScheduler";
+import { startSystemStatusScheduler } from "./lib/systemStatusMonitor";
 
 const app = createApp();
 
@@ -16,4 +17,5 @@ app.listen(env.PORT, () => {
   startRetentionScheduler();
   startNetworkMonitorScheduler();
   startLightingAutomationScheduler();
+  startSystemStatusScheduler();
 });
