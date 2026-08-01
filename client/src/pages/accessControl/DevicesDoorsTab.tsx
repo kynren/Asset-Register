@@ -50,6 +50,10 @@ export function DevicesDoorsTab() {
   const [deletingDevice, setDeletingDevice] = useState<Device | null>(null);
   const [doorDeviceId, setDoorDeviceId] = useState<number | null>(null);
   const [deletingDoor, setDeletingDoor] = useState<Door | null>(null);
+  // Keyed by device id — lets "Refresh Doors" (and door discovery right after adding a device)
+  // explain *why* no doors showed up (auth failure, unreachable, unsupported firmware) instead
+  // of silently leaving the door list empty with no explanation.
+  const [discoveryResults, setDiscoveryResults] = useState<Record<number, { ok: boolean; message: string }>>({});
   const queryClient = useQueryClient();
 
   const { data: devices, isLoading } = useQuery({
@@ -68,7 +72,12 @@ export function DevicesDoorsTab() {
 
   const createDeviceMutation = useMutation({
     mutationFn: (values: DeviceFormValues) => axiosClient.post("/access-control/devices", values),
-    onSuccess: () => { invalidate(); setShowDeviceForm(false); },
+    onSuccess: (res) => {
+      const { id, doorDiscovery } = res.data as { id: number; doorDiscovery: { ok: boolean; message: string } | null };
+      if (doorDiscovery) setDiscoveryResults((r) => ({ ...r, [id]: doorDiscovery }));
+      invalidate();
+      setShowDeviceForm(false);
+    },
   });
 
   const updateDeviceMutation = useMutation({
@@ -88,7 +97,10 @@ export function DevicesDoorsTab() {
 
   const refreshDoorsMutation = useMutation({
     mutationFn: (id: number) => axiosClient.post(`/access-control/devices/${id}/refresh-doors`),
-    onSuccess: invalidate,
+    onSuccess: (res, id) => {
+      setDiscoveryResults((r) => ({ ...r, [id]: res.data as { ok: boolean; message: string } }));
+      invalidate();
+    },
   });
 
   const createDoorMutation = useMutation({
@@ -158,8 +170,17 @@ export function DevicesDoorsTab() {
             </div>
           </div>
 
+          {discoveryResults[device.id] && (
+            <div className={`alert ${discoveryResults[device.id].ok ? "alert-success" : "alert-danger"}`} style={{ marginBottom: 12, fontSize: 12 }}>
+              {discoveryResults[device.id].message}
+            </div>
+          )}
+
           {device.doors.length === 0 ? (
-            <div className="muted" style={{ fontSize: 13 }}>No doors added yet.</div>
+            <div className="muted" style={{ fontSize: 13 }}>
+              No doors added yet.
+              {!discoveryResults[device.id] && ' Click "Refresh Doors" to auto-detect, or "Add Door" to add one manually.'}
+            </div>
           ) : (
             <table className="data-table">
               <thead><tr><th>Door #</th><th>Name</th><th>Door State</th><th>Lock State</th><th>Last Checked</th><th></th></tr></thead>
