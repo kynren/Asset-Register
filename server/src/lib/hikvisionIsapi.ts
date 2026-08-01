@@ -286,17 +286,20 @@ export async function getDoorStatus(
 }
 
 /**
- * GET /ISAPI/AccessControl/Door/capabilities — asks the controller how many physical doors it
- * actually supports (e.g. a DS-K2604 reports 4, a DS-K2601 reports 1), independent of how many
- * doors happen to be configured/reporting status right now. This is what lets discoverDoors
- * (accessControl.routes.ts) provision every door a multi-door panel has — including doors that
- * haven't been wired/activated yet and so don't show up in getDoorStatus's response — instead of
- * only ever seeing doors that already have activity.
+ * Asks the controller how many physical doors it actually supports (e.g. a DS-K2604 reports 4,
+ * a DS-K2601 reports 1), independent of how many doors happen to be configured/reporting status
+ * right now. This is what lets discoverDoors (accessControl.routes.ts) provision every door a
+ * multi-door panel has — including doors that haven't been wired/activated yet and so don't show
+ * up in getDoorStatus's response — instead of only ever seeing doors that already have activity.
  *
- * Hikvision's capabilities documents aren't perfectly uniform across firmware, so this checks a
- * few known shapes for the door-count range (commonly a doorNo min/max pair) and returns `count:
- * null` rather than guessing if none match — the caller falls back to whatever getDoorStatus
- * reported in that case, exactly like before this existed.
+ * Per Hikvision's own ISAPI documentation (tpp.hikvision.com), the authoritative source for max
+ * door count is the door-control-schedule capability doc, JSON_Cap_DoorStatusPlan, served at
+ * `/ISAPI/AccessControl/DoorStatusPlan/capabilities` — "you can get the maximum number of doors
+ * supported by the device from the configuration capability of the door control schedule." This
+ * is tried first; `/ISAPI/AccessControl/Door/capabilities` (also a real, documented path, per
+ * Hikvision's Wiki page listing) is tried as a fallback in case a given firmware only implements
+ * one of the two. If neither yields a parseable count, this returns `count: null` rather than
+ * guessing — the caller falls back to whatever getDoorStatus reported.
  */
 export async function getDoorCapabilities(
   hostname: string,
@@ -304,24 +307,44 @@ export async function getDoorCapabilities(
   username: string,
   password: string
 ): Promise<{ ok: boolean; count: number | null; message: string }> {
-  const url = jsonUrl(hostname, port, "/ISAPI/AccessControl/Door/capabilities");
-  try {
-    const res = await digestFetch("GET", url, username, password);
-    if (res.status === 401) return { ok: false, count: null, message: "Authentication failed — check the ISAPI username/password." };
-    if (res.status === 404) return { ok: true, count: null, message: "This device did not report door capabilities (endpoint not supported on this model/firmware)." };
-    if (!res.ok) return { ok: false, count: null, message: `Device responded with HTTP ${res.status}.` };
-
-    const data = (await res.json().catch(() => ({}))) as Record<string, any>;
-    const doorNoRange = data.DoorCap?.doorNo ?? data.DoorCaps?.doorNo ?? data.doorNo;
+  function extractMaxDoorNo(data: Record<string, any>): number | null {
+    const doorNoRange =
+      data.DoorStatusPlanCap?.doorNo ?? data.DoorCap?.doorNo ?? data.DoorCaps?.doorNo ?? data.doorNo;
     const max = doorNoRange?.["@max"] ?? doorNoRange?.max;
-    const count = max !== undefined ? Number(max) : null;
-
-    return count && count > 0
-      ? { ok: true, count, message: `This controller supports ${count} door(s).` }
-      : { ok: true, count: null, message: "Could not determine door count from this device's capabilities response." };
-  } catch (err) {
-    return { ok: false, count: null, message: `Could not reach device: ${connectionErrorMessage(err)}` };
+    return max !== undefined ? Number(max) : null;
   }
+
+  async function tryEndpoint(path: string): Promise<{ ok: boolean; count: number | null; notFound?: boolean; authFailed?: boolean; httpStatus?: number } | { networkError: unknown }> {
+    try {
+      const res = await digestFetch("GET", jsonUrl(hostname, port, path), username, password);
+      if (res.status === 401) return { ok: false, count: null, authFailed: true };
+      if (res.status === 404) return { ok: false, count: null, notFound: true };
+      if (!res.ok) return { ok: false, count: null, httpStatus: res.status };
+      const data = (await res.json().catch(() => ({}))) as Record<string, any>;
+      return { ok: true, count: extractMaxDoorNo(data) };
+    } catch (err) {
+      return { networkError: err };
+    }
+  }
+
+  const first = await tryEndpoint("/ISAPI/AccessControl/DoorStatusPlan/capabilities");
+  if ("networkError" in first) return { ok: false, count: null, message: `Could not reach device: ${connectionErrorMessage(first.networkError)}` };
+  if (first.authFailed) return { ok: false, count: null, message: "Authentication failed — check the ISAPI username/password." };
+  if (first.ok && first.count) return { ok: true, count: first.count, message: `This controller supports ${first.count} door(s).` };
+
+  // Only fall through to the second path if the first was a legitimate "not supported here" —
+  // an actual HTTP error on the primary (documented) path shouldn't be silently masked.
+  if (!first.notFound && !first.ok) return { ok: false, count: null, message: `Device responded with HTTP ${first.httpStatus} reading door capabilities.` };
+
+  const second = await tryEndpoint("/ISAPI/AccessControl/Door/capabilities");
+  if ("networkError" in second) return { ok: false, count: null, message: `Could not reach device: ${connectionErrorMessage(second.networkError)}` };
+  if (second.authFailed) return { ok: false, count: null, message: "Authentication failed — check the ISAPI username/password." };
+  if (second.notFound) return { ok: true, count: null, message: "This device did not report door capabilities on either known endpoint (not supported on this model/firmware)." };
+  if (!second.ok) return { ok: false, count: null, message: `Device responded with HTTP ${second.httpStatus} reading door capabilities.` };
+
+  return second.count
+    ? { ok: true, count: second.count, message: `This controller supports ${second.count} door(s).` }
+    : { ok: true, count: null, message: "Could not determine door count from this device's capabilities response." };
 }
 
 /**
@@ -402,12 +425,26 @@ export async function enrollCard(
 }
 
 /**
- * GET /ISAPI/AccessControl/CaptureCardId — reads whatever card is presented at a reader wired
+ * GET /ISAPI/AccessControl/CaptureCardInfo — reads whatever card is presented at a reader wired
  * to this controller, for card-enrollment UIs ("tap a card, its number appears in the field").
- * This blocks on the device side until a card is presented or it times out, so it's given a much
- * longer timeout than this module's other calls (real desktop enrollment tools like iVMS-4200
- * give an operator ~10-15s to tap the card). A device that reports no card presented within that
- * window is a normal outcome, not an error — the caller should let the user try again.
+ * This is a real, documented Hikvision ISAPI endpoint (confirmed via Hikvision's own tpp.hikvision.com
+ * Wiki, which lists both `/ISAPI/AccessControl/CaptureCardInfo?format=json` and
+ * `/ISAPI/AccessControl/CaptureCardInfo/capabilities?format=json`) — an earlier version of this
+ * function guessed a `CaptureCardId` path that doesn't appear in Hikvision's own documentation
+ * and has been corrected.
+ *
+ * This only reads via a reader wired to a *network-connected* access control panel ("Remote"
+ * mode in Hikvision's own card-enrollment dialog). It deliberately does NOT attempt to read a
+ * USB-attached desktop card enrollment station (Hikvision's DS-K1F100 series etc., "Local" mode)
+ * — those connect directly to a PC over USB with no IP/ISAPI stack at all, so a browser-based web
+ * app has no way to reach one; only desktop client software with local USB driver access
+ * (iVMS-4200/HikCentral) can. The frontend disables Read entirely when the user selects Local
+ * mode rather than attempting (and silently failing) a network call that could never work.
+ *
+ * Blocks on the device side until a card is presented or it times out, so it's given a much
+ * longer timeout than this module's other calls (real desktop enrollment tools give an operator
+ * ~10-15s to tap the card). A device that reports no card presented within that window is a
+ * normal outcome, not an error — the caller should let the user try again.
  */
 export async function captureCardId(
   hostname: string,
@@ -415,7 +452,7 @@ export async function captureCardId(
   username: string,
   password: string
 ): Promise<{ ok: boolean; cardNo: string | null; message: string }> {
-  const url = jsonUrl(hostname, port, "/ISAPI/AccessControl/CaptureCardId");
+  const url = jsonUrl(hostname, port, "/ISAPI/AccessControl/CaptureCardInfo");
   try {
     const res = await digestFetch("GET", url, username, password, { timeoutMs: 15000 });
     if (res.status === 401) return { ok: false, cardNo: null, message: "Authentication failed — check the ISAPI username/password." };
@@ -423,7 +460,7 @@ export async function captureCardId(
     if (!res.ok) return { ok: false, cardNo: null, message: `Device responded with HTTP ${res.status}.` };
 
     const data = (await res.json().catch(() => ({}))) as Record<string, any>;
-    const cardNo = data.CardNoInfo?.cardNo ?? data.CaptureCardId?.cardNo ?? data.cardNo ?? null;
+    const cardNo = data.CaptureCardInfo?.cardNo ?? data.CardNoInfo?.cardNo ?? data.cardNo ?? null;
     return cardNo
       ? { ok: true, cardNo: String(cardNo), message: `Read card ${cardNo}.` }
       : { ok: false, cardNo: null, message: "No card was presented at the reader — try again and tap the card within the time limit." };

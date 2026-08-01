@@ -410,11 +410,42 @@ interface AccessControlDeviceOption {
   ipAddress: string | null;
 }
 
-// Mirrors the "Add" card dialog in Hikvision's own iVMS-4200 Person screen: type a card number
-// or tap a physical card at a reader wired to one of this org's access control devices and have
-// its number filled in automatically. "Read" is a real ISAPI call (captureCardId in
-// hikvisionIsapi.ts) — it is NOT verified against physical card-reader hardware in this codebase
-// yet, so if it fails against a real controller, that's the first thing to check.
+// Mirrors Hikvision's own Person-screen card dialog. Their real "Settings" panel offers two
+// fundamentally different reading modes — Local and Remote — because "Card Enrollment Station"
+// covers two different kinds of hardware:
+//   - Local: a USB-attached desktop enrollment reader (Hikvision's DS-K1F100 series etc.). These
+//     have no IP/ISAPI stack at all — they're read by desktop client software (iVMS-4200/
+//     HikCentral) with local USB driver access, which a browser-based web app cannot reach.
+//   - Remote: the reader wired to a network-connected access control panel, read over ISAPI
+//     (captureCardId → GET /ISAPI/AccessControl/CaptureCardInfo on that device). This is the only
+//     mode this app can actually perform "Read" for.
+// Local mode is included for parity with Hikvision's own dialog and because a site's settings
+// legitimately record which physical station is at the front desk, but Read is disabled while
+// it's selected rather than attempting a network call that could never work for that hardware.
+interface CardReaderSettings {
+  mode: "local" | "remote";
+  deviceId: number | null;
+  cardType: string;
+  buzzing: boolean;
+  cardNoType: string;
+  m1Encryption: boolean;
+}
+const DEFAULT_READER_SETTINGS: CardReaderSettings = {
+  mode: "remote",
+  deviceId: null,
+  cardType: "All",
+  buzzing: true,
+  cardNoType: "Card Serial Number (CSN)",
+  m1Encryption: false,
+};
+const READER_CARD_TYPES = ["All", "IC Card", "ID Card", "CPU Card"];
+const CARD_NO_TYPES = ["Card Serial Number (CSN)", "Wiegand 26", "Wiegand 34", "RS-485/Wiegand 34"];
+
+// "Read" is a real ISAPI call (captureCardId in hikvisionIsapi.ts, GET
+// /ISAPI/AccessControl/CaptureCardInfo — confirmed against Hikvision's own ISAPI documentation)
+// against whichever access control device is configured as the Remote reader in Settings. It is
+// NOT verified against physical card-reader hardware in this codebase, so if it fails against a
+// real controller, that's the first thing to check.
 function AddCardModal({ personId, onClose, onSaved }: { personId: number; onClose: () => void; onSaved: () => void }) {
   const [cardNumber, setCardNumber] = useState("");
   const [cardType, setCardType] = useState(CARD_TYPES[0]);
@@ -427,12 +458,12 @@ function AddCardModal({ personId, onClose, onSaved }: { personId: number; onClos
   });
   const readableDevices = (devices ?? []).filter((d) => d.ipAddress);
 
-  const { value: readerDeviceId, setValue: setReaderDeviceId } = useUserPreference<number | null>("accessControl.cardReaderDeviceId", null);
-  const effectiveReaderId = readableDevices.some((d) => d.id === readerDeviceId) ? readerDeviceId : (readableDevices[0]?.id ?? null);
-  const readerDevice = readableDevices.find((d) => d.id === effectiveReaderId) ?? null;
+  const { value: readerSettings, setValue: setReaderSettings } = useUserPreference<CardReaderSettings>("accessControl.cardReaderSettings", DEFAULT_READER_SETTINGS);
+  const isRemote = readerSettings.mode === "remote";
+  const readerDevice = isRemote ? (readableDevices.find((d) => d.id === readerSettings.deviceId) ?? null) : null;
 
   const readMutation = useMutation({
-    mutationFn: () => axiosClient.post(`/access-control/devices/${effectiveReaderId}/capture-card`),
+    mutationFn: () => axiosClient.post(`/access-control/devices/${readerDevice!.id}/capture-card`),
     onSuccess: (res) => {
       const data = res.data as { ok: boolean; cardNo: string | null };
       if (data.ok && data.cardNo) setCardNumber(data.cardNo);
@@ -449,6 +480,12 @@ function AddCardModal({ personId, onClose, onSaved }: { personId: number; onClos
     },
   });
 
+  const readTitle = !isRemote
+    ? "Local (USB) enrollment stations can't be read from a web browser — see Settings"
+    : readerDevice
+      ? `Read from ${readerDevice.name}`
+      : "No Remote reader configured — see Settings";
+
   return (
     <div className="modal-overlay" style={{ zIndex: 200 }} onClick={onClose}>
       <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
@@ -459,6 +496,11 @@ function AddCardModal({ personId, onClose, onSaved }: { personId: number; onClos
 
         {addMutation.isError && <div className="alert alert-danger">{(addMutation.error as any)?.response?.data?.error ?? "Could not add this card."}</div>}
         {readResult && !readResult.ok && <div className="alert alert-danger" style={{ fontSize: 12 }}>{readResult.message}</div>}
+        {!isRemote && (
+          <div className="alert alert-info" style={{ fontSize: 12 }}>
+            Mode is set to Local — a USB card enrollment station can only be read by Hikvision's own desktop software (iVMS-4200/HikCentral), not from this web app. Type the card number below, or switch to Remote in Settings to read via a networked controller's reader.
+          </div>
+        )}
 
         <div className="field">
           <label>Card No.</label>
@@ -468,7 +510,7 @@ function AddCardModal({ personId, onClose, onSaved }: { personId: number; onClos
               type="button"
               className="btn btn-secondary btn-sm"
               disabled={!readerDevice || readMutation.isPending}
-              title={readerDevice ? `Read from ${readerDevice.name}` : "No card reader configured — see Settings"}
+              title={readTitle}
               onClick={() => readMutation.mutate()}
             >
               {readMutation.isPending ? "Reading…" : "Read"}
@@ -499,51 +541,103 @@ function AddCardModal({ personId, onClose, onSaved }: { personId: number; onClos
       {showSettings && (
         <ReaderSettingsModal
           devices={readableDevices}
-          currentId={effectiveReaderId}
+          settings={readerSettings}
           onClose={() => setShowSettings(false)}
-          onSave={(id) => { setReaderDeviceId(id); setShowSettings(false); }}
+          onSave={(s) => { setReaderSettings(s); setShowSettings(false); }}
         />
       )}
     </div>
   );
 }
 
-// Which access control device's reader "Read" should capture from — persisted per-user since a
-// site with several controllers likely has one operator's desk near a specific reader.
+// Matches Hikvision's own card-reader Settings dialog (Mode / Card Enrollment Station / Card
+// Type / Buzzing / Card No. Type / M1 Card Encryption). Persisted per-user since a site's front
+// desk likely has one physical reader and one habitual mode. Card Type, Buzzing, Card No. Type,
+// and M1 Card Encryption are saved for parity with Hikvision's own dialog and as a record of the
+// site's reader configuration, but — unlike Mode and the device selection — this app does not yet
+// send them as part of the capture request: Hikvision's CaptureCardInfo request-body schema for
+// these fields isn't confirmed against real hardware, so they're not wired into captureCardId()
+// to avoid sending unverified parameters to a physical controller.
 function ReaderSettingsModal({
   devices,
-  currentId,
+  settings,
   onClose,
   onSave,
 }: {
   devices: AccessControlDeviceOption[];
-  currentId: number | null;
+  settings: CardReaderSettings;
   onClose: () => void;
-  onSave: (id: number | null) => void;
+  onSave: (settings: CardReaderSettings) => void;
 }) {
-  const [selected, setSelected] = useState<number | "">(currentId ?? "");
+  const [draft, setDraft] = useState<CardReaderSettings>(settings);
   return (
     <div className="modal-overlay" style={{ zIndex: 250 }} onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Card Reader Settings</h3>
+          <h3>Settings</h3>
           <button className="modal-close" onClick={onClose}><Icon name="close" size={18} /></button>
         </div>
+
         <div className="field">
-          <label>Read cards from</label>
-          <select className="select" value={selected} onChange={(e) => setSelected(e.target.value ? Number(e.target.value) : "")}>
-            <option value="">No reader (type card numbers manually)</option>
-            {devices.map((d) => <option key={d.id} value={d.id}>{d.name} ({d.ipAddress})</option>)}
-          </select>
-          {devices.length === 0 && (
-            <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-              No access control device with an IP address is registered yet — add one under Devices &amp; Doors first.
-            </p>
-          )}
+          <label>Mode</label>
+          <div className="row gap-3" style={{ alignItems: "center", height: 34 }}>
+            <label className="row gap-1" style={{ alignItems: "center", fontSize: 13, cursor: "pointer" }}>
+              <input type="radio" checked={draft.mode === "local"} onChange={() => setDraft((d) => ({ ...d, mode: "local" }))} /> Local
+            </label>
+            <label className="row gap-1" style={{ alignItems: "center", fontSize: 13, cursor: "pointer" }}>
+              <input type="radio" checked={draft.mode === "remote"} onChange={() => setDraft((d) => ({ ...d, mode: "remote" }))} /> Remote
+            </label>
+          </div>
         </div>
+
+        {draft.mode === "local" ? (
+          <p className="muted" style={{ fontSize: 12 }}>
+            Local (USB) card enrollment stations — e.g. Hikvision's DS-K1F100 series — connect directly to a PC and can only be read by desktop client software (iVMS-4200/HikCentral) with local USB driver access. This web app can't reach one, so there's no station to select here; switch to Remote to read via a networked controller's own reader instead.
+          </p>
+        ) : (
+          <div className="field">
+            <label>Card Enrollment Station</label>
+            <select className="select" value={draft.deviceId ?? ""} onChange={(e) => setDraft((d) => ({ ...d, deviceId: e.target.value ? Number(e.target.value) : null }))}>
+              <option value="">Select a device...</option>
+              {devices.map((dev) => <option key={dev.id} value={dev.id}>{dev.name} ({dev.ipAddress})</option>)}
+            </select>
+            {devices.length === 0 && (
+              <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+                No access control device with an IP address is registered yet — add one under Devices &amp; Doors first.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="field">
+          <label>Card Type</label>
+          <select className="select" value={draft.cardType} onChange={(e) => setDraft((d) => ({ ...d, cardType: e.target.value }))}>
+            {READER_CARD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+
+        <label className="row gap-1" style={{ fontSize: 13, cursor: "pointer", margin: "12px 0" }}>
+          <input type="checkbox" checked={draft.buzzing} onChange={(e) => setDraft((d) => ({ ...d, buzzing: e.target.checked }))} /> Buzzing
+        </label>
+
+        <div className="field">
+          <label>Card No. Type</label>
+          <select className="select" value={draft.cardNoType} onChange={(e) => setDraft((d) => ({ ...d, cardNoType: e.target.value }))}>
+            {CARD_NO_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+
+        <label className="row gap-2" style={{ fontSize: 13, cursor: "pointer", marginTop: 12, justifyContent: "space-between" }}>
+          M1 Card Encryption
+          <div className="form-toggle-switch">
+            <input type="checkbox" checked={draft.m1Encryption} onChange={(e) => setDraft((d) => ({ ...d, m1Encryption: e.target.checked }))} />
+            <span className="form-toggle-switch-track" />
+          </div>
+        </label>
+
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={() => onSave(selected === "" ? null : selected)}>Save</button>
+          <button className="btn btn-primary" onClick={() => onSave(draft)}>OK</button>
         </div>
       </div>
     </div>
