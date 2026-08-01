@@ -78,14 +78,18 @@ async function gen1(ip: string, port: number | null | undefined, path: string, p
 export interface ShellyDetection {
   gen: number;
   kind: ShellyKind;
+  /** How many independently-controllable outputs this physical device has (e.g. 2 for a
+   * Shelly 2PM, 4 for a Shelly Pro 4PM). The caller creates one LightingDevice row per
+   * output — see lighting.routes.ts — since each output is switched/dimmed independently. */
+  outputs: number;
 }
 
 /**
- * Works out which generation a device is, and whether its channel is a plain switch
- * or a dimmable light. There's no single field that reliably says "this is a light"
- * across every Gen2/3 model, so Switch.GetStatus is tried first and Light.GetStatus is
- * the fallback — whichever one the device actually answers wins, rather than
- * maintaining a hardcoded model list.
+ * Works out which generation a device is, whether its channels are plain switches or
+ * dimmable lights, and how many outputs it has. There's no single field that reliably
+ * says "this is a light" across every Gen2/3 model, so Switch.GetStatus is tried first
+ * and Light.GetStatus is the fallback — whichever one the device actually answers wins,
+ * rather than maintaining a hardcoded model list.
  */
 export async function detectShelly(ip: string, port: number | null | undefined): Promise<ShellyDetection> {
   const info = await gen1(ip, port, "/shelly");
@@ -93,16 +97,31 @@ export async function detectShelly(ip: string, port: number | null | undefined):
 
   if (gen === 1) {
     const status = await gen1(ip, port, "/status");
-    const kind: ShellyKind = Array.isArray(status.lights) && status.lights.length > 0 ? "LIGHT" : "SWITCH";
-    return { gen, kind };
+    const lightCount = Array.isArray(status.lights) ? status.lights.length : 0;
+    const relayCount = Array.isArray(status.relays) ? status.relays.length : 0;
+    if (lightCount > 0) return { gen, kind: "LIGHT", outputs: lightCount };
+    return { gen, kind: "SWITCH", outputs: Math.max(1, relayCount) };
+  }
+
+  // Shelly.GetStatus (no params) returns the device's full status object, with one
+  // "switch:N" or "light:N" key per output — counting them tells us the output count
+  // without guessing or probing each id individually.
+  try {
+    const full = await rpc(ip, port, "Shelly.GetStatus");
+    const switchCount = Object.keys(full).filter((k) => /^switch:\d+$/.test(k)).length;
+    const lightCount = Object.keys(full).filter((k) => /^light:\d+$/.test(k)).length;
+    if (lightCount > 0) return { gen, kind: "LIGHT", outputs: lightCount };
+    if (switchCount > 0) return { gen, kind: "SWITCH", outputs: switchCount };
+  } catch {
+    // fall through to the single-channel probe below
   }
 
   try {
     await rpc(ip, port, "Switch.GetStatus", { id: 0 });
-    return { gen, kind: "SWITCH" };
+    return { gen, kind: "SWITCH", outputs: 1 };
   } catch {
     await rpc(ip, port, "Light.GetStatus", { id: 0 });
-    return { gen, kind: "LIGHT" };
+    return { gen, kind: "LIGHT", outputs: 1 };
   }
 }
 

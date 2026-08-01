@@ -41,7 +41,7 @@ const doorRightSchema = z.object({
 });
 
 export const createCredentialSchema = z.object({
-  userId: z.number().int(),
+  personId: z.number().int(),
   cardNumber: z.string().min(1).optional(),
   hasPin: z.boolean().optional(),
   validFrom: z.string().datetime().nullable().optional(),
@@ -59,4 +59,56 @@ export const updateCredentialSchema = z.object({
 export const syncEventsSchema = z.object({
   startTime: z.string().datetime().optional(),
   endTime: z.string().datetime().optional(),
+});
+
+// ───────────────────────── ZigBee (scaffold) ─────────────────────────
+
+export const updateZigbeeCoordinatorSchema = z.object({
+  serialPort: z.string().nullable(),
+});
+
+// ───────────────────────── Person / Organization directory ─────────────────────────
+
+export const createOrganizationSchema = z.object({
+  name: z.string().min(1),
+  parentId: z.number().int().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const updateOrganizationSchema = createOrganizationSchema.partial();
+
+export const createPersonSchema = z.object({
+  personId: z.string().min(1),
+  name: z.string().min(1),
+  gender: z.enum(["MALE", "FEMALE"]).optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().optional(),
+  organizationId: z.number().int().nullable().optional(),
+  validFrom: z.string().datetime().nullable().optional(),
+  validTo: z.string().datetime().nullable().optional(),
+  longTermEffective: z.boolean().optional(),
+  remark: z.string().optional(),
+});
+
+export const updatePersonSchema = createPersonSchema.partial();
+
+export const createPersonCardSchema = z.object({
+  cardNumber: z.string().min(1),
+  cardType: z.string().optional(),
+});
+
+// ───────────────────────── Access Group ─────────────────────────
+
+export const createAccessGroupSchema = z.object({
+  name: z.string().min(1),
+  planTemplateNo: z.string().min(1).max(8).optional(),
+  personIds: z.array(z.number().int()).default([]),
+  doorIds: z.array(z.number().int()).default([]),
+});
+
+export const updateAccessGroupSchema = z.object({
+  name: z.string().min(1).optional(),
+  planTemplateNo: z.string().min(1).max(8).optional(),
+  personIds: z.array(z.number().int()).optional(),
+  doorIds: z.array(z.number().int()).optional(),
 });

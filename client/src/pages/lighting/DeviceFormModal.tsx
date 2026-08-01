@@ -37,7 +37,7 @@ const PROTOCOL_LABELS: Record<LightingProtocol, string> = {
 };
 
 const PROTOCOL_HELP: Record<LightingProtocol, string> = {
-  SHELLY: "Connects directly to the device's local Shelly API over Wi-Fi — no cloud account needed. Generation (Gen1/Gen2/3) and whether it's a switch or a dimmable light are detected automatically once saved.",
+  SHELLY: "Connects directly to the device's local Shelly API over Wi-Fi — no cloud account needed. Generation (Gen1/Gen2/3) and whether it's a switch or a dimmable light are detected automatically once saved. If this device has more than one output (e.g. a Shelly 2PM or Pro 4PM), one entry is created per output automatically.",
   TASMOTA: "Connects directly to the device's local Tasmota HTTP API over Wi-Fi — no cloud account needed. Whether it's a plain switch or a dimmable light is detected automatically once saved. Devices with a Tasmota web admin password set are not supported.",
   GENERIC_HTTP: "For any other web-controllable light or IoT device — Home Assistant automations, ESPHome, IFTTT/webhook proxies, or a self-built relay. Supply the exact URLs the app should call to turn it on/off, and optionally a URL to read its current state.",
 };

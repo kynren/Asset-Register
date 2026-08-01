@@ -236,10 +236,19 @@ export async function controlDoor(
 
 export interface IsapiDoorStatus {
   doorNumber: number;
-  state: "open" | "closed" | "unknown";
+  /** Physical door-contact position (is the door itself open or closed). */
+  doorState: "open" | "closed" | "unknown";
+  /** Whether the electric lock/strike is engaged. Not every model/firmware reports this
+   * alongside door-contact state — "unknown" here means the caller should leave whatever
+   * lockState is already on record (e.g. from the last control command) rather than overwrite
+   * a known value with a guess. */
+  lockState: "locked" | "unlocked" | "unknown";
 }
 
-/** GET /ISAPI/AccessControl/Door/status — best-effort door lock-state read; see file header note. */
+/** GET /ISAPI/AccessControl/Door/status — best-effort door status read. Returns one entry
+ * per door the controller actually has, so the caller (discoverDoors in accessControl.routes.ts)
+ * also uses this to auto-create Door rows for doorNumbers it hasn't seen before, instead of
+ * requiring the user to know and manually enter how many doors a given controller has. */
 export async function getDoorStatus(
   hostname: string,
   port: number | null | undefined,
@@ -258,9 +267,17 @@ export async function getDoorStatus(
     if (!Array.isArray(entries)) entries = [entries];
 
     const doors: IsapiDoorStatus[] = entries.map((d: Record<string, unknown>) => {
-      const raw = String(d.doorState ?? d.status ?? "").toLowerCase();
-      const state: IsapiDoorStatus["state"] = raw.includes("open") ? "open" : raw.includes("clos") || raw.includes("lock") ? "closed" : "unknown";
-      return { doorNumber: Number(d.doorNo ?? d.doorNumber ?? 0), state };
+      const doorRaw = String(d.doorState ?? d.status ?? "").toLowerCase();
+      const doorState: IsapiDoorStatus["doorState"] = doorRaw.includes("open") ? "open" : doorRaw.includes("clos") ? "closed" : "unknown";
+
+      const lockRaw = String(d.lockState ?? d.doorLockStatus ?? d.lockStatus ?? "").toLowerCase();
+      const lockState: IsapiDoorStatus["lockState"] = lockRaw.includes("unlock")
+        ? "unlocked"
+        : lockRaw.includes("lock")
+          ? "locked"
+          : "unknown";
+
+      return { doorNumber: Number(d.doorNo ?? d.doorNumber ?? 0), doorState, lockState };
     });
     return { ok: true, doors, message: `Read status for ${doors.length} door(s).` };
   } catch (err) {

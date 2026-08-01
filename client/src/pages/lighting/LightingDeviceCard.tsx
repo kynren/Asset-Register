@@ -7,7 +7,7 @@ import { PermissionGate } from "../../auth/PermissionGate";
 export interface LightingDevice {
   id: number;
   name: string;
-  protocol: "SHELLY" | "TASMOTA" | "GENERIC_HTTP";
+  protocol: "SHELLY" | "TASMOTA" | "GENERIC_HTTP" | "ZIGBEE";
   ipAddress: string | null;
   port: number | null;
   gen: number | null;
@@ -16,6 +16,9 @@ export interface LightingDevice {
   offUrl: string | null;
   statusUrl: string | null;
   statusOnPath: string | null;
+  icon: string | null;
+  sortOrder: number;
+  groupId: number | null;
   location: { id: number; name: string } | null;
   status: "ONLINE" | "OFFLINE" | "UNKNOWN";
   isOn: boolean;
@@ -28,6 +31,7 @@ const PROTOCOL_LABELS: Record<LightingDevice["protocol"], string> = {
   SHELLY: "Shelly",
   TASMOTA: "Tasmota",
   GENERIC_HTTP: "Generic HTTP",
+  ZIGBEE: "ZigBee",
 };
 
 export function LightingDeviceCard({

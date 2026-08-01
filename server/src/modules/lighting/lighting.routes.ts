@@ -6,8 +6,26 @@ import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { detectIotDevice, getIotStatus, IotDeviceLike, needsDetection, setIotBrightness, setIotPower } from "../../lib/iotDeviceApi";
+import { detectShelly } from "../../lib/shellyApi";
+import { attemptConnect, getCoordinator, listDevices, updateCoordinatorConfig } from "../../lib/zigbeeCoordinator";
 import { startLightingDiscovery } from "./lighting.discover.service";
-import { brightnessSchema, createDeviceSchema, discoverSchema, powerSchema, updateDeviceSchema } from "./lighting.schema";
+import {
+  brightnessSchema,
+  createAutomationSchema,
+  createDeviceSchema,
+  createGroupSchema,
+  createSceneSchema,
+  discoverSchema,
+  moveDeviceSchema,
+  powerSchema,
+  reorderGroupsSchema,
+  updateAutomationSchema,
+  updateDeviceIconSchema,
+  updateDeviceSchema,
+  updateGroupSchema,
+  updateSceneSchema,
+  updateZigbeeCoordinatorSchema,
+} from "./lighting.schema";
 
 const router = Router();
 router.use(verifyJwt);
@@ -25,6 +43,9 @@ const deviceSelect = {
   offUrl: true,
   statusUrl: true,
   statusOnPath: true,
+  icon: true,
+  sortOrder: true,
+  groupId: true,
   locationId: true,
   location: { select: { id: true, name: true } },
   status: true,
@@ -98,11 +119,57 @@ async function markOffline(id: number) {
   });
 }
 
+// A physical Shelly device can have more than one independently-controllable output (a
+// Shelly 2PM has 2, a Pro 4PM has 4); each one gets its own LightingDevice row, sharing the
+// same IP but a distinct `channel`, since they're switched/dimmed independently. Detects the
+// device once up front to learn gen/kind/outputs, so the per-row creation below doesn't need
+// a redundant detection pass through refreshDevice(). If the device can't be reached yet, this
+// falls back to a single channel-0 row — outputs are only split at add time, not retroactively,
+// so a device that was offline when added should be deleted and re-added once reachable to
+// pick up its other outputs.
+async function createShellyOutputDevices(name: string, ipAddress: string, port: number | null, locationId: number | null) {
+  const detection = await detectShelly(ipAddress, port).catch(() => null);
+  const outputs = detection?.outputs ?? 1;
+  const created = [];
+  for (let channel = 0; channel < outputs; channel++) {
+    const device = await prisma.lightingDevice.create({
+      data: {
+        name: outputs > 1 ? `${name} — Output ${channel + 1}` : name,
+        protocol: "SHELLY",
+        ipAddress,
+        port,
+        locationId,
+        channel,
+        gen: detection?.gen ?? null,
+        kind: detection?.kind ?? null,
+      },
+      select: deviceSelect,
+    });
+    created.push(await refreshDevice(device.id).catch(() => device));
+  }
+  return created;
+}
+
 router.get("/devices", requirePermission("lighting", "view"), async (_req, res) => {
   res.json(await prisma.lightingDevice.findMany({ select: deviceSelect, orderBy: { name: "asc" } }));
 });
 
 router.post("/devices", requirePermission("lighting", "create"), validateBody(createDeviceSchema), async (req, res) => {
+  // A Shelly device may expose more than one output — split into one LightingDevice row per
+  // output (see createShellyOutputDevices) instead of always creating exactly one row.
+  if (req.body.protocol === "SHELLY") {
+    const created = await createShellyOutputDevices(req.body.name, req.body.ipAddress, req.body.port ?? null, req.body.locationId ?? null);
+    await logAudit({
+      userId: req.user!.id,
+      action: "lightingDevice.create",
+      entityType: "LightingDevice",
+      entityId: created[0].id,
+      metadata: { outputs: created.length, deviceIds: created.map((d) => d.id) },
+    });
+    res.status(201).json(created.length > 1 ? created : created[0]);
+    return;
+  }
+
   const device = await prisma.lightingDevice.create({ data: req.body, select: deviceSelect });
   await logAudit({ userId: req.user!.id, action: "lightingDevice.create", entityType: "LightingDevice", entityId: device.id });
 
@@ -229,6 +296,11 @@ router.post("/discover/:id/adopt-all", requirePermission("lighting", "create"), 
   const toAdd = scan.results.filter((r) => !r.alreadyAdded);
   const created = [];
   for (const r of toAdd) {
+    if (r.protocol === "SHELLY") {
+      const devices = await createShellyOutputDevices(r.name || r.model || r.ipAddress, r.ipAddress, null, null).catch(() => []);
+      created.push(...devices);
+      continue;
+    }
     const device = await prisma.lightingDevice
       .create({ data: { name: r.name || r.model || r.ipAddress, protocol: r.protocol, ipAddress: r.ipAddress, gen: r.gen }, select: deviceSelect })
       .catch(() => null);
@@ -239,6 +311,187 @@ router.post("/discover/:id/adopt-all", requirePermission("lighting", "create"), 
   await prisma.lightingScanResult.updateMany({ where: { scanId: scan.id }, data: { alreadyAdded: true } });
   await logAudit({ userId: req.user!.id, action: "lightingDevice.adoptAll", entityType: "LightingScan", entityId: scan.id, metadata: { count: created.length } });
   res.json(created);
+});
+
+// ───────────────────────── Dashboard: device icon + group placement ─────────────────────────
+
+router.patch("/devices/:id/icon", requirePermission("lighting", "edit"), validateBody(updateDeviceIconSchema), async (req, res) => {
+  const device = await prisma.lightingDevice.update({ where: { id: Number(req.params.id) }, data: { icon: req.body.icon }, select: deviceSelect });
+  res.json(device);
+});
+
+// Drag-and-drop: moves a device into a group (or ungroups it with groupId: null) and/or
+// updates its sort position within that group's card.
+router.patch("/devices/:id/move", requirePermission("lighting", "edit"), validateBody(moveDeviceSchema), async (req, res) => {
+  const device = await prisma.lightingDevice.update({
+    where: { id: Number(req.params.id) },
+    data: { groupId: req.body.groupId, ...(req.body.sortOrder !== undefined ? { sortOrder: req.body.sortOrder } : {}) },
+    select: deviceSelect,
+  });
+  res.json(device);
+});
+
+// ───────────────────────── Groups (Dashboard cards / Areas) ─────────────────────────
+
+router.get("/groups", requirePermission("lighting", "view"), async (_req, res) => {
+  res.json(await prisma.lightingGroup.findMany({ orderBy: { sortOrder: "asc" } }));
+});
+
+router.post("/groups", requirePermission("lighting", "create"), validateBody(createGroupSchema), async (req, res) => {
+  const maxSort = await prisma.lightingGroup.aggregate({ _max: { sortOrder: true } });
+  const group = await prisma.lightingGroup.create({ data: { ...req.body, sortOrder: (maxSort._max.sortOrder ?? -1) + 1 } });
+  await logAudit({ userId: req.user!.id, action: "lightingGroup.create", entityType: "LightingGroup", entityId: group.id });
+  res.status(201).json(group);
+});
+
+router.patch("/groups/:id", requirePermission("lighting", "edit"), validateBody(updateGroupSchema), async (req, res) => {
+  const group = await prisma.lightingGroup.update({ where: { id: Number(req.params.id) }, data: req.body });
+  await logAudit({ userId: req.user!.id, action: "lightingGroup.update", entityType: "LightingGroup", entityId: group.id });
+  res.json(group);
+});
+
+// Drag-and-drop reordering of the group cards themselves — `ids` is the full list of group ids
+// in their new left-to-right/top-to-bottom order.
+router.post("/groups/reorder", requirePermission("lighting", "edit"), validateBody(reorderGroupsSchema), async (req, res) => {
+  await Promise.all(req.body.ids.map((id: number, index: number) => prisma.lightingGroup.update({ where: { id }, data: { sortOrder: index } })));
+  res.json({ ok: true });
+});
+
+router.delete("/groups/:id", requirePermission("lighting", "delete"), async (req, res) => {
+  // Ungroup its devices rather than cascading — deleting a card shouldn't delete the lights in it.
+  await prisma.lightingDevice.updateMany({ where: { groupId: Number(req.params.id) }, data: { groupId: null } });
+  await prisma.lightingGroup.delete({ where: { id: Number(req.params.id) } });
+  await logAudit({ userId: req.user!.id, action: "lightingGroup.delete", entityType: "LightingGroup", entityId: Number(req.params.id) });
+  res.json({ ok: true });
+});
+
+// ───────────────────────── Scenes ─────────────────────────
+
+const sceneSelect = {
+  id: true,
+  name: true,
+  icon: true,
+  createdAt: true,
+  actions: { select: { id: true, deviceId: true, turnOn: true, brightness: true, device: { select: { id: true, name: true } } } },
+};
+
+router.get("/scenes", requirePermission("lighting", "view"), async (_req, res) => {
+  res.json(await prisma.lightingScene.findMany({ select: sceneSelect, orderBy: { name: "asc" } }));
+});
+
+router.post("/scenes", requirePermission("lighting", "create"), validateBody(createSceneSchema), async (req, res) => {
+  const { actions, ...rest } = req.body;
+  const scene = await prisma.lightingScene.create({ data: { ...rest, actions: { create: actions } }, select: sceneSelect });
+  await logAudit({ userId: req.user!.id, action: "lightingScene.create", entityType: "LightingScene", entityId: scene.id });
+  res.status(201).json(scene);
+});
+
+router.patch("/scenes/:id", requirePermission("lighting", "edit"), validateBody(updateSceneSchema), async (req, res) => {
+  const { actions, ...rest } = req.body;
+  const scene = await prisma.lightingScene.update({
+    where: { id: Number(req.params.id) },
+    data: { ...rest, ...(actions !== undefined ? { actions: { deleteMany: {}, create: actions } } : {}) },
+    select: sceneSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "lightingScene.update", entityType: "LightingScene", entityId: scene.id });
+  res.json(scene);
+});
+
+router.delete("/scenes/:id", requirePermission("lighting", "delete"), async (req, res) => {
+  await prisma.lightingScene.delete({ where: { id: Number(req.params.id) } });
+  await logAudit({ userId: req.user!.id, action: "lightingScene.delete", entityType: "LightingScene", entityId: Number(req.params.id) });
+  res.json({ ok: true });
+});
+
+// Applies every action in the scene to its device, best-effort per device so one unreachable
+// light doesn't block the rest of the scene from activating.
+router.post("/scenes/:id/activate", requirePermission("lighting", "edit"), async (req, res) => {
+  const scene = await prisma.lightingScene.findUnique({ where: { id: Number(req.params.id) }, include: { actions: { include: { device: true } } } });
+  if (!scene) throw new ApiError(404, "Scene not found");
+
+  const results: { deviceId: number; ok: boolean; message: string }[] = [];
+  for (const action of scene.actions) {
+    const device = action.device;
+    let gen = device.gen;
+    let kind = device.kind;
+    try {
+      if (needsDetection(device.protocol, gen, kind)) {
+        const detected = await detectIotDevice(toIotDevice(device));
+        gen = detected.gen;
+        kind = detected.kind;
+      }
+      await setIotPower(toIotDevice(device, { gen, kind }), action.turnOn);
+      if (action.turnOn && action.brightness !== null && device.kind === "LIGHT") {
+        await setIotBrightness(toIotDevice(device, { gen, kind }), action.brightness);
+      }
+      results.push({ deviceId: device.id, ok: true, message: "OK" });
+    } catch (err) {
+      results.push({ deviceId: device.id, ok: false, message: (err as Error).message });
+    }
+  }
+  await Promise.all(scene.actions.map((a) => refreshDevice(a.deviceId).catch(() => undefined)));
+
+  const successCount = results.filter((r) => r.ok).length;
+  await logAudit({ userId: req.user!.id, action: "lightingScene.activate", entityType: "LightingScene", entityId: scene.id, metadata: { total: results.length, success: successCount } });
+  res.json({ ok: results.length === 0 || successCount === results.length, results, message: `Applied to ${successCount}/${results.length} device(s).` });
+});
+
+// ───────────────────────── Automations ─────────────────────────
+
+const automationSelect = {
+  id: true,
+  name: true,
+  isEnabled: true,
+  daysOfWeek: true,
+  timeOfDay: true,
+  actionType: true,
+  targetDeviceId: true,
+  targetDevice: { select: { id: true, name: true } },
+  targetSceneId: true,
+  targetScene: { select: { id: true, name: true } },
+  turnOn: true,
+  lastRunDate: true,
+  createdAt: true,
+};
+
+router.get("/automations", requirePermission("lighting", "view"), async (_req, res) => {
+  res.json(await prisma.lightingAutomation.findMany({ select: automationSelect, orderBy: { timeOfDay: "asc" } }));
+});
+
+router.post("/automations", requirePermission("lighting", "create"), validateBody(createAutomationSchema), async (req, res) => {
+  const automation = await prisma.lightingAutomation.create({ data: req.body, select: automationSelect });
+  await logAudit({ userId: req.user!.id, action: "lightingAutomation.create", entityType: "LightingAutomation", entityId: automation.id });
+  res.status(201).json(automation);
+});
+
+router.patch("/automations/:id", requirePermission("lighting", "edit"), validateBody(updateAutomationSchema), async (req, res) => {
+  const automation = await prisma.lightingAutomation.update({ where: { id: Number(req.params.id) }, data: req.body, select: automationSelect });
+  await logAudit({ userId: req.user!.id, action: "lightingAutomation.update", entityType: "LightingAutomation", entityId: automation.id });
+  res.json(automation);
+});
+
+router.delete("/automations/:id", requirePermission("lighting", "delete"), async (req, res) => {
+  await prisma.lightingAutomation.delete({ where: { id: Number(req.params.id) } });
+  await logAudit({ userId: req.user!.id, action: "lightingAutomation.delete", entityType: "LightingAutomation", entityId: Number(req.params.id) });
+  res.json({ ok: true });
+});
+
+// ───────────────────────── ZigBee (scaffold — see server/src/lib/zigbeeCoordinator.ts) ─────────────────────────
+
+router.get("/zigbee/coordinator", requirePermission("lighting", "view"), async (_req, res) => {
+  res.json(await getCoordinator("LIGHTING"));
+});
+
+router.patch("/zigbee/coordinator", requirePermission("lighting", "edit"), validateBody(updateZigbeeCoordinatorSchema), async (req, res) => {
+  res.json(await updateCoordinatorConfig("LIGHTING", req.body.serialPort));
+});
+
+router.post("/zigbee/coordinator/connect", requirePermission("lighting", "edit"), async (_req, res) => {
+  res.json(await attemptConnect("LIGHTING"));
+});
+
+router.get("/zigbee/devices", requirePermission("lighting", "view"), async (_req, res) => {
+  res.json(await listDevices("LIGHTING"));
 });
 
 export default router;

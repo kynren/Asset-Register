@@ -1,25 +1,33 @@
 import { useState } from "react";
+import { ZigbeeScaffoldTab } from "../../components/ZigbeeScaffoldTab";
 import { DevicesDoorsTab } from "./DevicesDoorsTab";
+import { DoorStatusTab } from "./DoorStatusTab";
+import { PersonsTab } from "./PersonsTab";
+import { AccessGroupTab } from "./AccessGroupTab";
 import { CredentialsTab } from "./CredentialsTab";
 import { AccessEventLogTab } from "./AccessEventLogTab";
 
 const TABS = [
+  { key: "doors", label: "Manage Doors" },
   { key: "devices", label: "Devices & Doors" },
+  { key: "persons", label: "Persons" },
+  { key: "groups", label: "Access Group" },
   { key: "credentials", label: "Credentials" },
   { key: "events", label: "Event Log" },
+  { key: "zigbee", label: "ZigBee" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
 
 export function AccessControlPage() {
-  const [tab, setTab] = useState<TabKey>("devices");
+  const [tab, setTab] = useState<TabKey>("doors");
 
   return (
     <div className="stack gap-3">
       <div className="page-header">
         <div>
           <h1 className="page-title">Access Control</h1>
-          <p className="page-subtitle">Door controllers, remote door control, credentials, and the access event log — over Hikvision ISAPI.</p>
+          <p className="page-subtitle">Door controllers, persons, access groups, remote door control, credentials, and the access event log — over Hikvision ISAPI.</p>
         </div>
       </div>
 
@@ -31,9 +39,13 @@ export function AccessControlPage() {
         ))}
       </div>
 
+      {tab === "doors" && <DoorStatusTab />}
       {tab === "devices" && <DevicesDoorsTab />}
+      {tab === "persons" && <PersonsTab />}
+      {tab === "groups" && <AccessGroupTab />}
       {tab === "credentials" && <CredentialsTab />}
       {tab === "events" && <AccessEventLogTab />}
+      {tab === "zigbee" && <ZigbeeScaffoldTab apiBase="/access-control" module="access-control" />}
     </div>
   );
 }
