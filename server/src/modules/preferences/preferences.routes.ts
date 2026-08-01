@@ -11,7 +11,7 @@ router.use(verifyJwt);
 // A short allowlist of recognized preference keys — not for security (these are always scoped to
 // req.user!.id, never another account), just to stop an arbitrary/unbounded set of rows from
 // accumulating under a typo'd key.
-const KNOWN_KEYS = new Set(["nvr.matrixLayout", "sidebar.collapsed", "theme"]);
+const KNOWN_KEYS = new Set(["nvr.matrixLayout", "sidebar.collapsed", "theme", "accessControl.cardReaderDeviceId"]);
 
 function assertKnownKey(key: string) {
   if (!KNOWN_KEYS.has(key)) throw new ApiError(400, `Unknown preference key: ${key}`);

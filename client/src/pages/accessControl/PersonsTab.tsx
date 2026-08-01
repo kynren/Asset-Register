@@ -8,6 +8,7 @@ import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { useUserPreference } from "../../hooks/useUserPreference";
 
 interface Organization {
   id: number;
@@ -177,7 +178,10 @@ export function PersonsTab() {
 
       {editingPerson && (
         <EditPersonModal
-          person={editingPerson === "new" ? null : editingPerson}
+          // Re-resolve against the live query result (not the stale row snapshot captured at
+          // click time) so actions inside the modal that only invalidate the list query — like
+          // adding/removing a card — are reflected without the user having to close and reopen it.
+          person={editingPerson === "new" ? null : (persons?.find((p) => p.id === editingPerson.id) ?? editingPerson)}
           organizations={organizations ?? []}
           onClose={() => setEditingPerson(null)}
           onSaved={invalidatePersons}
@@ -250,7 +254,7 @@ function EditPersonModal({
   const [validTo, setValidTo] = useState(person?.validTo ? person.validTo.slice(0, 10) : "");
   const [longTermEffective, setLongTermEffective] = useState(person?.longTermEffective ?? false);
   const [remark, setRemark] = useState(person?.remark ?? "");
-  const [newCardNumber, setNewCardNumber] = useState("");
+  const [addingCard, setAddingCard] = useState(false);
   const queryClient = useQueryClient();
 
   function invalidate() {
@@ -274,11 +278,6 @@ function EditPersonModal({
       return person ? axiosClient.patch(`/access-control/persons/${person.id}`, body) : axiosClient.post("/access-control/persons", body);
     },
     onSuccess: () => { invalidate(); onSaved(); onClose(); },
-  });
-
-  const addCardMutation = useMutation({
-    mutationFn: () => axiosClient.post(`/access-control/persons/${person!.id}/cards`, { cardNumber: newCardNumber }),
-    onSuccess: () => { invalidate(); setNewCardNumber(""); },
   });
 
   const deleteCardMutation = useMutation({
@@ -353,27 +352,44 @@ function EditPersonModal({
           <strong style={{ fontSize: 13 }}>Card</strong>
           <div className="row gap-2 flex-wrap">
             {person.cards.map((c) => (
-              <div key={c.id} className="card" style={{ padding: "10px 14px", minWidth: 160 }}>
-                <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div key={c.id} className="card" style={{ padding: "10px 14px", minWidth: 150, position: "relative" }}>
+                <PermissionGate module="access-control" action="edit">
+                  <button
+                    className="btn-icon"
+                    style={{ position: "absolute", top: 4, right: 4, opacity: 0.6 }}
+                    onClick={() => deleteCardMutation.mutate(c.id)}
+                    title="Remove card"
+                  >
+                    <Icon name="close" size={12} />
+                  </button>
+                </PermissionGate>
+                <div className="row gap-2" style={{ alignItems: "center" }}>
+                  <Icon name="key" size={22} />
                   <div>
-                    <div style={{ fontFamily: "monospace", fontWeight: 700 }}>{c.cardNumber}</div>
+                    <div style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 13 }}>{c.cardNumber}</div>
                     <div className="muted" style={{ fontSize: 11 }}>{c.cardType}</div>
                   </div>
-                  <PermissionGate module="access-control" action="edit">
-                    <button className="btn-icon" onClick={() => deleteCardMutation.mutate(c.id)} title="Remove card"><Icon name="trash" size={12} /></button>
-                  </PermissionGate>
                 </div>
               </div>
             ))}
-          </div>
-          <PermissionGate module="access-control" action="edit">
-            <div className="row gap-2">
-              <input className="input" placeholder="New card number" value={newCardNumber} onChange={(e) => setNewCardNumber(e.target.value)} style={{ width: 200 }} />
-              <button className="btn btn-secondary btn-sm" disabled={!newCardNumber.trim() || addCardMutation.isPending} onClick={() => addCardMutation.mutate()}>
-                <Icon name="plus" size={12} /> Add Card
+            <PermissionGate module="access-control" action="edit">
+              <button
+                onClick={() => setAddingCard(true)}
+                className="row"
+                style={{
+                  width: 90, height: 64, alignItems: "center", justifyContent: "center", borderRadius: 8,
+                  border: "2px dashed var(--color-border)", background: "transparent", cursor: "pointer", color: "var(--color-primary)",
+                }}
+                title="Add card"
+              >
+                <Icon name="plus" size={20} />
               </button>
-            </div>
-          </PermissionGate>
+            </PermissionGate>
+          </div>
+
+          {addingCard && (
+            <AddCardModal personId={person.id} onClose={() => setAddingCard(false)} onSaved={invalidate} />
+          )}
         </div>
       )}
 
@@ -383,5 +399,153 @@ function EditPersonModal({
         </p>
       )}
     </FormModal>
+  );
+}
+
+const CARD_TYPES = ["Normal Card", "Visitor Card", "Duress Card", "Patrol Card"];
+
+interface AccessControlDeviceOption {
+  id: number;
+  name: string;
+  ipAddress: string | null;
+}
+
+// Mirrors the "Add" card dialog in Hikvision's own iVMS-4200 Person screen: type a card number
+// or tap a physical card at a reader wired to one of this org's access control devices and have
+// its number filled in automatically. "Read" is a real ISAPI call (captureCardId in
+// hikvisionIsapi.ts) — it is NOT verified against physical card-reader hardware in this codebase
+// yet, so if it fails against a real controller, that's the first thing to check.
+function AddCardModal({ personId, onClose, onSaved }: { personId: number; onClose: () => void; onSaved: () => void }) {
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardType, setCardType] = useState(CARD_TYPES[0]);
+  const [showSettings, setShowSettings] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: devices } = useQuery({
+    queryKey: ["access-control-devices"],
+    queryFn: async () => (await axiosClient.get("/access-control/devices")).data as AccessControlDeviceOption[],
+  });
+  const readableDevices = (devices ?? []).filter((d) => d.ipAddress);
+
+  const { value: readerDeviceId, setValue: setReaderDeviceId } = useUserPreference<number | null>("accessControl.cardReaderDeviceId", null);
+  const effectiveReaderId = readableDevices.some((d) => d.id === readerDeviceId) ? readerDeviceId : (readableDevices[0]?.id ?? null);
+  const readerDevice = readableDevices.find((d) => d.id === effectiveReaderId) ?? null;
+
+  const readMutation = useMutation({
+    mutationFn: () => axiosClient.post(`/access-control/devices/${effectiveReaderId}/capture-card`),
+    onSuccess: (res) => {
+      const data = res.data as { ok: boolean; cardNo: string | null };
+      if (data.ok && data.cardNo) setCardNumber(data.cardNo);
+    },
+  });
+  const readResult = readMutation.data?.data as { ok: boolean; message: string } | undefined;
+
+  const addMutation = useMutation({
+    mutationFn: () => axiosClient.post(`/access-control/persons/${personId}/cards`, { cardNumber, cardType }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["access-control-persons"] });
+      onSaved();
+      onClose();
+    },
+  });
+
+  return (
+    <div className="modal-overlay" style={{ zIndex: 200 }} onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Add</h3>
+          <button className="modal-close" onClick={onClose}><Icon name="close" size={18} /></button>
+        </div>
+
+        {addMutation.isError && <div className="alert alert-danger">{(addMutation.error as any)?.response?.data?.error ?? "Could not add this card."}</div>}
+        {readResult && !readResult.ok && <div className="alert alert-danger" style={{ fontSize: 12 }}>{readResult.message}</div>}
+
+        <div className="field">
+          <label>Card No.</label>
+          <div className="row gap-2">
+            <input className="input" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="Type it or tap a card" style={{ flex: 1 }} autoFocus />
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={!readerDevice || readMutation.isPending}
+              title={readerDevice ? `Read from ${readerDevice.name}` : "No card reader configured — see Settings"}
+              onClick={() => readMutation.mutate()}
+            >
+              {readMutation.isPending ? "Reading…" : "Read"}
+            </button>
+          </div>
+        </div>
+
+        <div className="field">
+          <label>Card Type</label>
+          <select className="select" value={cardType} onChange={(e) => setCardType(e.target.value)}>
+            {CARD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+
+        <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+          <button type="button" className="btn-icon row gap-1" style={{ width: "auto", fontSize: 12, color: "var(--color-text-muted)" }} onClick={() => setShowSettings(true)}>
+            <Icon name="wrench" size={13} /> Settings
+          </button>
+          <div className="row gap-2">
+            <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" disabled={!cardNumber.trim() || addMutation.isPending} onClick={() => addMutation.mutate()}>
+              {addMutation.isPending ? "Adding..." : "Add"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showSettings && (
+        <ReaderSettingsModal
+          devices={readableDevices}
+          currentId={effectiveReaderId}
+          onClose={() => setShowSettings(false)}
+          onSave={(id) => { setReaderDeviceId(id); setShowSettings(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Which access control device's reader "Read" should capture from — persisted per-user since a
+// site with several controllers likely has one operator's desk near a specific reader.
+function ReaderSettingsModal({
+  devices,
+  currentId,
+  onClose,
+  onSave,
+}: {
+  devices: AccessControlDeviceOption[];
+  currentId: number | null;
+  onClose: () => void;
+  onSave: (id: number | null) => void;
+}) {
+  const [selected, setSelected] = useState<number | "">(currentId ?? "");
+  return (
+    <div className="modal-overlay" style={{ zIndex: 250 }} onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Card Reader Settings</h3>
+          <button className="modal-close" onClick={onClose}><Icon name="close" size={18} /></button>
+        </div>
+        <div className="field">
+          <label>Read cards from</label>
+          <select className="select" value={selected} onChange={(e) => setSelected(e.target.value ? Number(e.target.value) : "")}>
+            <option value="">No reader (type card numbers manually)</option>
+            {devices.map((d) => <option key={d.id} value={d.id}>{d.name} ({d.ipAddress})</option>)}
+          </select>
+          {devices.length === 0 && (
+            <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+              No access control device with an IP address is registered yet — add one under Devices &amp; Doors first.
+            </p>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={() => onSave(selected === "" ? null : selected)}>Save</button>
+        </div>
+      </div>
+    </div>
   );
 }
