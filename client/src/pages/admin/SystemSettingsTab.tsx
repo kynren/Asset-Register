@@ -60,10 +60,26 @@ export function SystemSettingsTab() {
   });
 
   const { data: agentKeys } = useQuery({ queryKey: ["agent-keys"], queryFn: async () => (await axiosClient.get("/settings/agent-keys")).data });
+  // The create response is the ONLY place the full key is ever available — the list below always
+  // shows a truncated preview (same "can't be retrieved again" convention as the password vault),
+  // so this has to be captured here and shown once, with a copy button, or the key is unusable.
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const [keyCopied, setKeyCopied] = useState(false);
   const createKeyMutation = useMutation({
     mutationFn: (label: string) => axiosClient.post("/settings/agent-keys", { label }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["agent-keys"] }),
+    onSuccess: (res) => {
+      setNewKey(res.data.key);
+      setKeyCopied(false);
+      queryClient.invalidateQueries({ queryKey: ["agent-keys"] });
+    },
   });
+
+  async function copyNewKey() {
+    if (!newKey) return;
+    await navigator.clipboard.writeText(newKey);
+    setKeyCopied(true);
+    setTimeout(() => setKeyCopied(false), 1800);
+  }
   const toggleKeyMutation = useMutation({
     mutationFn: (params: { id: number; isActive: boolean }) => axiosClient.patch(`/settings/agent-keys/${params.id}`, { isActive: params.isActive }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["agent-keys"] }),
@@ -155,6 +171,16 @@ export function SystemSettingsTab() {
           Shared by both agents: the per-machine device agent's <code>.env</code> as <code>AGENT_API_KEY</code>, and the
           network relay agent's <code>.env</code> as <code>AGENT_API_KEY</code> (above).
         </p>
+        {newKey && (
+          <div className="alert alert-success" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <strong>Key generated — copy it now, it won't be shown again:</strong>
+            <div className="row gap-2" style={{ alignItems: "center" }}>
+              <code style={{ fontSize: 12, wordBreak: "break-all", flex: 1 }}>{newKey}</code>
+              <button className="btn btn-secondary btn-sm" onClick={copyNewKey}>{keyCopied ? "Copied!" : "Copy"}</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setNewKey(null)}>Dismiss</button>
+            </div>
+          </div>
+        )}
         <DataTable columns={agentKeyColumns} data={agentKeys ?? []} clientPageSize={5} />
       </div>
     </div>
