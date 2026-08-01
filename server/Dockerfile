@@ -13,9 +13,12 @@ RUN npm run build -w server
 
 FROM node:20-slim AS runtime
 # ffmpeg powers the RTSP-to-HLS relay for camera live view/recording; iputils-ping and net-tools
-# (arp) back the real network ping/discovery features.
+# (arp) back the real network ping/discovery features. tzdata is required for the TZ env var
+# (see docker-compose.yml) to actually take effect — without it, Node/date silently fall back to
+# UTC no matter what TZ is set to, which is exactly the kind of thing that makes a Lighting
+# Automation look like it fires at the wrong hour (or never) for no visible reason.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg iputils-ping net-tools openssl ca-certificates \
+    ffmpeg iputils-ping net-tools openssl ca-certificates tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

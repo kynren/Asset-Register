@@ -51,6 +51,11 @@ three secrets. Generate each one separately:
 openssl rand -hex 32
 ```
 
+`TZ` defaults to `Europe/London`; override it in `.env` if your users are somewhere else (e.g.
+`America/New_York`). Lighting Automations store the wall-clock time you pick in the browser with
+no timezone attached, so if this doesn't match where your users actually are, automations will
+fire at the wrong hour (looking, from a clock-watcher's perspective, like they never fire at all).
+
 ## 5. Build and start everything
 
 ```bash
