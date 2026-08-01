@@ -108,6 +108,12 @@ async function runAutomationTick(): Promise<void> {
     include: { actions: true },
   });
 
+  // Temporary diagnostic — this tick runs every 60s regardless of whether anything matches, but
+  // previously logged nothing on a no-op pass, making it impossible to tell "not ticking" apart
+  // from "ticking but nothing due" from the outside. Remove once the current triage is resolved.
+  // eslint-disable-next-line no-console
+  console.log(`[lighting-scheduler] tick at ${now.toISOString()} (dayOfWeek=${dayOfWeek}, timeOfDay=${timeOfDay}) — due=${due.length}`);
+
   for (const automation of due) {
     await notifyAutomationStart(automation.name);
     let summary: ActionSummary = { succeeded: 0, failed: 0, errors: [] };
