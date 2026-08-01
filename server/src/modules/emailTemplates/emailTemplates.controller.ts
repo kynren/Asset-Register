@@ -104,6 +104,7 @@ const SAMPLE_VARIABLES: Record<EmailEventType, Record<string, string>> = {
   LOW_STOCK: { itemName: "HDMI Cable 2m", quantityOnHand: "3", reorderLevel: "10", stockUrl: "https://app-assets.kynren.com/stock" },
   DEVICE_OFFLINE: { deviceName: "core-switch-01 (192.168.1.10)", ipAddress: "192.168.1.10", deviceType: "Network Switching / Routing", sinceTime: "12 Jul 2026, 14:32", monitorUrl: "https://app-assets.kynren.com/network" },
   DEVICE_ONLINE: { deviceName: "core-switch-01 (192.168.1.10)", ipAddress: "192.168.1.10", deviceType: "Network Switching / Routing", sinceTime: "12 Jul 2026, 14:47", monitorUrl: "https://app-assets.kynren.com/network" },
+  MAGIC_LOGIN_LINK: { firstName: "Jordan", magicUrl: "https://app-assets.kynren.com/magic-login/sample-token" },
 };
 
 export async function sendTest(req: Request, res: Response) {

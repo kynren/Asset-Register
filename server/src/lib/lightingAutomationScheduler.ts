@@ -58,8 +58,13 @@ async function applyDeviceActions(actions: { deviceId: number; turnOn: boolean; 
         where: { id: device.id },
         data: { gen, kind, ...(status ? { status: "ONLINE", isOn: status.on, brightness: status.brightness, powerW: status.powerW } : {}), lastCheckedAt: new Date() },
       });
-    } catch {
-      // Best-effort per device — see comment above.
+    } catch (err) {
+      // Best-effort per device (see comment above) — but still logged, otherwise a command that
+      // never reached a device (wrong IP, device offline, detection failure) leaves no trace
+      // anywhere and looks identical to the automation silently doing nothing.
+      // eslint-disable-next-line no-console
+      console.error(`Lighting automation: command to device ${device.id} ("${device.name}") failed:`, err instanceof Error ? err.message : err);
+      await prisma.lightingDevice.update({ where: { id: device.id }, data: { status: "OFFLINE", lastCheckedAt: new Date() } }).catch(() => undefined);
     }
   }
 }
@@ -76,8 +81,17 @@ async function runAutomationTick(): Promise<void> {
   const timeOfDay = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   const today = now.toISOString().slice(0, 10);
 
+  // OR'd against `lastRunDate: null` deliberately, not `NOT: { lastRunDate: today }` alone — SQL's
+  // NULL = anything is unknown rather than true, so a plain not-equal comparison silently excludes
+  // rows where lastRunDate is still null, which is every automation that has never fired yet. That
+  // meant brand-new automations could match every other condition and still never actually trigger.
   const due = await prisma.lightingAutomation.findMany({
-    where: { isEnabled: true, timeOfDay, daysOfWeek: { has: dayOfWeek }, NOT: { lastRunDate: today } },
+    where: {
+      isEnabled: true,
+      timeOfDay,
+      daysOfWeek: { has: dayOfWeek },
+      OR: [{ lastRunDate: null }, { lastRunDate: { not: today } }],
+    },
     include: { actions: true },
   });
 
@@ -99,7 +113,13 @@ async function runAutomationTick(): Promise<void> {
   // Paired "off" trigger — DEVICE automations only, turns every action device off regardless of
   // how it was configured for the on-leg (brightness doesn't apply to an off state).
   const dueOff = await prisma.lightingAutomation.findMany({
-    where: { isEnabled: true, actionType: "DEVICE", offTimeOfDay: timeOfDay, daysOfWeek: { has: dayOfWeek }, NOT: { lastRunDateOff: today } },
+    where: {
+      isEnabled: true,
+      actionType: "DEVICE",
+      offTimeOfDay: timeOfDay,
+      daysOfWeek: { has: dayOfWeek },
+      OR: [{ lastRunDateOff: null }, { lastRunDateOff: { not: today } }],
+    },
     include: { actions: true },
   });
 

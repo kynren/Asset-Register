@@ -177,6 +177,38 @@ export async function resetPassword(req: Request, res: Response) {
   res.json({ ok: true });
 }
 
+// ───────────────────────── Magic login link ─────────────────────────
+// Admin-initiated (see users.controller.ts sendMagicLink) rather than self-service like forgot
+// password — an admin generates and emails a one-time link from a user's Detail page, and
+// consuming it here logs that user straight in via the same access-token + refresh-session path
+// as a normal password login. Kept short-lived (15 min) since it grants a live session, not just
+// access to a reset form.
+
+export async function magicLogin(req: Request, res: Response) {
+  const { token } = req.body;
+  const tokenHash = hashToken(token);
+  const magicToken = await prisma.magicLoginToken.findUnique({ where: { tokenHash } });
+
+  if (!magicToken || magicToken.usedAt || magicToken.expiresAt < new Date()) {
+    throw new ApiError(400, "This login link is invalid or has expired.");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: magicToken.userId }, include: { role: true } });
+  if (!user || !user.isActive) throw new ApiError(400, "This login link is invalid or has expired.");
+
+  await prisma.magicLoginToken.update({ where: { id: magicToken.id }, data: { usedAt: new Date() } });
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
+  const accessToken = issueAccessToken(user);
+  const refreshToken = await createRefreshSession(user.id, req.headers["user-agent"] as string | undefined, (await resolveClientIp(req.ip)) ?? undefined);
+  res.cookie(env.REFRESH_COOKIE_NAME, refreshToken, REFRESH_COOKIE_OPTIONS);
+
+  await logAudit({ userId: user.id, action: "auth.magic_login", entityType: "User", entityId: user.id, ipAddress: req.ip });
+
+  const permissions = await getPermissionMap(user.roleId);
+  res.json({ accessToken, user: sanitizeUser(user), permissions });
+}
+
 // ───────────────────────── MFA ─────────────────────────
 
 export async function mfaEnrollStart(req: Request, res: Response) {
