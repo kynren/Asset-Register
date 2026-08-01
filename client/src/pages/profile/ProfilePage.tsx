@@ -7,6 +7,8 @@ import { AvatarGallery } from "./AvatarGallery";
 import { ColorPaletteCard } from "./ColorPaletteCard";
 import { PasswordInput } from "../../components/PasswordInput";
 import { McpConnectionCard } from "./McpConnectionCard";
+import { MfaCard } from "../password/MfaCard";
+import { SessionsCard } from "../password/SessionsCard";
 
 function initials(firstName: string, lastName: string) {
   return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
@@ -130,6 +132,10 @@ export function ProfilePage() {
       </div>
 
       <PasswordChangeCard />
+
+      <MfaCard />
+
+      <SessionsCard />
 
       <McpConnectionCard />
 

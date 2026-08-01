@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { KpiCard } from "../../components/KpiCard";
 import { SimpleBarChart, SimplePieChart } from "../../components/ChartWrapper";
+import { RadialGauge } from "../../components/RadialGauge";
 import { DataTable } from "../../components/DataTable";
 import { SkeletonBlock } from "../../components/Skeleton";
 
@@ -48,7 +49,7 @@ export function KpiLowStockWidget() {
 
 export function KpiDevicesWidget() {
   const { data } = useSummary();
-  return <KpiCard label="Devices Seen (24h)" value={data ? `${data.kpis.devicesSeen24h} / ${data.kpis.devicesTotal}` : "—"} icon="network" tone="success" />;
+  return <KpiCard label="Devices Seen (24h)" value={data ? `${data.kpis.devicesSeen24h} / ${data.kpis.devicesTotal}` : "—"} icon="network" tone="success" live />;
 }
 
 export function KpiDocsWidget() {
@@ -69,7 +70,7 @@ export function AssetsByStatusWidget() {
   return (
     <>
       <h3 className="mt-0">Assets by Status</h3>
-      {data ? <SimpleBarChart data={data.assetsByStatus} xKey="status" yKey="count" /> : <SkeletonBlock height={180} />}
+      {data ? <SimpleBarChart data={data.assetsByStatus} xKey="status" yKey="count" glow /> : <SkeletonBlock height={180} />}
     </>
   );
 }
@@ -79,7 +80,38 @@ export function TicketsByStatusWidget() {
   return (
     <>
       <h3 className="mt-0">Tickets by Status</h3>
-      {data ? <SimplePieChart data={data.ticketsByStatus} dataKey="count" nameKey="status" /> : <SkeletonBlock height={180} />}
+      {data ? <SimplePieChart data={data.ticketsByStatus} dataKey="count" nameKey="status" glow /> : <SkeletonBlock height={180} />}
+    </>
+  );
+}
+
+export function DevicesOnlineGaugeWidget() {
+  const { data } = useSummary();
+  const pct = data && data.kpis.devicesTotal > 0 ? Math.round((data.kpis.devicesSeen24h / data.kpis.devicesTotal) * 100) : 0;
+  return (
+    <>
+      <h3 className="mt-0">Devices Online</h3>
+      {data ? (
+        <RadialGauge value={pct} tone="success" sublabel={`${data.kpis.devicesSeen24h} of ${data.kpis.devicesTotal}`} />
+      ) : (
+        <SkeletonBlock height={150} />
+      )}
+    </>
+  );
+}
+
+export function TicketResolutionGaugeWidget() {
+  const { data } = useSummary();
+  const total = (data?.kpis.openTickets ?? 0) + (data?.kpis.closedTickets ?? 0);
+  const pct = data && total > 0 ? Math.round((data.kpis.closedTickets / total) * 100) : 0;
+  return (
+    <>
+      <h3 className="mt-0">Ticket Resolution Rate</h3>
+      {data ? (
+        <RadialGauge value={pct} tone="primary" sublabel={`${data.kpis.closedTickets} closed / ${total} total`} />
+      ) : (
+        <SkeletonBlock height={150} />
+      )}
     </>
   );
 }
@@ -188,6 +220,8 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: "kpi-low-stock", title: "Low Stock Items", defaultCols: 1, Component: KpiLowStockWidget },
   { id: "kpi-devices", title: "Devices Seen (24h)", defaultCols: 1, Component: KpiDevicesWidget },
   { id: "kpi-docs", title: "Docs & SOPs", defaultCols: 1, Component: KpiDocsWidget },
+  { id: "gauge-devices-online", title: "Devices Online", defaultCols: 1, Component: DevicesOnlineGaugeWidget },
+  { id: "gauge-ticket-resolution", title: "Ticket Resolution Rate", defaultCols: 1, Component: TicketResolutionGaugeWidget },
   { id: "chart-assets-status", title: "Assets by Status", defaultCols: 2, Component: AssetsByStatusWidget },
   { id: "chart-tickets-status", title: "Tickets by Status", defaultCols: 2, Component: TicketsByStatusWidget },
   { id: "recent-activity", title: "Recent Activity", defaultCols: 4, Component: RecentActivityWidget },
@@ -202,6 +236,8 @@ export const DEFAULT_DASHBOARD_LAYOUT = [
   { id: "kpi-low-stock", cols: 1 },
   { id: "kpi-devices", cols: 1 },
   { id: "kpi-docs", cols: 1 },
+  { id: "gauge-devices-online", cols: 1 },
+  { id: "gauge-ticket-resolution", cols: 1 },
   { id: "chart-assets-status", cols: 2 },
   { id: "chart-tickets-status", cols: 2 },
   { id: "recent-activity", cols: 4 },

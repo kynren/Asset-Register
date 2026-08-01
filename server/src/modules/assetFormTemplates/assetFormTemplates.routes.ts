@@ -81,6 +81,41 @@ router.delete("/:id", requirePermission("admin", "delete"), async (req, res) => 
   res.json({ ok: true });
 });
 
+router.post("/:id/duplicate", requirePermission("admin", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.assetFormTemplate.findUnique({ where: { id }, include: { fields: { orderBy: { order: "asc" } } } });
+  if (!source) throw new ApiError(404, "Form template not found");
+
+  let newName = `${source.name} (Copy)`;
+  let suffix = 1;
+  while (await prisma.assetFormTemplate.findUnique({ where: { name: newName } })) {
+    suffix += 1;
+    newName = `${source.name} (Copy ${suffix})`;
+  }
+
+  // fieldKey uniqueness is scoped to (templateId, fieldKey), so copying it verbatim onto the
+  // new templateId is safe — no collision with the source template's own fields.
+  const clone = await prisma.assetFormTemplate.create({
+    data: {
+      name: newName,
+      description: source.description,
+      fields: {
+        create: source.fields.map((f) => ({
+          label: f.label,
+          fieldType: f.fieldType,
+          required: f.required,
+          options: f.options ?? undefined,
+          fieldKey: f.fieldKey,
+          order: f.order,
+        })),
+      },
+    },
+    include: { fields: true, categories: true },
+  });
+  await logAudit({ userId: req.user!.id, action: "assetFormTemplate.duplicate", entityType: "AssetFormTemplate", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+});
+
 router.post("/:id/fields", requirePermission("admin", "edit"), validateBody(createFieldSchema), async (req, res) => {
   const templateId = Number(req.params.id);
   const template = await prisma.assetFormTemplate.findUnique({ where: { id: templateId } });

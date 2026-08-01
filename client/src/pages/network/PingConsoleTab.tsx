@@ -5,6 +5,7 @@ import { getAccessToken } from "../../api/tokenStore";
 import { Icon } from "../../components/Icon";
 import { AddNodeModal, NodeFormValues } from "./AddNodeModal";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useClientInfo } from "../../hooks/useClientInfo";
 
 interface GraphNodeOption {
   id: number;
@@ -37,6 +38,14 @@ export function PingConsoleTab() {
   const abortRef = useRef<AbortController | null>(null);
   const consoleEndRef = useRef<HTMLDivElement>(null);
   const lineIdRef = useRef(0);
+
+  const { data: clientInfo } = useClientInfo();
+  const defaultHostSet = useRef(false);
+  useEffect(() => {
+    if (defaultHostSet.current || !clientInfo?.observedIp) return;
+    setHost(clientInfo.observedIp);
+    defaultHostSet.current = true;
+  }, [clientInfo]);
 
   const { data: graph } = useQuery({
     queryKey: ["network-graph"],

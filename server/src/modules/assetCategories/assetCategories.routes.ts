@@ -62,4 +62,30 @@ router.delete("/:id", requirePermission("admin", "delete"), async (req, res) => 
   res.json({ ok: true });
 });
 
+router.post("/:id/duplicate", requirePermission("admin", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.assetCategory.findUnique({ where: { id } });
+  if (!source) throw new ApiError(404, "Category not found");
+
+  let newName = `${source.name} (Copy)`;
+  let suffix = 1;
+  while (await prisma.assetCategory.findUnique({ where: { name: newName } })) {
+    suffix += 1;
+    newName = `${source.name} (Copy ${suffix})`;
+  }
+
+  const clone = await prisma.assetCategory.create({
+    data: {
+      name: newName,
+      formTemplateId: source.formTemplateId,
+      isComputerAsset: source.isComputerAsset,
+      isShowAsset: source.isShowAsset,
+      isSwitchingDevice: source.isSwitchingDevice,
+    },
+    select: categorySelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "assetCategory.duplicate", entityType: "AssetCategory", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+});
+
 export default router;

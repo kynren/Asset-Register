@@ -99,6 +99,28 @@ router.delete("/:id", requirePermission("nvr", "delete"), async (req, res) => {
   res.json({ ok: true });
 });
 
+// ipAddress/port stay blank on the clone — copying a real NVR's network address would create a
+// second device claiming the same host, which isn't a duplicate anyone wants.
+router.post("/:id/duplicate", requirePermission("nvr", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.nvr.findUnique({ where: { id } });
+  if (!source) throw new ApiError(404, "NVR not found");
+
+  const clone = await prisma.nvr.create({
+    data: {
+      name: `${source.name} (Copy)`,
+      protocol: source.protocol,
+      locationId: source.locationId,
+      model: source.model,
+      notes: source.notes,
+      status: "UNKNOWN",
+    },
+    select: nvrSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "nvr.duplicate", entityType: "Nvr", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+});
+
 router.post("/:id/check-status", requirePermission("nvr", "edit"), async (req, res) => {
   const nvr = await prisma.nvr.findUnique({ where: { id: Number(req.params.id) } });
   if (!nvr) throw new ApiError(404, "NVR not found");
@@ -217,6 +239,27 @@ router.delete("/cameras/:cameraId", requirePermission("nvr", "delete"), async (r
   await prisma.camera.delete({ where: { id: Number(req.params.cameraId) } });
   await logAudit({ userId: req.user!.id, action: "camera.delete", entityType: "Camera", entityId: Number(req.params.cameraId) });
   res.json({ ok: true });
+});
+
+// ipAddress and streamUrl (which embeds the source IP) stay blank on the clone for the same
+// reason as NVR duplicate — same channel/PTZ config, but no claimed network address.
+router.post("/cameras/:cameraId/duplicate", requirePermission("nvr", "create"), async (req, res) => {
+  const cameraId = Number(req.params.cameraId);
+  const source = await prisma.camera.findUnique({ where: { id: cameraId } });
+  if (!source) throw new ApiError(404, "Camera not found");
+
+  const clone = await prisma.camera.create({
+    data: {
+      nvrId: source.nvrId,
+      name: `${source.name} (Copy)`,
+      channel: source.channel,
+      locationId: source.locationId,
+      ptzEnabled: source.ptzEnabled,
+      status: "UNKNOWN",
+    },
+  });
+  await logAudit({ userId: req.user!.id, action: "camera.duplicate", entityType: "Camera", entityId: clone.id, metadata: { sourceId: cameraId } });
+  res.status(201).json(clone);
 });
 
 router.post("/cameras/:cameraId/check-status", requirePermission("nvr", "edit"), async (req, res) => {

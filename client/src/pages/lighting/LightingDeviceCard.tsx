@@ -39,12 +39,14 @@ export function LightingDeviceCard({
   onToggle,
   onBrightnessCommit,
   onEdit,
+  onDuplicate,
   onDelete,
 }: {
   device: LightingDevice;
   onToggle: (on: boolean) => void;
   onBrightnessCommit: (value: number) => void;
   onEdit: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 }) {
   const isLight = device.kind === "LIGHT" && device.protocol !== "GENERIC_HTTP";
@@ -73,6 +75,11 @@ export function LightingDeviceCard({
           <PermissionGate module="lighting" action="edit">
             <button className="btn btn-secondary btn-sm btn-icon" onClick={onEdit} title="Edit device">
               <Icon name="edit" size={12} />
+            </button>
+          </PermissionGate>
+          <PermissionGate module="lighting" action="create">
+            <button className="btn btn-secondary btn-sm btn-icon" onClick={onDuplicate} title="Duplicate device">
+              <Icon name="paperclip" size={12} />
             </button>
           </PermissionGate>
           <PermissionGate module="lighting" action="delete">

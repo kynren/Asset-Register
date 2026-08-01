@@ -346,7 +346,99 @@
     @apply text-xs text-text-muted font-semibold uppercase tracking-wide;
   }
   .kpi-value {
-    @apply text-[26px] font-bold;
+    @apply text-[26px] font-bold tabular-nums;
+  }
+
+  /* ---------- Dashboard: ambient glow + live-data animation ---------- */
+
+  @keyframes kynren-drift {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(6%, -8%) scale(1.15); }
+  }
+  @keyframes kynren-breathe {
+    0%, 100% { opacity: 0.12; transform: scale(1); }
+    50% { opacity: 0.26; transform: scale(1.18); }
+  }
+  @keyframes kynren-pulse-ring {
+    0% { transform: scale(1); opacity: 0.65; }
+    100% { transform: scale(2.8); opacity: 0; }
+  }
+
+  .dashboard-ambient {
+    @apply pointer-events-none absolute inset-0 overflow-hidden;
+    z-index: 0;
+  }
+  .dashboard-ambient span {
+    @apply absolute rounded-full opacity-[0.1];
+    filter: blur(60px);
+    animation: kynren-drift 24s ease-in-out infinite alternate;
+  }
+  .dashboard-ambient span:nth-child(1) {
+    width: 420px;
+    height: 420px;
+    top: -140px;
+    left: 4%;
+    background: var(--color-primary);
+  }
+  .dashboard-ambient span:nth-child(2) {
+    width: 360px;
+    height: 360px;
+    top: 35%;
+    right: -60px;
+    background: var(--color-success);
+    animation-duration: 30s;
+    animation-delay: -8s;
+  }
+  .dashboard-ambient span:nth-child(3) {
+    width: 300px;
+    height: 300px;
+    bottom: -120px;
+    left: 38%;
+    background: var(--color-warning);
+    animation-duration: 27s;
+    animation-delay: -14s;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .dashboard-ambient span {
+      opacity: 0.18;
+    }
+  }
+  :root[data-theme="dark"] .dashboard-ambient span {
+    opacity: 0.18;
+  }
+
+  .widget-card {
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  }
+  .widget-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px -10px var(--color-primary-soft), var(--shadow-sm);
+  }
+
+  .kpi-icon-glow {
+    @apply relative inline-flex items-center justify-center rounded-full;
+    width: 28px;
+    height: 28px;
+  }
+  .kpi-icon-glow::before {
+    content: "";
+    @apply absolute inset-0 rounded-full;
+    background: currentColor;
+    animation: kynren-breathe 3.2s ease-in-out infinite;
+  }
+  .kpi-icon-glow svg {
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 0 3px currentColor);
+  }
+
+  .live-dot {
+    @apply relative inline-block w-[7px] h-[7px] rounded-full bg-success;
+  }
+  .live-dot::after {
+    content: "";
+    @apply absolute inset-0 rounded-full bg-success;
+    animation: kynren-pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   .filter-bar {
@@ -511,12 +603,14 @@
   /* Placed in the utilities layer (not components) so these responsive overrides
      win over Tailwind's own same-named grid-cols-* utilities at the cascade level. */
   @media (max-width: 1100px) {
+    .grid-cols-5,
     .grid-cols-4,
     .grid-cols-3 {
       @apply grid-cols-2;
     }
   }
   @media (max-width: 640px) {
+    .grid-cols-5,
     .grid-cols-4,
     .grid-cols-3,
     .grid-cols-2 {

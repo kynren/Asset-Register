@@ -95,6 +95,11 @@ export function DevicesDoorsTab() {
     onSuccess: () => { invalidate(); setDeletingDevice(null); },
   });
 
+  const duplicateDeviceMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/access-control/devices/${id}/duplicate`),
+    onSuccess: invalidate,
+  });
+
   const checkStatusMutation = useMutation({
     mutationFn: (id: number) => axiosClient.post(`/access-control/devices/${id}/check-status`),
     onSuccess: invalidate,
@@ -168,6 +173,7 @@ export function DevicesDoorsTab() {
               </PermissionGate>
               <PermissionGate module="access-control" action="create">
                 <button className="btn btn-secondary btn-sm" onClick={() => setDoorDeviceId(device.id)}><Icon name="plus" size={12} /> Add Door</button>
+                <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateDeviceMutation.mutate(device.id)}><Icon name="paperclip" size={12} /></button>
               </PermissionGate>
               <PermissionGate module="access-control" action="delete">
                 <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeletingDevice(device)}><Icon name="trash" size={13} /></button>

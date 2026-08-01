@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { PermissionGate } from "../../auth/PermissionGate";
+import { useClientInfo } from "../../hooks/useClientInfo";
 
 interface DiscoverResult {
   id: number;
@@ -38,6 +39,15 @@ export function DiscoverPanel({ onAdded }: { onAdded: () => void }) {
   const [subnet, setSubnet] = useState("192.168.1");
   const [scanId, setScanId] = useState<number | null>(null);
   const queryClient = useQueryClient();
+
+  const { data: clientInfo } = useClientInfo();
+  const defaultSubnetSet = useRef(false);
+  useEffect(() => {
+    if (defaultSubnetSet.current || !clientInfo?.observedIp) return;
+    const prefix = clientInfo.observedIp.split(".").slice(0, 3).join(".");
+    if (isValidSubnetPrefix(prefix)) setSubnet(prefix);
+    defaultSubnetSet.current = true;
+  }, [clientInfo]);
 
   const { data: scan } = useQuery({
     queryKey: ["lighting-discover", scanId],

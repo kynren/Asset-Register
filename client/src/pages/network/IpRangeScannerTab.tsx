@@ -6,6 +6,7 @@ import { Icon } from "../../components/Icon";
 import { DataTable } from "../../components/DataTable";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { AssetFormModal, AssetFormValues } from "../assets/AssetFormModal";
+import { useClientInfo } from "../../hooks/useClientInfo";
 
 interface ScanResult {
   id: number;
@@ -127,6 +128,18 @@ export function IpRangeScannerTab() {
   const statsShownFor = useRef<number | null>(null);
   const [adopting, setAdopting] = useState<ScanResult | null>(null);
   const queryClient = useQueryClient();
+
+  const { data: clientInfo } = useClientInfo();
+  const defaultRangeSet = useRef(false);
+  useEffect(() => {
+    if (defaultRangeSet.current || !clientInfo?.observedIp) return;
+    const range = applyNetmaskToRange(clientInfo.observedIp, 24);
+    if (range) {
+      setStartIp(range.start);
+      setEndIp(range.end);
+    }
+    defaultRangeSet.current = true;
+  }, [clientInfo]);
 
   const { data: history } = useQuery({
     queryKey: ["network-scans"],

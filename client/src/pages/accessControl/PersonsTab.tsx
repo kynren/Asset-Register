@@ -83,6 +83,11 @@ export function PersonsTab() {
     onSuccess: () => { invalidatePersons(); setDeletingPerson(null); },
   });
 
+  const duplicatePersonMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/access-control/persons/${id}/duplicate`),
+    onSuccess: invalidatePersons,
+  });
+
   const deleteOrgMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/access-control/organizations/${id}`),
     onSuccess: () => { invalidateOrgs(); setDeletingOrg(null); if (selectedOrgId === deletingOrg?.id) setSelectedOrgId(null); },
@@ -135,6 +140,9 @@ export function PersonsTab() {
         <div className="row gap-1">
           <PermissionGate module="access-control" action="edit">
             <button className="btn btn-secondary btn-sm btn-icon" onClick={(e) => { e.stopPropagation(); setEditingPerson(row.original); }} title="Edit"><Icon name="edit" size={12} /></button>
+          </PermissionGate>
+          <PermissionGate module="access-control" action="create">
+            <button className="btn btn-secondary btn-sm btn-icon" onClick={(e) => { e.stopPropagation(); duplicatePersonMutation.mutate(row.original.id); }} title="Duplicate"><Icon name="paperclip" size={12} /></button>
           </PermissionGate>
           <PermissionGate module="access-control" action="delete">
             <button className="btn btn-danger btn-sm btn-icon" onClick={(e) => { e.stopPropagation(); setDeletingPerson(row.original); }} title="Delete"><Icon name="trash" size={12} /></button>

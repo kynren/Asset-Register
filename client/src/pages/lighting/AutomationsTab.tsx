@@ -8,10 +8,18 @@ import { PermissionGate } from "../../auth/PermissionGate";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
 import { LightingDevice } from "./LightingDeviceCard";
+import { DeviceActionPicker, DraftAction, actionsToDrafts, draftsToActions } from "./DeviceActionPicker";
 
 interface Scene {
   id: number;
   name: string;
+}
+interface AutomationAction {
+  id: number;
+  deviceId: number;
+  turnOn: boolean;
+  brightness: number | null;
+  device: { id: number; name: string };
 }
 interface Automation {
   id: number;
@@ -20,11 +28,10 @@ interface Automation {
   daysOfWeek: number[];
   timeOfDay: string;
   actionType: "DEVICE" | "SCENE";
-  targetDeviceId: number | null;
-  targetDevice: { id: number; name: string } | null;
+  actions: AutomationAction[];
   targetSceneId: number | null;
   targetScene: { id: number; name: string } | null;
-  turnOn: boolean | null;
+  offTimeOfDay: string | null;
 }
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -38,7 +45,14 @@ function daysSummary(days: number[]): string {
 
 function actionSummary(a: Automation): string {
   if (a.actionType === "SCENE") return `Activate "${a.targetScene?.name ?? "scene"}"`;
-  return `Turn ${a.turnOn ? "On" : "Off"} "${a.targetDevice?.name ?? "device"}"`;
+  if (a.actions.length === 0) return "No devices selected";
+  if (a.actions.length === 1) {
+    const only = a.actions[0];
+    return `Turn ${only.turnOn ? "On" : "Off"} "${only.device.name}"`;
+  }
+  const names = a.actions.slice(0, 2).map((x) => x.device.name).join(", ");
+  const rest = a.actions.length - 2;
+  return `${names}${rest > 0 ? ` +${rest} more` : ""}`;
 }
 
 export function AutomationsTab() {
@@ -67,6 +81,10 @@ export function AutomationsTab() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/lighting/automations/${id}`),
     onSuccess: () => { invalidate(); setDeleting(null); },
+  });
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/lighting/automations/${id}/duplicate`),
+    onSuccess: invalidate,
   });
 
   const calendarCells = useMemo(() => {
@@ -98,7 +116,9 @@ export function AutomationsTab() {
                   <strong style={{ fontSize: 13 }}>{a.name}</strong>
                   {!a.isEnabled && <span className="badge badge-neutral">Disabled</span>}
                 </div>
-                <p className="muted" style={{ fontSize: 12, margin: "2px 0 0" }}>{daysSummary(a.daysOfWeek)} at {a.timeOfDay} · {actionSummary(a)}</p>
+                <p className="muted" style={{ fontSize: 12, margin: "2px 0 0" }}>
+                  {daysSummary(a.daysOfWeek)} · On {a.timeOfDay}{a.offTimeOfDay ? ` → Off ${a.offTimeOfDay}` : ""} · {actionSummary(a)}
+                </p>
               </div>
               <div className="row gap-2" style={{ alignItems: "center" }}>
                 <PermissionGate module="lighting" action="edit">
@@ -107,6 +127,9 @@ export function AutomationsTab() {
                     <span className="form-toggle-switch-track" />
                   </label>
                   <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setEditing(a)}><Icon name="edit" size={12} /></button>
+                </PermissionGate>
+                <PermissionGate module="lighting" action="create">
+                  <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(a.id)}><Icon name="paperclip" size={12} /></button>
                 </PermissionGate>
                 <PermissionGate module="lighting" action="delete">
                   <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(a)}><Icon name="trash" size={12} /></button>
@@ -146,7 +169,7 @@ export function AutomationsTab() {
                         className="badge badge-primary"
                         style={{ border: "none", cursor: "pointer", fontSize: 10, textAlign: "left", padding: "2px 4px" }}
                         onClick={() => setEditing(a)}
-                        title={`${a.timeOfDay} · ${actionSummary(a)}`}
+                        title={`On ${a.timeOfDay}${a.offTimeOfDay ? ` → Off ${a.offTimeOfDay}` : ""} · ${actionSummary(a)}`}
                       >
                         {a.timeOfDay} {a.name}
                       </button>
@@ -195,9 +218,10 @@ function AutomationFormModal({
   const [days, setDays] = useState<Set<number>>(new Set(automation?.daysOfWeek ?? [1, 2, 3, 4, 5]));
   const [timeOfDay, setTimeOfDay] = useState(automation?.timeOfDay ?? "18:00");
   const [actionType, setActionType] = useState<"DEVICE" | "SCENE">(automation?.actionType ?? "DEVICE");
-  const [targetDeviceId, setTargetDeviceId] = useState<number | "">(automation?.targetDeviceId ?? "");
+  const [drafts, setDrafts] = useState<Map<number, DraftAction>>(actionsToDrafts(automation?.actions ?? []));
   const [targetSceneId, setTargetSceneId] = useState<number | "">(automation?.targetSceneId ?? "");
-  const [turnOn, setTurnOn] = useState(automation?.turnOn ?? true);
+  const [offEnabled, setOffEnabled] = useState(automation?.offTimeOfDay != null);
+  const [offTimeOfDay, setOffTimeOfDay] = useState(automation?.offTimeOfDay ?? "23:00");
 
   function toggleDay(d: number) {
     setDays((prev) => {
@@ -215,16 +239,20 @@ function AutomationFormModal({
         daysOfWeek: [...days],
         timeOfDay,
         actionType,
-        targetDeviceId: actionType === "DEVICE" ? Number(targetDeviceId) : null,
+        actions: actionType === "DEVICE" ? draftsToActions(drafts) : undefined,
         targetSceneId: actionType === "SCENE" ? Number(targetSceneId) : null,
-        turnOn: actionType === "DEVICE" ? turnOn : null,
+        offTimeOfDay: actionType === "DEVICE" && offEnabled ? offTimeOfDay : null,
       };
       return automation ? axiosClient.patch(`/lighting/automations/${automation.id}`, body) : axiosClient.post("/lighting/automations", body);
     },
     onSuccess: () => { onSaved(); onClose(); },
   });
 
-  const canSubmit = name.trim() && days.size > 0 && (actionType === "DEVICE" ? targetDeviceId !== "" : targetSceneId !== "");
+  const canSubmit =
+    name.trim() &&
+    days.size > 0 &&
+    (actionType === "DEVICE" ? drafts.size > 0 : targetSceneId !== "") &&
+    (actionType !== "DEVICE" || !offEnabled || offTimeOfDay !== timeOfDay);
 
   return (
     <FormModal title={automation ? "Edit Automation" : "Add Automation"} onClose={onClose} onSubmit={() => mutation.mutate()} submitting={mutation.isPending} submitDisabled={!canSubmit}>
@@ -259,23 +287,23 @@ function AutomationFormModal({
         </div>
       </div>
 
-      {actionType === "DEVICE" ? (
-        <div className="grid grid-cols-2">
-          <div className="field">
-            <label>Device *</label>
-            <select className="select" value={targetDeviceId} onChange={(e) => setTargetDeviceId(e.target.value ? Number(e.target.value) : "")}>
-              <option value="">Select device...</option>
-              {devices.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </div>
-          <div className="field">
-            <label>State</label>
-            <select className="select" value={turnOn ? "on" : "off"} onChange={(e) => setTurnOn(e.target.value === "on")}>
-              <option value="on">Turn On</option>
-              <option value="off">Turn Off</option>
-            </select>
-          </div>
+      {actionType === "DEVICE" && (
+        <div className="field">
+          <label className="row gap-2" style={{ cursor: "pointer", alignItems: "center" }}>
+            <input type="checkbox" checked={offEnabled} onChange={(e) => setOffEnabled(e.target.checked)} />
+            Also turn these devices off at a time
+          </label>
+          {offEnabled && (
+            <input className="input" type="time" style={{ marginTop: 6 }} value={offTimeOfDay} onChange={(e) => setOffTimeOfDay(e.target.value)} />
+          )}
+          {offEnabled && offTimeOfDay === timeOfDay && (
+            <p style={{ fontSize: 12, color: "var(--color-danger)", margin: "4px 0 0" }}>Off time must be different from the on time.</p>
+          )}
         </div>
+      )}
+
+      {actionType === "DEVICE" ? (
+        <DeviceActionPicker devices={devices} drafts={drafts} onChange={setDrafts} />
       ) : (
         <div className="field">
           <label>Scene *</label>

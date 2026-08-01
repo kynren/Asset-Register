@@ -68,7 +68,7 @@ function App() {
           <Route path="/assistant" element={<PermissionGate module="virtual-assistant" redirect><AssistantPage /></PermissionGate>} />
 
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/password" element={<PasswordManagementPage />} />
+          <Route path="/password" element={<PermissionGate module="password" redirect><PasswordManagementPage /></PermissionGate>} />
           <Route path="/admin" element={<PermissionGate module="admin" redirect><AdminPage /></PermissionGate>} />
           <Route path="/admin/users/:id" element={<PermissionGate module="admin" redirect><UserDetailPage /></PermissionGate>} />
         </Route>

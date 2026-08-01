@@ -37,9 +37,12 @@ const MODULE_INFO: Record<ModuleName, { label: string; description: string }> = 
   helpdesk: { label: "Helpdesk & Ticketing", description: "Ticket CRUD, comments, status workflow." },
   operations: { label: "Operations Tools", description: "IT Projects Kanban, Knowledge Base, Asset Bookings, Saved Queries, Resource Scheduling, Bulk & Reports — and Software Licenses." },
   nvr: { label: "NVRs & Cameras", description: "Device management, live view, event log, ONVIF PTZ control, recording & retention, motion detection alerts." },
+  "access-control": { label: "Access Control", description: "Doors, credentials, Person/Organization directory, Access Groups." },
+  lighting: { label: "Lighting", description: "Devices, Rooms dashboard, Scenes, Automations, ZigBee scaffold." },
   "virtual-assistant": { label: "Virtual Assistant", description: "In-app assistant chat and quick actions." },
   docs: { label: "Docs & SOPs", description: "Manuals, SOPs, runbooks, and other documents — collections, full-text search, attachments." },
   admin: { label: "Admin & Setup", description: "Users, Roles & Permissions, Categories & Locations, Asset Form Templates, System Settings, Audit Log." },
+  password: { label: "Password Management", description: "Each user's personal password vault." },
 };
 
 export function RolesTab() {

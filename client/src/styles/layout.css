@@ -71,7 +71,7 @@
     --tb-green: var(--color-success);
     --tb-cyan: var(--color-primary);
     --tb-blue: var(--color-primary);
-    @apply h-16 min-h-[64px] bg-tb-bg text-tb-text flex items-center gap-5 px-6 flex-shrink-0 z-10;
+    @apply h-16 min-h-[64px] bg-tb-bg text-tb-text flex items-center gap-5 px-6 flex-shrink-0 z-30;
   }
 
   .topbar-title {

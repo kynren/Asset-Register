@@ -55,6 +55,11 @@ export function DevicesTab() {
     onSuccess: () => { invalidate(); setDeletingDevice(null); },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/lighting/devices/${id}/duplicate`),
+    onSuccess: invalidate,
+  });
+
   const powerMutation = useMutation({
     mutationFn: ({ id, on }: { id: number; on: boolean }) => axiosClient.post(`/lighting/devices/${id}/power`, { on }),
     onSuccess: invalidate,
@@ -108,6 +113,7 @@ export function DevicesTab() {
             onToggle={(on) => powerMutation.mutate({ id: device.id, on })}
             onBrightnessCommit={(value) => brightnessMutation.mutate({ id: device.id, value })}
             onEdit={() => setEditingDevice(device)}
+            onDuplicate={() => duplicateMutation.mutate(device.id)}
             onDelete={() => setDeletingDevice(device)}
           />
         ))}

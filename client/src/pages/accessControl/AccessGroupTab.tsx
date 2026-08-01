@@ -66,6 +66,11 @@ export function AccessGroupTab() {
     onSuccess: invalidate,
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/access-control/groups/${id}/duplicate`),
+    onSuccess: invalidate,
+  });
+
   const selected = groups?.find((g) => g.id === selectedId) ?? null;
 
   const columns: ColumnDef<AccessGroup, any>[] = [
@@ -104,6 +109,11 @@ export function AccessGroupTab() {
           <div className="row gap-2">
             <PermissionGate module="access-control" action="create">
               <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}><Icon name="plus" size={13} /> Add</button>
+            </PermissionGate>
+            <PermissionGate module="access-control" action="create">
+              <button className="btn btn-secondary btn-sm" disabled={!selected || duplicateMutation.isPending} onClick={() => selected && duplicateMutation.mutate(selected.id)}>
+                <Icon name="paperclip" size={13} /> Duplicate
+              </button>
             </PermissionGate>
             <PermissionGate module="access-control" action="delete">
               <button className="btn btn-secondary btn-sm" disabled={!selected} onClick={() => selected && setDeleting(selected)}><Icon name="trash" size={13} /> Delete</button>

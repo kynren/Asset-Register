@@ -193,6 +193,31 @@ router.delete("/devices/:id", requirePermission("lighting", "delete"), async (re
   res.json({ ok: true });
 });
 
+// ipAddress and the on/off/status URLs (which are built from it) stay blank on the clone — same
+// reasoning as NVR/Camera/AccessControlDevice duplicate. ZigBee pairing fields are also dropped:
+// they identify one specific paired radio, not something a "copy" could legitimately inherit.
+router.post("/devices/:id/duplicate", requirePermission("lighting", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.lightingDevice.findUnique({ where: { id } });
+  if (!source) throw new ApiError(404, "Lighting device not found");
+
+  const clone = await prisma.lightingDevice.create({
+    data: {
+      name: `${source.name} (Copy)`,
+      protocol: source.protocol,
+      kind: source.kind,
+      channel: source.channel,
+      icon: source.icon,
+      groupId: source.groupId,
+      locationId: source.locationId,
+      status: "UNKNOWN",
+    },
+    select: deviceSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "lightingDevice.duplicate", entityType: "LightingDevice", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+});
+
 // Manual per-device refresh (e.g. a "Refresh" affordance on one card).
 router.post("/devices/:id/refresh", requirePermission("lighting", "view"), async (req, res) => {
   const id = Number(req.params.id);
@@ -403,6 +428,23 @@ router.delete("/scenes/:id", requirePermission("lighting", "delete"), async (req
   res.json({ ok: true });
 });
 
+router.post("/scenes/:id/duplicate", requirePermission("lighting", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.lightingScene.findUnique({ where: { id }, include: { actions: true } });
+  if (!source) throw new ApiError(404, "Scene not found");
+
+  const clone = await prisma.lightingScene.create({
+    data: {
+      name: `${source.name} (Copy)`,
+      icon: source.icon,
+      actions: { create: source.actions.map((a) => ({ deviceId: a.deviceId, turnOn: a.turnOn, brightness: a.brightness })) },
+    },
+    select: sceneSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "lightingScene.duplicate", entityType: "LightingScene", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+});
+
 // Applies every action in the scene to its device, best-effort per device so one unreachable
 // light doesn't block the rest of the scene from activating.
 router.post("/scenes/:id/activate", requirePermission("lighting", "edit"), async (req, res) => {
@@ -445,11 +487,10 @@ const automationSelect = {
   daysOfWeek: true,
   timeOfDay: true,
   actionType: true,
-  targetDeviceId: true,
-  targetDevice: { select: { id: true, name: true } },
+  actions: { select: { id: true, deviceId: true, turnOn: true, brightness: true, device: { select: { id: true, name: true } } } },
   targetSceneId: true,
   targetScene: { select: { id: true, name: true } },
-  turnOn: true,
+  offTimeOfDay: true,
   lastRunDate: true,
   createdAt: true,
 };
@@ -459,13 +500,22 @@ router.get("/automations", requirePermission("lighting", "view"), async (_req, r
 });
 
 router.post("/automations", requirePermission("lighting", "create"), validateBody(createAutomationSchema), async (req, res) => {
-  const automation = await prisma.lightingAutomation.create({ data: req.body, select: automationSelect });
+  const { actions, ...rest } = req.body;
+  const automation = await prisma.lightingAutomation.create({
+    data: { ...rest, ...(actions ? { actions: { create: actions } } : {}) },
+    select: automationSelect,
+  });
   await logAudit({ userId: req.user!.id, action: "lightingAutomation.create", entityType: "LightingAutomation", entityId: automation.id });
   res.status(201).json(automation);
 });
 
 router.patch("/automations/:id", requirePermission("lighting", "edit"), validateBody(updateAutomationSchema), async (req, res) => {
-  const automation = await prisma.lightingAutomation.update({ where: { id: Number(req.params.id) }, data: req.body, select: automationSelect });
+  const { actions, ...rest } = req.body;
+  const automation = await prisma.lightingAutomation.update({
+    where: { id: Number(req.params.id) },
+    data: { ...rest, ...(actions !== undefined ? { actions: { deleteMany: {}, create: actions } } : {}) },
+    select: automationSelect,
+  });
   await logAudit({ userId: req.user!.id, action: "lightingAutomation.update", entityType: "LightingAutomation", entityId: automation.id });
   res.json(automation);
 });
@@ -474,6 +524,84 @@ router.delete("/automations/:id", requirePermission("lighting", "delete"), async
   await prisma.lightingAutomation.delete({ where: { id: Number(req.params.id) } });
   await logAudit({ userId: req.user!.id, action: "lightingAutomation.delete", entityType: "LightingAutomation", entityId: Number(req.params.id) });
   res.json({ ok: true });
+});
+
+router.post("/automations/:id/duplicate", requirePermission("lighting", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.lightingAutomation.findUnique({ where: { id }, include: { actions: true } });
+  if (!source) throw new ApiError(404, "Automation not found");
+
+  const clone = await prisma.lightingAutomation.create({
+    data: {
+      name: `${source.name} (Copy)`,
+      isEnabled: source.isEnabled,
+      daysOfWeek: source.daysOfWeek,
+      timeOfDay: source.timeOfDay,
+      actionType: source.actionType,
+      offTimeOfDay: source.offTimeOfDay,
+      targetSceneId: source.targetSceneId,
+      // lastRunDate/lastRunDateOff are intentionally left unset — a duplicate hasn't fired yet.
+      ...(source.actionType === "DEVICE"
+        ? { actions: { create: source.actions.map((a) => ({ deviceId: a.deviceId, turnOn: a.turnOn, brightness: a.brightness })) } }
+        : {}),
+    },
+    select: automationSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "lightingAutomation.duplicate", entityType: "LightingAutomation", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+});
+
+// ───────────────────────── Dashboard summary ─────────────────────────
+// Backs the redesigned Dashboard tab's stat row/bar chart with real data only — this app has no
+// climate or solar-panel integration, so there is no "indoor temp"/"solar energy" to report; the
+// closest honest analog to a day-by-day usage chart is counting real power.toggle audit events.
+
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+router.get("/dashboard-summary", requirePermission("lighting", "view"), async (_req, res) => {
+  const [devices, groups, automationsActiveCount] = await Promise.all([
+    prisma.lightingDevice.findMany({ select: { id: true, isOn: true, powerW: true, groupId: true } }),
+    prisma.lightingGroup.findMany({ select: { id: true, name: true, icon: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.lightingAutomation.count({ where: { isEnabled: true } }),
+  ]);
+
+  const devicesOn = devices.filter((d) => d.isOn).length;
+  const totalPowerW = devices.reduce((sum, d) => sum + (d.isOn ? d.powerW ?? 0 : 0), 0);
+  const devicesPerRoom = groups.map((g) => ({
+    roomId: g.id,
+    roomName: g.name,
+    icon: g.icon,
+    deviceCount: devices.filter((d) => d.groupId === g.id).length,
+    devicesOn: devices.filter((d) => d.groupId === g.id && d.isOn).length,
+  }));
+
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  since.setDate(since.getDate() - 6);
+  const logs = await prisma.auditLog.findMany({
+    where: { action: "lightingDevice.power", createdAt: { gte: since } },
+    select: { createdAt: true, metadata: true },
+  });
+  const activityByDay = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(since);
+    d.setDate(since.getDate() + i);
+    return { day: DAY_LABELS[d.getDay()], count: 0 };
+  });
+  for (const log of logs) {
+    if ((log.metadata as { on?: boolean } | null)?.on !== true) continue;
+    const idx = Math.floor((log.createdAt.getTime() - since.getTime()) / 86_400_000);
+    if (idx >= 0 && idx < 7) activityByDay[idx].count += 1;
+  }
+
+  res.json({
+    totalDevices: devices.length,
+    devicesOn,
+    totalPowerW: Math.round(totalPowerW * 10) / 10,
+    roomsCount: groups.length,
+    automationsActiveCount,
+    devicesPerRoom,
+    activityByDay,
+  });
 });
 
 // ───────────────────────── ZigBee (scaffold — see server/src/lib/zigbeeCoordinator.ts) ─────────────────────────

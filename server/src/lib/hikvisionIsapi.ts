@@ -268,13 +268,23 @@ export async function getDoorStatus(
   username: string,
   password: string,
   doorNumber: number
-): Promise<{ ok: boolean; door: IsapiDoorStatus | null; notFound: boolean; message: string }> {
+): Promise<{ ok: boolean; door: IsapiDoorStatus | null; notFound: boolean; authFailed: boolean; unreachable: boolean; message: string }> {
   const url = jsonUrl(hostname, port, `/ISAPI/AccessControl/Door/status/${doorNumber}`);
   try {
     const res = await digestFetch("GET", url, username, password);
-    if (res.status === 401) return { ok: false, door: null, notFound: false, message: "Authentication failed — check the ISAPI username/password." };
-    if (res.status === 404) return { ok: true, door: null, notFound: true, message: `Door ${doorNumber} not found on this controller.` };
-    if (!res.ok) return { ok: false, door: null, notFound: false, message: `Device responded with HTTP ${res.status} reading door ${doorNumber} status.` };
+    if (res.status === 401) {
+      return { ok: false, door: null, notFound: false, authFailed: true, unreachable: false, message: "Authentication failed — check the ISAPI username/password." };
+    }
+    if (res.status === 404) {
+      return { ok: true, door: null, notFound: true, authFailed: false, unreachable: false, message: `Door ${doorNumber} not found on this controller.` };
+    }
+    if (!res.ok) {
+      // Real hardware (multiple firmware versions) has been observed returning a non-404 error
+      // (commonly HTTP 400) for THIS status endpoint on doors that genuinely exist — see the
+      // module doc comment above. So a non-404, non-401 failure here is not treated as proof the
+      // door doesn't exist, only that its live status can't be read this way.
+      return { ok: false, door: null, notFound: false, authFailed: false, unreachable: false, message: `Device responded with HTTP ${res.status} reading door ${doorNumber} status.` };
+    }
 
     const data = (await res.json().catch(() => ({}))) as Record<string, any>;
     const d = data.DoorStatus ?? data.doorStatus ?? data;
@@ -288,9 +298,12 @@ export async function getDoorStatus(
         ? "locked"
         : "unknown";
 
-    return { ok: true, door: { doorNumber, doorState, lockState }, notFound: false, message: `Read status for door ${doorNumber}.` };
+    return { ok: true, door: { doorNumber, doorState, lockState }, notFound: false, authFailed: false, unreachable: false, message: `Read status for door ${doorNumber}.` };
   } catch (err) {
-    return { ok: false, door: null, notFound: false, message: `Could not reach device: ${connectionErrorMessage(err)}` };
+    // A thrown exception (timeout, ECONNREFUSED, DNS failure, ...) means the device itself
+    // couldn't be reached at all — unlike an HTTP-level error, this genuinely says nothing is
+    // there to probe further, so the caller stops rather than guessing at more door numbers.
+    return { ok: false, door: null, notFound: false, authFailed: false, unreachable: true, message: `Could not reach device: ${connectionErrorMessage(err)}` };
   }
 }
 

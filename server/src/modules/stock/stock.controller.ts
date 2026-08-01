@@ -57,6 +57,36 @@ export async function remove(req: Request, res: Response) {
   res.json({ ok: true });
 }
 
+export async function duplicate(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const source = await prisma.stockItem.findUnique({ where: { id } });
+  if (!source) throw new ApiError(404, "Stock item not found");
+
+  let newSku = `${source.sku}-COPY`;
+  let suffix = 1;
+  while (await prisma.stockItem.findUnique({ where: { sku: newSku } })) {
+    suffix += 1;
+    newSku = `${source.sku}-COPY${suffix}`;
+  }
+
+  const clone = await prisma.stockItem.create({
+    data: {
+      sku: newSku,
+      name: source.name,
+      category: source.category,
+      unit: source.unit,
+      reorderLevel: source.reorderLevel,
+      unitCost: source.unitCost,
+      locationId: source.locationId,
+      // Quantities and stock levels are physical counts, not part of an item's definition — a
+      // duplicate starts at zero on hand, same as any newly-created item.
+    },
+  });
+
+  await logAudit({ userId: req.user!.id, action: "stockItem.duplicate", entityType: "StockItem", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+}
+
 export async function addTransaction(req: Request, res: Response) {
   const stockItemId = Number(req.params.id);
   const { type, quantity, locationId, reason } = req.body;

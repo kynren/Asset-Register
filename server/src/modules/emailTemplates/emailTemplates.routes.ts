@@ -33,6 +33,7 @@ router.get("/:id", requirePermission("admin", "view"), controller.getOne);
 router.post("/", requirePermission("admin", "create"), validateBody(createEmailTemplateSchema), controller.create);
 router.patch("/:id", requirePermission("admin", "edit"), validateBody(updateEmailTemplateSchema), controller.update);
 router.delete("/:id", requirePermission("admin", "delete"), controller.remove);
+router.post("/:id/duplicate", requirePermission("admin", "create"), controller.duplicate);
 router.patch("/:id/activate", requirePermission("admin", "edit"), controller.activate);
 router.patch("/:id/deactivate", requirePermission("admin", "edit"), controller.deactivate);
 router.post("/:id/test", requirePermission("admin", "edit"), validateBody(sendTestEmailSchema), controller.sendTest);

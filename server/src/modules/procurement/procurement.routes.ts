@@ -42,6 +42,25 @@ router.delete("/suppliers/:id", requirePermission("stock", "delete"), async (req
   res.json({ ok: true });
 });
 
+router.post("/suppliers/:id/duplicate", requirePermission("stock", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.supplier.findUnique({ where: { id } });
+  if (!source) throw new ApiError(404, "Supplier not found");
+
+  const clone = await prisma.supplier.create({
+    data: {
+      name: `${source.name} (Copy)`,
+      contactName: source.contactName,
+      email: source.email,
+      phone: source.phone,
+      address: source.address,
+      notes: source.notes,
+    },
+  });
+  await logAudit({ userId: req.user!.id, action: "supplier.duplicate", entityType: "Supplier", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+});
+
 // ───────────────────────── Purchase Orders ─────────────────────────
 
 const poSelect = {

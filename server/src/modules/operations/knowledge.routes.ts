@@ -57,4 +57,17 @@ router.delete("/:id", requirePermission("operations", "delete"), async (req, res
   res.json({ ok: true });
 });
 
+router.post("/:id/duplicate", requirePermission("operations", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.knowledgeArticle.findUnique({ where: { id } });
+  if (!source) throw new ApiError(404, "Article not found");
+
+  const clone = await prisma.knowledgeArticle.create({
+    data: { title: `${source.title} (Copy)`, content: source.content, category: source.category, createdById: req.user!.id },
+    select: articleSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "operations.knowledge.duplicate", entityType: "KnowledgeArticle", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+});
+
 export default router;

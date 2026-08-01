@@ -49,6 +49,11 @@ export function KnowledgeBaseTab() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["op-knowledge"] }); setDeleting(null); },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/operations/knowledge/${id}/duplicate`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["op-knowledge"] }),
+  });
+
   return (
     <div>
       <div className="ot-body-header">
@@ -72,9 +77,14 @@ export function KnowledgeBaseTab() {
                     {a.createdBy.firstName} {a.createdBy.lastName} · {dayjs(a.updatedAt).format("DD MMM YYYY")}
                   </div>
                 </div>
-                <PermissionGate module="operations" action="delete">
-                  <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(a)}><Icon name="trash" size={12} /></button>
-                </PermissionGate>
+                <div className="row gap-1">
+                  <PermissionGate module="operations" action="create">
+                    <button className="ad-btn" title="Duplicate" onClick={() => duplicateMutation.mutate(a.id)}><Icon name="paperclip" size={12} /></button>
+                  </PermissionGate>
+                  <PermissionGate module="operations" action="delete">
+                    <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(a)}><Icon name="trash" size={12} /></button>
+                  </PermissionGate>
+                </div>
               </div>
               {expanded === a.id && <div className="ot-item-body">{a.content}</div>}
             </div>
