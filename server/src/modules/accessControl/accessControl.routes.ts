@@ -181,6 +181,19 @@ async function discoverDoors(deviceId: number, ipAddress: string, port: number |
       }
       if (result.notFound) break; // ran off the end of this controller's real doors
       if (!result.ok) {
+        // Without a capability count, a status-read failure on doors 2+ genuinely doesn't tell us
+        // whether that door exists — so probing still stops here rather than guessing further.
+        // Door 1 is the one exception: an access *control device* by definition controls at least
+        // one door, so if even door 1's status read fails, this device almost certainly still has
+        // a door 1 that the user needs to be able to see and manage (e.g. via manual door
+        // control) — the same door they could otherwise only get to by clicking "Add Door"
+        // themselves. Leaving the list empty here just forces that manual step for something the
+        // device has already implicitly confirmed by responding on this address/port/credentials.
+        if (doorNumber === 1 && doorsFound === 0) {
+          await upsertDoorPlaceholder(deviceId, 1);
+          doorsFound++;
+          statusReadFailures++;
+        }
         firstFailureMessage = result.message;
         break;
       }
@@ -191,7 +204,7 @@ async function discoverDoors(deviceId: number, ipAddress: string, port: number |
   if (statusReadFailures > 0) {
     return {
       ok: true,
-      message: `Added ${doorsFound} door(s) from this controller's reported capabilities, but live status couldn't be read (${firstFailureMessage}) — shown as unknown until this succeeds.`,
+      message: `Added ${doorsFound} door(s), but live status couldn't be read (${firstFailureMessage}) — shown as unknown until this succeeds.`,
     };
   }
   return { ok: true, message: doorsFound > 0 ? `Read status for ${doorsFound} door(s).` : "This controller did not report any doors." };
