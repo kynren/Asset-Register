@@ -138,14 +138,21 @@ router.post("/devices", requirePermission("access-control", "create"), validateB
   await logAudit({ userId: req.user!.id, action: "accessControlDevice.create", entityType: "AccessControlDevice", entityId: device.id });
 
   // Best-effort immediate door discovery so the card shows its real doors right away instead
-  // of "No doors added yet" until someone clicks Refresh Doors — a failure here (unreachable
-  // device) is fine, Refresh Doors retries the same discovery once it's reachable.
+  // of "No doors added yet" until someone clicks Refresh Doors. A failure here (unreachable
+  // device, wrong credentials, or this firmware not supporting the status endpoint) doesn't
+  // block device creation, but the result is surfaced back to the client (doorDiscovery) so
+  // the UI can explain *why* no doors showed up instead of silently showing an empty list —
+  // previously this was swallowed entirely, leaving no way to tell "genuinely zero doors"
+  // apart from "discovery failed".
+  let doorDiscovery: { ok: boolean; doors: unknown[]; message: string } | null = null;
   if (device.ipAddress) {
-    await discoverDoors(device.id, device.ipAddress, device.port, device.username ?? "", encryptedPassword ? decryptSecret(encryptedPassword) : "").catch(() => undefined);
+    doorDiscovery = await discoverDoors(device.id, device.ipAddress, device.port, device.username ?? "", encryptedPassword ? decryptSecret(encryptedPassword) : "").catch(
+      (err) => ({ ok: false, doors: [], message: err instanceof Error ? err.message : "Door discovery failed." })
+    );
   }
 
   const withDoors = await prisma.accessControlDevice.findUnique({ where: { id: device.id }, select: deviceSelect });
-  res.status(201).json(withDoors ?? device);
+  res.status(201).json({ ...(withDoors ?? device), doorDiscovery });
 });
 
 router.patch("/devices/:id", requirePermission("access-control", "edit"), validateBody(updateDeviceSchema), async (req, res) => {
