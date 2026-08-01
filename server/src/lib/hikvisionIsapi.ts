@@ -337,19 +337,20 @@ export async function getDoorCapabilities(
   if (first.authFailed) return { ok: false, count: null, message: "Authentication failed — check the ISAPI username/password." };
   if (first.ok && first.count) return { ok: true, count: first.count, message: `This controller supports ${first.count} door(s).` };
 
-  // Only fall through to the second path if the first was a legitimate "not supported here" —
-  // an actual HTTP error on the primary (documented) path shouldn't be silently masked.
-  if (!first.notFound && !first.ok) return { ok: false, count: null, message: `Device responded with HTTP ${first.httpStatus} reading door capabilities.` };
-
+  // Fall through to the second (also-documented) path whenever the first didn't yield a usable
+  // count — whether that's a clean 404 or some other HTTP error. Real hardware in the field has
+  // returned non-404 errors (e.g. 400) for a resource its firmware simply doesn't implement, so
+  // treating only 404 as "try the fallback" was too strict and caused door discovery to abort
+  // entirely instead of trying the second endpoint or, failing that, probing door numbers directly.
   const second = await tryEndpoint("/ISAPI/AccessControl/Door/capabilities");
   if ("networkError" in second) return { ok: false, count: null, message: `Could not reach device: ${connectionErrorMessage(second.networkError)}` };
   if (second.authFailed) return { ok: false, count: null, message: "Authentication failed — check the ISAPI username/password." };
-  if (second.notFound) return { ok: true, count: null, message: "This device did not report door capabilities on either known endpoint (not supported on this model/firmware)." };
-  if (!second.ok) return { ok: false, count: null, message: `Device responded with HTTP ${second.httpStatus} reading door capabilities.` };
+  if (second.ok && second.count) return { ok: true, count: second.count, message: `This controller supports ${second.count} door(s).` };
 
-  return second.count
-    ? { ok: true, count: second.count, message: `This controller supports ${second.count} door(s).` }
-    : { ok: true, count: null, message: "Could not determine door count from this device's capabilities response." };
+  // Neither endpoint gave us a door count, but that's not a hard failure — the device is reachable
+  // and authenticated, it just doesn't expose a capabilities count on either known path. The caller
+  // treats count:null as "unknown" and falls back to probing door numbers directly.
+  return { ok: true, count: null, message: "This device did not report a door count on either known capabilities endpoint — probing door numbers directly instead." };
 }
 
 /**
