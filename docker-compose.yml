@@ -23,6 +23,14 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # Without this the container defaults to UTC regardless of where the VPS or its users
+      # actually are. Lighting Automations store timezone-naive wall-clock times (whatever the
+      # browser's <input type="time"> shows), and the scheduler compares them against this
+      # container's local clock — so a mismatch here means automations silently fire at the
+      # wrong wall-clock hour instead of not firing at all, which looks identical to "never
+      # triggers" if you're watching for it at your own local time. Defaults to Europe/London
+      # (correctly handles the GMT/BST switch); override via TZ in .env if that's ever wrong.
+      TZ: ${TZ:-Europe/London}
       DATABASE_URL: postgresql://${POSTGRES_USER:-kynren}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kynren_asset_register}
       PORT: 4000
       CLIENT_ORIGIN: ${CLIENT_ORIGIN:?set CLIENT_ORIGIN in .env, e.g. https://your-domain.com}
