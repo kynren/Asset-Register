@@ -15,6 +15,7 @@ router.get("/:id/devices", requirePermission("admin", "view"), controller.device
 router.post("/", requirePermission("admin", "create"), validateBody(createUserSchema), controller.create);
 router.patch("/:id", requirePermission("admin", "edit"), validateBody(updateUserSchema), controller.update);
 router.post("/:id/reset-password", requirePermission("admin", "edit"), validateBody(resetPasswordSchema), controller.resetPassword);
+router.post("/:id/send-magic-link", requirePermission("admin", "edit"), controller.sendMagicLink);
 router.delete("/:id", requirePermission("admin", "delete"), controller.remove);
 
 export default router;

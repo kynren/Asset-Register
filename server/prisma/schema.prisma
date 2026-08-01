@@ -81,6 +81,8 @@ model User {
 
   refreshSessions               RefreshSession[]
   passwordResetTokens           PasswordResetToken[]
+  magicLoginTokens               MagicLoginToken[]        @relation("MagicLoginTokenUser")
+  magicLoginTokensCreated        MagicLoginToken[]        @relation("MagicLoginTokenCreatedBy")
   passwordHistory               PasswordHistory[]
   checkoutsReceived             AssetCheckout[]          @relation("CheckoutRecipient")
   checkoutsIssued               AssetCheckout[]          @relation("CheckoutIssuer")
@@ -112,6 +114,22 @@ model PasswordResetToken {
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+}
+
+// One-time, short-lived login token an admin can generate for a user from their User Detail page
+// — emailed to the user, and consuming it (POST /auth/magic-login) logs them straight in without
+// a password, same session-issuing path as a normal login. createdById records which admin sent
+// it, since (unlike self-service forgot-password) this is one account acting on another's behalf.
+model MagicLoginToken {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  user          User      @relation("MagicLoginTokenUser", fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdById   Int
+  createdBy     User      @relation("MagicLoginTokenCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
 }
 
 model PasswordHistory {
@@ -1422,6 +1440,7 @@ enum EmailEventType {
   LOW_STOCK
   DEVICE_OFFLINE
   DEVICE_ONLINE
+  MAGIC_LOGIN_LINK
 }
 
 // Blocks is an ordered array of { id, type, ...type-specific fields } — rendered to HTML by

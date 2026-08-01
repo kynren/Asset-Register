@@ -36,6 +36,7 @@ export function UserDetailPage() {
   const [roleId, setRoleId] = useState<number | "">("");
   const [saved, setSaved] = useState(false);
   const [tempPasswordInfo, setTempPasswordInfo] = useState<string | null>(null);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [showQr, setShowQr] = useState(false);
 
   const { data: user, isLoading } = useQuery({
@@ -80,6 +81,14 @@ export function UserDetailPage() {
   const resetPasswordMutation = useMutation({
     mutationFn: () => axiosClient.post(`/users/${id}/reset-password`, {}),
     onSuccess: (res) => setTempPasswordInfo(res.data.tempPassword),
+  });
+
+  const magicLinkMutation = useMutation({
+    mutationFn: () => axiosClient.post(`/users/${id}/send-magic-link`, {}),
+    onSuccess: () => {
+      setMagicLinkSent(true);
+      setTimeout(() => setMagicLinkSent(false), 4000);
+    },
   });
 
   if (isLoading || !user) {
@@ -142,14 +151,27 @@ export function UserDetailPage() {
           </div>
           <button className="btn btn-primary btn-sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>Save Changes</button>
 
-          <div className="row gap-2" style={{ marginTop: 18, borderTop: "1px solid var(--color-border)", paddingTop: 14 }}>
+          <div className="row gap-2" style={{ marginTop: 18, borderTop: "1px solid var(--color-border)", paddingTop: 14, flexWrap: "wrap" }}>
             <button className="btn btn-secondary btn-sm" onClick={() => resetPasswordMutation.mutate()} disabled={resetPasswordMutation.isPending}>
               Set Temporary Password
+            </button>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => magicLinkMutation.mutate()}
+              disabled={magicLinkMutation.isPending || !user.isActive}
+              title={!user.isActive ? "Reactivate this account first" : undefined}
+            >
+              {magicLinkSent ? "Link Sent" : "Send Magic Login Link"}
             </button>
             <button className={`btn btn-sm ${user.isActive ? "btn-danger" : "btn-secondary"}`} onClick={() => toggleActiveMutation.mutate()}>
               {user.isActive ? "Deactivate Account" : "Reactivate Account"}
             </button>
           </div>
+          {magicLinkMutation.isError && (
+            <div className="alert alert-danger" style={{ marginTop: 10 }}>
+              {(magicLinkMutation.error as any)?.response?.data?.error ?? "Could not send the login link."}
+            </div>
+          )}
         </div>
 
         <div className="card">

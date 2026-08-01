@@ -2,7 +2,7 @@ import { Router } from "express";
 import { verifyJwt } from "../../middleware/auth";
 import { validateBody } from "../../middleware/validate";
 import * as controller from "./auth.controller";
-import { changePasswordSchema, forgotPasswordSchema, loginSchema, mfaVerifySchema, resetPasswordSchema } from "./auth.schema";
+import { changePasswordSchema, forgotPasswordSchema, loginSchema, magicLoginSchema, mfaVerifySchema, resetPasswordSchema } from "./auth.schema";
 
 const router = Router();
 
@@ -14,6 +14,7 @@ router.post("/change-password", verifyJwt, validateBody(changePasswordSchema), c
 
 router.post("/forgot-password", validateBody(forgotPasswordSchema), controller.forgotPassword);
 router.post("/reset-password", validateBody(resetPasswordSchema), controller.resetPassword);
+router.post("/magic-login", validateBody(magicLoginSchema), controller.magicLogin);
 
 router.post("/mfa/enroll/start", verifyJwt, controller.mfaEnrollStart);
 router.post("/mfa/enroll/verify", verifyJwt, validateBody(mfaVerifySchema), controller.mfaEnrollVerify);

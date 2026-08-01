@@ -7,6 +7,7 @@ import { logAudit } from "../../lib/auditLogger";
 import { sendEventEmail } from "../../lib/emailNotify";
 import { generateTempPassword } from "../../lib/passwords";
 import { getPagination, paginatedResponse } from "../../lib/pagination";
+import { generateOpaqueToken, hashToken } from "../auth/auth.service";
 
 const userSelect = {
   id: true,
@@ -107,6 +108,31 @@ export async function resetPassword(req: Request, res: Response) {
   await prisma.user.update({ where: { id }, data: { passwordHash, mustChangePassword: true } });
   await logAudit({ userId: req.user!.id, action: "user.reset_password", entityType: "User", entityId: id });
   res.json({ ok: true, tempPassword: newPassword });
+}
+
+// Short-lived (15 min) since, unlike a password reset link, clicking it logs the recipient
+// straight into a live session — no separate re-authentication step.
+export async function sendMagicLink(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw new ApiError(404, "User not found");
+  if (!user.isActive) throw new ApiError(400, "Cannot send a login link to a deactivated account");
+
+  const rawToken = generateOpaqueToken();
+  const tokenHash = hashToken(rawToken);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  await prisma.magicLoginToken.create({ data: { userId: user.id, tokenHash, expiresAt, createdById: req.user!.id } });
+
+  const magicUrl = `${env.CLIENT_ORIGIN}/magic-login/${rawToken}`;
+  await sendEventEmail({
+    eventType: "MAGIC_LOGIN_LINK",
+    to: user.email,
+    variables: { firstName: user.firstName, magicUrl },
+    fallbackSubject: "Your Kynren Asset Register login link",
+    fallbackText: `Hello ${user.firstName},\n\nAn administrator generated a one-time login link for your account. This link signs you straight in and expires in 15 minutes:\n\n${magicUrl}\n\nIf you weren't expecting this, you can ignore this email.`,
+  });
+  await logAudit({ userId: req.user!.id, action: "user.magic_link_sent", entityType: "User", entityId: id });
+  res.json({ ok: true });
 }
 
 export async function remove(req: Request, res: Response) {

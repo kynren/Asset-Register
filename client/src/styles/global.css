@@ -170,6 +170,11 @@
 
   .card {
     @apply bg-surface border border-border rounded shadow-sm p-[18px];
+    resize: both;
+    overflow: auto;
+    min-width: 160px;
+    min-height: 60px;
+    max-width: 100%;
   }
 
   .stack {

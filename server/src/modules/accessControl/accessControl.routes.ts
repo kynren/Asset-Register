@@ -146,17 +146,22 @@ async function upsertDoorPlaceholder(deviceId: number, doorNumber: number) {
 // door numbers 1, 2, 3... until one comes back "not found" — there, a status-read failure (as
 // opposed to a clean 404) does stop the probe, since without a capability count a failure gives
 // no way to distinguish "this door exists but status is unreadable" from "ran off the end".
+// Hikvision access controllers sold/deployed here top out at 4 doors per panel, so discovery
+// never needs to probe or register more than that — capping here also protects against a
+// capabilities read that misreports a much larger count.
+const MAX_DOORS_PER_DEVICE = 4;
+
 async function discoverDoors(deviceId: number, ipAddress: string, port: number | null, username: string, password: string) {
   const capabilities = await getDoorCapabilities(ipAddress, port, username, password);
   if (!capabilities.ok) return { ok: false, message: capabilities.message };
 
-  const PROBE_LIMIT = 16;
   let doorsFound = 0;
   let statusReadFailures = 0;
   let firstFailureMessage: string | null = null;
 
   if (capabilities.count) {
-    for (let doorNumber = 1; doorNumber <= capabilities.count; doorNumber++) {
+    const doorLimit = Math.min(capabilities.count, MAX_DOORS_PER_DEVICE);
+    for (let doorNumber = 1; doorNumber <= doorLimit; doorNumber++) {
       const result = await getDoorStatus(ipAddress, port, username, password, doorNumber);
       if (result.ok && result.door) {
         await upsertDoorFromStatus(deviceId, result.door);
@@ -172,7 +177,7 @@ async function discoverDoors(deviceId: number, ipAddress: string, port: number |
       }
     }
   } else {
-    for (let doorNumber = 1; doorNumber <= PROBE_LIMIT; doorNumber++) {
+    for (let doorNumber = 1; doorNumber <= MAX_DOORS_PER_DEVICE; doorNumber++) {
       const result = await getDoorStatus(ipAddress, port, username, password, doorNumber);
       if (result.ok && result.door) {
         await upsertDoorFromStatus(deviceId, result.door);
