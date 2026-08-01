@@ -17,6 +17,7 @@ import {
   getDeviceInfo,
   getDoorCapabilities,
   getDoorStatus,
+  IsapiDoorStatus,
   searchAcsEvents,
 } from "../../lib/hikvisionIsapi";
 import {
@@ -103,54 +104,68 @@ function devicePassword(device: { encryptedPassword: string | null }): string {
   return device.encryptedPassword ? decryptSecret(device.encryptedPassword) : "";
 }
 
-// A Hikvision access controller comes with one or more physical doors wired to it — this reads
-// them straight from the device (ISAPI /AccessControl/Door/status reports one entry per door)
-// and upserts a Door row per doorNumber the device reports, so the user doesn't have to know or
-// manually enter how many doors a given controller has. Existing doors get their doorState (and
-// lockState, if the device actually reported one — see IsapiDoorStatus) refreshed; a doorNumber
-// never seen before gets created with a default name ("Door N") the user can rename. Called both
-// right after a device is added and from the "Refresh Doors" button.
-async function discoverDoors(deviceId: number, ipAddress: string, port: number | null, username: string, password: string) {
-  const result = await getDoorStatus(ipAddress, port, username, password);
-  if (!result.ok) return result;
-  const seenDoorNumbers = new Set<number>();
-  for (const d of result.doors) {
-    seenDoorNumbers.add(d.doorNumber);
-    const doorState = d.doorState === "open" ? "OPEN" : d.doorState === "closed" ? "CLOSED" : "UNKNOWN";
-    // Only touch lockState when the device actually reported one — most firmware doesn't
-    // include lock-relay state alongside door-contact state, and overwriting a value set by a
-    // real control command (see the /doors/:doorId/control route) with "unknown" would regress it.
-    const lockState = d.lockState === "unlocked" ? "UNLOCKED" : d.lockState === "locked" ? "LOCKED" : undefined;
-    await prisma.door.upsert({
-      where: { deviceId_doorNumber: { deviceId, doorNumber: d.doorNumber } },
-      update: { doorState, ...(lockState ? { lockState } : {}), lastCheckedAt: new Date() },
-      create: { deviceId, doorNumber: d.doorNumber, name: `Door ${d.doorNumber}`, doorState, lockState: lockState ?? "UNKNOWN", lastCheckedAt: new Date() },
-    });
-  }
+async function upsertDoorFromStatus(deviceId: number, door: IsapiDoorStatus) {
+  const doorState = door.doorState === "open" ? "OPEN" : door.doorState === "closed" ? "CLOSED" : "UNKNOWN";
+  // Only touch lockState when the device actually reported one — most firmware doesn't include
+  // lock-relay state alongside door-contact state, and overwriting a value set by a real control
+  // command (see the /doors/:doorId/control route) with "unknown" would regress it.
+  const lockState = door.lockState === "unlocked" ? "UNLOCKED" : door.lockState === "locked" ? "LOCKED" : undefined;
+  await prisma.door.upsert({
+    where: { deviceId_doorNumber: { deviceId, doorNumber: door.doorNumber } },
+    update: { doorState, ...(lockState ? { lockState } : {}), lastCheckedAt: new Date() },
+    create: { deviceId, doorNumber: door.doorNumber, name: `Door ${door.doorNumber}`, doorState, lockState: lockState ?? "UNKNOWN", lastCheckedAt: new Date() },
+  });
+}
 
-  // A multi-door panel (e.g. a 4-door DS-K2604) reports capabilities up front even for doors
-  // that haven't seen any activity yet, so status alone can under-report how many doors it
-  // actually has. Fill in the gap: any doorNumber within the controller's reported capability
-  // range that status didn't mention gets provisioned too (state UNKNOWN until it's polled or
-  // acted on), so the user sees every physical door as its own row instead of only whichever
-  // ones happened to already be open/closed.
+// A Hikvision access controller comes with one or more physical doors wired to it — this reads
+// each one straight from the device and upserts a Door row per doorNumber, so the user doesn't
+// have to know or manually enter how many doors a given controller has. Existing doors get their
+// doorState/lockState refreshed; a doorNumber never seen before gets created with a default name
+// ("Door N") the user can rename. Called both right after a device is added and from the
+// "Refresh Doors" button.
+//
+// getDoorStatus is a per-door call (see hikvisionIsapi.ts for why — confirmed against a real
+// controller that rejects a bulk "all doors" query), so this first asks getDoorCapabilities how
+// many doors the panel has and reads each one; if the device doesn't report a capability count
+// either, it falls back to probing door numbers 1, 2, 3... until one comes back "not found".
+async function discoverDoors(deviceId: number, ipAddress: string, port: number | null, username: string, password: string) {
   const capabilities = await getDoorCapabilities(ipAddress, port, username, password);
-  let extraDoorsProvisioned = 0;
-  if (capabilities.ok && capabilities.count) {
+  if (!capabilities.ok) return { ok: false, message: capabilities.message };
+
+  const PROBE_LIMIT = 16;
+  let doorsFound = 0;
+  let firstFailureMessage: string | null = null;
+
+  if (capabilities.count) {
     for (let doorNumber = 1; doorNumber <= capabilities.count; doorNumber++) {
-      if (seenDoorNumbers.has(doorNumber)) continue;
-      const existing = await prisma.door.findUnique({ where: { deviceId_doorNumber: { deviceId, doorNumber } } });
-      if (existing) continue;
-      await prisma.door.create({ data: { deviceId, doorNumber, name: `Door ${doorNumber}`, doorState: "UNKNOWN", lockState: "UNKNOWN" } });
-      extraDoorsProvisioned++;
+      const result = await getDoorStatus(ipAddress, port, username, password, doorNumber);
+      if (result.ok && result.door) {
+        await upsertDoorFromStatus(deviceId, result.door);
+        doorsFound++;
+      } else if (!result.ok) {
+        firstFailureMessage = firstFailureMessage ?? result.message;
+      }
+      // A per-door 404 despite capabilities claiming this doorNumber exists is left alone rather
+      // than guessed at — Refresh Doors will pick it up once the device actually reports it.
+    }
+  } else {
+    for (let doorNumber = 1; doorNumber <= PROBE_LIMIT; doorNumber++) {
+      const result = await getDoorStatus(ipAddress, port, username, password, doorNumber);
+      if (result.ok && result.door) {
+        await upsertDoorFromStatus(deviceId, result.door);
+        doorsFound++;
+        continue;
+      }
+      if (result.notFound) break; // ran off the end of this controller's real doors
+      if (!result.ok) {
+        firstFailureMessage = result.message;
+        break;
+      }
     }
   }
 
-  const message =
-    extraDoorsProvisioned > 0
-      ? `${result.message} Also provisioned ${extraDoorsProvisioned} additional door(s) from this controller's reported capabilities (${capabilities.count} total) that hadn't reported status yet.`
-      : result.message;
-  return { ...result, message };
+  if (doorsFound === 0 && firstFailureMessage) return { ok: false, message: firstFailureMessage };
+  return { ok: true, message: doorsFound > 0 ? `Read status for ${doorsFound} door(s).` : "This controller did not report any doors." };
 }
 
 // ───────────────────────── Devices ─────────────────────────
@@ -171,10 +186,10 @@ router.post("/devices", requirePermission("access-control", "create"), validateB
   // the UI can explain *why* no doors showed up instead of silently showing an empty list —
   // previously this was swallowed entirely, leaving no way to tell "genuinely zero doors"
   // apart from "discovery failed".
-  let doorDiscovery: { ok: boolean; doors: unknown[]; message: string } | null = null;
+  let doorDiscovery: { ok: boolean; message: string } | null = null;
   if (device.ipAddress) {
     doorDiscovery = await discoverDoors(device.id, device.ipAddress, device.port, device.username ?? "", encryptedPassword ? decryptSecret(encryptedPassword) : "").catch(
-      (err) => ({ ok: false, doors: [], message: err instanceof Error ? err.message : "Door discovery failed." })
+      (err) => ({ ok: false, message: err instanceof Error ? err.message : "Door discovery failed." })
     );
   }
 

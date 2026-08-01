@@ -245,52 +245,57 @@ export interface IsapiDoorStatus {
   lockState: "locked" | "unlocked" | "unknown";
 }
 
-/** GET /ISAPI/AccessControl/Door/status — best-effort door status read. Returns one entry
- * per door the controller actually has, so the caller (discoverDoors in accessControl.routes.ts)
- * also uses this to auto-create Door rows for doorNumbers it hasn't seen before, instead of
- * requiring the user to know and manually enter how many doors a given controller has. */
+/**
+ * GET /ISAPI/AccessControl/Door/status/<doorNo> — real-time physical door state for one door.
+ *
+ * This used to be a single bulk call with no door number, mirroring how getDoorCapabilities'
+ * DoorStatusPlan endpoint works. Verified against a real Hikvision controller (this app's own
+ * hardware testing, 2026-08): the bulk form returns HTTP 400, while every other per-resource
+ * ISAPI AccessControl endpoint in this file (DoorStatusPlan/<DoorNo>, RemoteControl/door/<doorNo>)
+ * requires the door number in the URL path — so this now follows that same, confirmed-working
+ * convention instead. discoverDoors (accessControl.routes.ts) loops this over every door number
+ * the controller's capabilities report (falling back to incremental probing if capabilities are
+ * unavailable) to build the door list.
+ */
 export async function getDoorStatus(
   hostname: string,
   port: number | null | undefined,
   username: string,
-  password: string
-): Promise<{ ok: boolean; doors: IsapiDoorStatus[]; message: string }> {
-  const url = jsonUrl(hostname, port, "/ISAPI/AccessControl/Door/status");
+  password: string,
+  doorNumber: number
+): Promise<{ ok: boolean; door: IsapiDoorStatus | null; notFound: boolean; message: string }> {
+  const url = jsonUrl(hostname, port, `/ISAPI/AccessControl/Door/status/${doorNumber}`);
   try {
     const res = await digestFetch("GET", url, username, password);
-    if (res.status === 401) return { ok: false, doors: [], message: "Authentication failed — check the ISAPI username/password." };
-    if (res.status === 404) return { ok: true, doors: [], message: "This device did not report door status (endpoint not supported on this model/firmware)." };
-    if (!res.ok) return { ok: false, doors: [], message: `Device responded with HTTP ${res.status}.` };
+    if (res.status === 401) return { ok: false, door: null, notFound: false, message: "Authentication failed — check the ISAPI username/password." };
+    if (res.status === 404) return { ok: true, door: null, notFound: true, message: `Door ${doorNumber} not found on this controller.` };
+    if (!res.ok) return { ok: false, door: null, notFound: false, message: `Device responded with HTTP ${res.status} reading door ${doorNumber} status.` };
 
-    const data = await res.json().catch(() => ({}) as Record<string, unknown>);
-    let entries = (data as any).DoorStatus ?? (data as any).doorStatus ?? [];
-    if (!Array.isArray(entries)) entries = [entries];
+    const data = (await res.json().catch(() => ({}))) as Record<string, any>;
+    const d = data.DoorStatus ?? data.doorStatus ?? data;
+    const doorRaw = String(d.doorState ?? d.status ?? "").toLowerCase();
+    const doorState: IsapiDoorStatus["doorState"] = doorRaw.includes("open") ? "open" : doorRaw.includes("clos") ? "closed" : "unknown";
 
-    const doors: IsapiDoorStatus[] = entries.map((d: Record<string, unknown>) => {
-      const doorRaw = String(d.doorState ?? d.status ?? "").toLowerCase();
-      const doorState: IsapiDoorStatus["doorState"] = doorRaw.includes("open") ? "open" : doorRaw.includes("clos") ? "closed" : "unknown";
+    const lockRaw = String(d.lockState ?? d.doorLockStatus ?? d.lockStatus ?? "").toLowerCase();
+    const lockState: IsapiDoorStatus["lockState"] = lockRaw.includes("unlock")
+      ? "unlocked"
+      : lockRaw.includes("lock")
+        ? "locked"
+        : "unknown";
 
-      const lockRaw = String(d.lockState ?? d.doorLockStatus ?? d.lockStatus ?? "").toLowerCase();
-      const lockState: IsapiDoorStatus["lockState"] = lockRaw.includes("unlock")
-        ? "unlocked"
-        : lockRaw.includes("lock")
-          ? "locked"
-          : "unknown";
-
-      return { doorNumber: Number(d.doorNo ?? d.doorNumber ?? 0), doorState, lockState };
-    });
-    return { ok: true, doors, message: `Read status for ${doors.length} door(s).` };
+    return { ok: true, door: { doorNumber, doorState, lockState }, notFound: false, message: `Read status for door ${doorNumber}.` };
   } catch (err) {
-    return { ok: false, doors: [], message: `Could not reach device: ${connectionErrorMessage(err)}` };
+    return { ok: false, door: null, notFound: false, message: `Could not reach device: ${connectionErrorMessage(err)}` };
   }
 }
 
 /**
  * Asks the controller how many physical doors it actually supports (e.g. a DS-K2604 reports 4,
- * a DS-K2601 reports 1), independent of how many doors happen to be configured/reporting status
- * right now. This is what lets discoverDoors (accessControl.routes.ts) provision every door a
- * multi-door panel has — including doors that haven't been wired/activated yet and so don't show
- * up in getDoorStatus's response — instead of only ever seeing doors that already have activity.
+ * a DS-K2601 reports 1). discoverDoors (accessControl.routes.ts) calls this first and then reads
+ * every door number in that range via getDoorStatus, so a multi-door panel's doors are all
+ * discovered up front rather than requiring the user to add each one manually. If a device
+ * doesn't report a capability count, discoverDoors falls back to probing door numbers
+ * incrementally instead.
  *
  * Per Hikvision's own ISAPI documentation (tpp.hikvision.com), the authoritative source for max
  * door count is the door-control-schedule capability doc, JSON_Cap_DoorStatusPlan, served at
