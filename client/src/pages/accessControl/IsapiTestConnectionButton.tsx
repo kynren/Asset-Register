@@ -15,11 +15,17 @@ export function IsapiTestConnectionButton({
   port,
   username,
   password,
+  deviceId,
 }: {
   ipAddress: string;
   port: number | null;
   username?: string;
   password?: string;
+  // Edit-form case: the password field is deliberately left blank ("leave blank to keep current
+  // password") rather than re-populated with the saved secret. Passing deviceId lets the backend
+  // fall back to the already-stored password when password is blank, instead of testing with an
+  // empty one and reporting a misleading "authentication failed".
+  deviceId?: number;
 }) {
   const mutation = useMutation({
     mutationFn: () =>
@@ -28,6 +34,7 @@ export function IsapiTestConnectionButton({
         port,
         username: username || undefined,
         password: password || undefined,
+        deviceId,
       }),
   });
 

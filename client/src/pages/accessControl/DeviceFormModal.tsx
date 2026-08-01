@@ -70,7 +70,7 @@ export function DeviceFormModal({
       </div>
       <p className="muted" style={{ fontSize: 12 }}>Credentials are encrypted at rest and never shown again after saving.</p>
 
-      <IsapiTestConnectionButton ipAddress={values.ipAddress} port={values.port} username={values.username} password={values.password} />
+      <IsapiTestConnectionButton ipAddress={values.ipAddress} port={values.port} username={values.username} password={values.password} deviceId={deviceId} />
     </FormModal>
   );
 }

@@ -205,7 +205,20 @@ router.patch("/devices/:id", requirePermission("access-control", "edit"), valida
     select: deviceSelect,
   });
   await logAudit({ userId: req.user!.id, action: "accessControlDevice.update", entityType: "AccessControlDevice", entityId: device.id });
-  res.json(device);
+
+  // Same best-effort discovery as device creation — an edit commonly means the IP/credentials
+  // just got fixed (e.g. after a failed Test Connection), so re-pull doors right away instead of
+  // requiring a separate manual "Refresh Doors" click before the card shows anything useful.
+  let doorDiscovery: { ok: boolean; message: string } | null = null;
+  if (device.ipAddress) {
+    const passwordForDiscovery = encryptedPassword ? decryptSecret(encryptedPassword) : devicePassword(await loadDeviceWithSecret(device.id));
+    doorDiscovery = await discoverDoors(device.id, device.ipAddress, device.port, device.username ?? "", passwordForDiscovery).catch(
+      (err) => ({ ok: false, message: err instanceof Error ? err.message : "Door discovery failed." })
+    );
+  }
+
+  const withDoors = await prisma.accessControlDevice.findUnique({ where: { id: device.id }, select: deviceSelect });
+  res.json({ ...(withDoors ?? device), doorDiscovery });
 });
 
 router.delete("/devices/:id", requirePermission("access-control", "delete"), async (req, res) => {
@@ -220,8 +233,13 @@ router.delete("/devices/:id", requirePermission("access-control", "delete"), asy
 // AccessControl-specific calls, so "Test Connection" stays reliable even before those are
 // verified against a real controller.
 router.post("/isapi/test-connection", requirePermission("access-control", "view"), validateBody(isapiConnectionSchema), async (req, res) => {
-  const { ipAddress, port, username, password } = req.body;
-  res.json(await getDeviceInfo(ipAddress, port, username ?? "", password ?? ""));
+  const { ipAddress, port, username, password, deviceId } = req.body;
+  let effectivePassword = password ?? "";
+  if (!effectivePassword && deviceId) {
+    const device = await prisma.accessControlDevice.findUnique({ where: { id: deviceId } });
+    if (device?.encryptedPassword) effectivePassword = decryptSecret(device.encryptedPassword);
+  }
+  res.json(await getDeviceInfo(ipAddress, port, username ?? "", effectivePassword));
 });
 
 router.post("/devices/:id/check-status", requirePermission("access-control", "edit"), async (req, res) => {
