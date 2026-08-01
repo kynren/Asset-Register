@@ -9,11 +9,13 @@ import { decryptSecret, encryptSecret } from "../../lib/crypto";
 import { pingHost } from "../../lib/ping";
 import { attemptConnect, getCoordinator, listDevices, updateCoordinatorConfig } from "../../lib/zigbeeCoordinator";
 import {
+  captureCardId,
   controlDoor,
   createOrUpdateAcsUser,
   deleteAcsUser,
   enrollCard,
   getDeviceInfo,
+  getDoorCapabilities,
   getDoorStatus,
   searchAcsEvents,
 } from "../../lib/hikvisionIsapi";
@@ -111,7 +113,9 @@ function devicePassword(device: { encryptedPassword: string | null }): string {
 async function discoverDoors(deviceId: number, ipAddress: string, port: number | null, username: string, password: string) {
   const result = await getDoorStatus(ipAddress, port, username, password);
   if (!result.ok) return result;
+  const seenDoorNumbers = new Set<number>();
   for (const d of result.doors) {
+    seenDoorNumbers.add(d.doorNumber);
     const doorState = d.doorState === "open" ? "OPEN" : d.doorState === "closed" ? "CLOSED" : "UNKNOWN";
     // Only touch lockState when the device actually reported one — most firmware doesn't
     // include lock-relay state alongside door-contact state, and overwriting a value set by a
@@ -123,7 +127,30 @@ async function discoverDoors(deviceId: number, ipAddress: string, port: number |
       create: { deviceId, doorNumber: d.doorNumber, name: `Door ${d.doorNumber}`, doorState, lockState: lockState ?? "UNKNOWN", lastCheckedAt: new Date() },
     });
   }
-  return result;
+
+  // A multi-door panel (e.g. a 4-door DS-K2604) reports capabilities up front even for doors
+  // that haven't seen any activity yet, so status alone can under-report how many doors it
+  // actually has. Fill in the gap: any doorNumber within the controller's reported capability
+  // range that status didn't mention gets provisioned too (state UNKNOWN until it's polled or
+  // acted on), so the user sees every physical door as its own row instead of only whichever
+  // ones happened to already be open/closed.
+  const capabilities = await getDoorCapabilities(ipAddress, port, username, password);
+  let extraDoorsProvisioned = 0;
+  if (capabilities.ok && capabilities.count) {
+    for (let doorNumber = 1; doorNumber <= capabilities.count; doorNumber++) {
+      if (seenDoorNumbers.has(doorNumber)) continue;
+      const existing = await prisma.door.findUnique({ where: { deviceId_doorNumber: { deviceId, doorNumber } } });
+      if (existing) continue;
+      await prisma.door.create({ data: { deviceId, doorNumber, name: `Door ${doorNumber}`, doorState: "UNKNOWN", lockState: "UNKNOWN" } });
+      extraDoorsProvisioned++;
+    }
+  }
+
+  const message =
+    extraDoorsProvisioned > 0
+      ? `${result.message} Also provisioned ${extraDoorsProvisioned} additional door(s) from this controller's reported capabilities (${capabilities.count} total) that hadn't reported status yet.`
+      : result.message;
+  return { ...result, message };
 }
 
 // ───────────────────────── Devices ─────────────────────────
@@ -203,6 +230,18 @@ router.post("/devices/:id/refresh-doors", requirePermission("access-control", "e
   if (!device.ipAddress) throw new ApiError(400, "This device has no IP address set");
 
   const result = await discoverDoors(device.id, device.ipAddress, device.port, device.username ?? "", devicePassword(device));
+  res.json(result);
+});
+
+// Reads whatever card is presented at a reader wired to this controller — used by the "Read"
+// button on the Person Credential tab's Add Card dialog so an operator can tap a physical card
+// instead of typing its number. Blocks (with a long timeout) on the device side until a card is
+// presented, so this can take several seconds to respond — that's expected, not a hang.
+router.post("/devices/:id/capture-card", requirePermission("access-control", "edit"), async (req, res) => {
+  const device = await loadDeviceWithSecret(Number(req.params.id));
+  if (!device.ipAddress) throw new ApiError(400, "This device has no IP address set");
+
+  const result = await captureCardId(device.ipAddress, device.port, device.username ?? "", devicePassword(device));
   res.json(result);
 });
 

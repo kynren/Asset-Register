@@ -286,6 +286,45 @@ export async function getDoorStatus(
 }
 
 /**
+ * GET /ISAPI/AccessControl/Door/capabilities — asks the controller how many physical doors it
+ * actually supports (e.g. a DS-K2604 reports 4, a DS-K2601 reports 1), independent of how many
+ * doors happen to be configured/reporting status right now. This is what lets discoverDoors
+ * (accessControl.routes.ts) provision every door a multi-door panel has — including doors that
+ * haven't been wired/activated yet and so don't show up in getDoorStatus's response — instead of
+ * only ever seeing doors that already have activity.
+ *
+ * Hikvision's capabilities documents aren't perfectly uniform across firmware, so this checks a
+ * few known shapes for the door-count range (commonly a doorNo min/max pair) and returns `count:
+ * null` rather than guessing if none match — the caller falls back to whatever getDoorStatus
+ * reported in that case, exactly like before this existed.
+ */
+export async function getDoorCapabilities(
+  hostname: string,
+  port: number | null | undefined,
+  username: string,
+  password: string
+): Promise<{ ok: boolean; count: number | null; message: string }> {
+  const url = jsonUrl(hostname, port, "/ISAPI/AccessControl/Door/capabilities");
+  try {
+    const res = await digestFetch("GET", url, username, password);
+    if (res.status === 401) return { ok: false, count: null, message: "Authentication failed — check the ISAPI username/password." };
+    if (res.status === 404) return { ok: true, count: null, message: "This device did not report door capabilities (endpoint not supported on this model/firmware)." };
+    if (!res.ok) return { ok: false, count: null, message: `Device responded with HTTP ${res.status}.` };
+
+    const data = (await res.json().catch(() => ({}))) as Record<string, any>;
+    const doorNoRange = data.DoorCap?.doorNo ?? data.DoorCaps?.doorNo ?? data.doorNo;
+    const max = doorNoRange?.["@max"] ?? doorNoRange?.max;
+    const count = max !== undefined ? Number(max) : null;
+
+    return count && count > 0
+      ? { ok: true, count, message: `This controller supports ${count} door(s).` }
+      : { ok: true, count: null, message: "Could not determine door count from this device's capabilities response." };
+  } catch (err) {
+    return { ok: false, count: null, message: `Could not reach device: ${connectionErrorMessage(err)}` };
+  }
+}
+
+/**
  * POST /ISAPI/AccessControl/UserInfo/Record — provisions (or overwrites) one person record on
  * the controller under employeeNo, with an optional validity window enforced by the device
  * itself. This is the same call Hikvision's own iVMS-4200 "Person" screen makes when adding
@@ -359,6 +398,37 @@ export async function enrollCard(
     return { ok: true, message: `Card ${cardNumber} enrolled against ${employeeNo}.` };
   } catch (err) {
     return { ok: false, message: `Could not reach device: ${connectionErrorMessage(err)}` };
+  }
+}
+
+/**
+ * GET /ISAPI/AccessControl/CaptureCardId — reads whatever card is presented at a reader wired
+ * to this controller, for card-enrollment UIs ("tap a card, its number appears in the field").
+ * This blocks on the device side until a card is presented or it times out, so it's given a much
+ * longer timeout than this module's other calls (real desktop enrollment tools like iVMS-4200
+ * give an operator ~10-15s to tap the card). A device that reports no card presented within that
+ * window is a normal outcome, not an error — the caller should let the user try again.
+ */
+export async function captureCardId(
+  hostname: string,
+  port: number | null | undefined,
+  username: string,
+  password: string
+): Promise<{ ok: boolean; cardNo: string | null; message: string }> {
+  const url = jsonUrl(hostname, port, "/ISAPI/AccessControl/CaptureCardId");
+  try {
+    const res = await digestFetch("GET", url, username, password, { timeoutMs: 15000 });
+    if (res.status === 401) return { ok: false, cardNo: null, message: "Authentication failed — check the ISAPI username/password." };
+    if (res.status === 404) return { ok: false, cardNo: null, message: "This device does not support card capture (endpoint not supported on this model/firmware)." };
+    if (!res.ok) return { ok: false, cardNo: null, message: `Device responded with HTTP ${res.status}.` };
+
+    const data = (await res.json().catch(() => ({}))) as Record<string, any>;
+    const cardNo = data.CardNoInfo?.cardNo ?? data.CaptureCardId?.cardNo ?? data.cardNo ?? null;
+    return cardNo
+      ? { ok: true, cardNo: String(cardNo), message: `Read card ${cardNo}.` }
+      : { ok: false, cardNo: null, message: "No card was presented at the reader — try again and tap the card within the time limit." };
+  } catch (err) {
+    return { ok: false, cardNo: null, message: `Could not reach device: ${connectionErrorMessage(err)}` };
   }
 }
 

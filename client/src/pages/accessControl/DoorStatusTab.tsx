@@ -176,51 +176,47 @@ export function DoorStatusTab() {
       )}
 
       {pageDoors.length > 0 && (
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
           {pageDoors.map((door) => {
             const isOpen = door.doorState === "OPEN";
             const isUnlocked = door.lockState === "UNLOCKED";
             return (
-              <div key={door.id} className="card" style={{ padding: 12, cursor: "pointer" }} onClick={() => setActiveDoor(door)}>
+              <div key={door.id} className="card" style={{ padding: "10px 12px", cursor: "pointer" }} onClick={() => setActiveDoor(door)}>
                 <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <input type="checkbox" checked={selected.has(door.id)} onChange={() => toggleSelected(door.id)} onClick={(e) => e.stopPropagation()} />
-                </div>
-                <div className="row" style={{ justifyContent: "center", margin: "4px 0 8px" }}>
-                  <div style={{ position: "relative", width: 56, height: 56 }}>
+                  <div style={{ position: "relative", width: 44, height: 44 }}>
                     <div
                       className="row"
                       style={{
-                        width: 56, height: 56, borderRadius: 10, alignItems: "center", justifyContent: "center",
+                        width: 44, height: 44, borderRadius: 8, alignItems: "center", justifyContent: "center",
                         background: isOpen ? "var(--color-warning-soft, #fef3c7)" : "var(--color-surface-muted, #e5e7eb)",
                         color: isOpen ? "var(--color-warning, #b45309)" : "var(--color-text-muted)",
                       }}
                     >
-                      <Icon name="door" size={26} />
+                      <Icon name="door" size={20} />
                     </div>
                     <div
                       className="row"
                       style={{
-                        position: "absolute", right: -4, bottom: -4, width: 22, height: 22, borderRadius: "50%",
+                        position: "absolute", right: -4, bottom: -4, width: 18, height: 18, borderRadius: "50%",
                         alignItems: "center", justifyContent: "center", border: "2px solid var(--color-surface)",
                         background: isUnlocked ? "var(--color-success, #16a34a)" : "var(--color-text-muted)", color: "#fff",
                       }}
                     >
-                      <Icon name={isUnlocked ? "unlock" : "password"} size={11} />
+                      <Icon name={isUnlocked ? "unlock" : "password"} size={9} />
                     </div>
                   </div>
+                  <input type="checkbox" checked={selected.has(door.id)} onChange={() => toggleSelected(door.id)} onClick={(e) => e.stopPropagation()} />
                 </div>
-                <p className="row" style={{ justifyContent: "center", textAlign: "center", fontSize: 12, fontWeight: 600, margin: "0 0 6px" }} title={`${door.deviceName} — ${door.name}`}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--color-primary)", margin: "8px 0 6px", lineHeight: 1.3 }} title={`${door.deviceName} — ${door.name}`}>
                   {door.deviceName} {door.name}
                 </p>
-                <div className="stack gap-1" style={{ fontSize: 11 }}>
-                  <div className="row gap-1" style={{ justifyContent: "center" }}>
+                <div className="row gap-3" style={{ fontSize: 11 }}>
+                  <div className="row gap-1" style={{ alignItems: "center" }}>
                     <Icon name="door" size={12} />
-                    <span className="muted">Door</span>
                     <span>{door.doorState === "UNKNOWN" ? "—" : door.doorState === "OPEN" ? "Open" : "Closed"}</span>
                   </div>
-                  <div className="row gap-1" style={{ justifyContent: "center" }}>
+                  <div className="row gap-1" style={{ alignItems: "center" }}>
                     <Icon name={isUnlocked ? "unlock" : "password"} size={12} />
-                    <span className="muted">Lock</span>
                     <span>{door.lockState === "UNKNOWN" ? "—" : door.lockState === "UNLOCKED" ? "Unlocked" : "Locked"}</span>
                   </div>
                 </div>
