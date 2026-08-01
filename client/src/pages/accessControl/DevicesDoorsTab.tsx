@@ -82,7 +82,12 @@ export function DevicesDoorsTab() {
 
   const updateDeviceMutation = useMutation({
     mutationFn: (values: DeviceFormValues) => axiosClient.patch(`/access-control/devices/${editingDevice!.id}`, stripBlankPassword(values)),
-    onSuccess: () => { invalidate(); setEditingDevice(null); },
+    onSuccess: (res) => {
+      const { id, doorDiscovery } = res.data as { id: number; doorDiscovery: { ok: boolean; message: string } | null };
+      if (doorDiscovery) setDiscoveryResults((r) => ({ ...r, [id]: doorDiscovery }));
+      invalidate();
+      setEditingDevice(null);
+    },
   });
 
   const deleteDeviceMutation = useMutation({

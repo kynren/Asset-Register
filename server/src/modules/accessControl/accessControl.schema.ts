@@ -29,6 +29,11 @@ export const isapiConnectionSchema = z.object({
   port: z.number().int().nullable().optional(),
   username: z.string().optional(),
   password: z.string().optional(),
+  // Set when testing from the Edit Device form, where the password field is deliberately left
+  // blank ("leave blank to keep current password") rather than re-populated with the saved
+  // secret. When password is empty and this is set, the route falls back to the device's already
+  // -stored password instead of testing with a blank one.
+  deviceId: z.number().int().optional(),
 });
 
 // Mirrors Hikvision's own UserInfo.RightPlan — one schedule template per door this credential
