@@ -49,4 +49,21 @@ router.delete("/:id", requirePermission("admin", "delete"), async (req, res) => 
   res.json({ ok: true });
 });
 
+router.post("/:id/duplicate", requirePermission("admin", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.location.findUnique({ where: { id } });
+  if (!source) throw new ApiError(404, "Location not found");
+
+  let newName = `${source.name} (Copy)`;
+  let suffix = 1;
+  while (await prisma.location.findUnique({ where: { name: newName } })) {
+    suffix += 1;
+    newName = `${source.name} (Copy ${suffix})`;
+  }
+
+  const clone = await prisma.location.create({ data: { name: newName, address: source.address } });
+  await logAudit({ userId: req.user!.id, action: "location.duplicate", entityType: "Location", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+});
+
 export default router;

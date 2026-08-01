@@ -68,6 +68,27 @@ export async function deactivate(req: Request, res: Response) {
   res.json(template);
 }
 
+// Created as inactive — only one template per eventType can be active at once (see activate()
+// above), and a fresh duplicate shouldn't silently take over live sending for its event.
+export async function duplicate(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const source = await prisma.emailTemplate.findUnique({ where: { id } });
+  if (!source) throw new ApiError(404, "Email template not found");
+
+  const clone = await prisma.emailTemplate.create({
+    data: {
+      name: `${source.name} (Copy)`,
+      eventType: source.eventType,
+      subject: source.subject,
+      blocks: source.blocks as any,
+      isActive: false,
+      createdById: req.user!.id,
+    },
+  });
+  await logAudit({ userId: req.user!.id, action: "emailTemplate.duplicate", entityType: "EmailTemplate", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+}
+
 export async function uploadImage(req: Request, res: Response) {
   if (!req.file) throw new ApiError(400, "No file uploaded");
   res.status(201).json({ url: `/uploads/email-templates/${req.file.filename}` });

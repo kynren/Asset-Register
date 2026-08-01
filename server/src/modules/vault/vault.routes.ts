@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../../config/prisma";
 import { verifyJwt } from "../../middleware/auth";
+import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { decryptVaultSecret, encryptVaultSecret } from "../../lib/crypto";
@@ -20,7 +21,7 @@ const listSelect = {
   updatedAt: true,
 };
 
-router.get("/", async (req, res) => {
+router.get("/", requirePermission("password", "view"), async (req, res) => {
   const entries = await prisma.vaultEntry.findMany({
     where: { userId: req.user!.id },
     select: listSelect,
@@ -29,7 +30,7 @@ router.get("/", async (req, res) => {
   res.json(entries);
 });
 
-router.post("/", validateBody(createVaultEntrySchema), async (req, res) => {
+router.post("/", requirePermission("password", "create"), validateBody(createVaultEntrySchema), async (req, res) => {
   const { password, ...rest } = req.body;
   const entry = await prisma.vaultEntry.create({
     data: { ...rest, userId: req.user!.id, encryptedPassword: encryptVaultSecret(password) },
@@ -39,7 +40,7 @@ router.post("/", validateBody(createVaultEntrySchema), async (req, res) => {
   res.status(201).json(entry);
 });
 
-router.patch("/:id", validateBody(updateVaultEntrySchema), async (req, res) => {
+router.patch("/:id", requirePermission("password", "edit"), validateBody(updateVaultEntrySchema), async (req, res) => {
   const id = Number(req.params.id);
   const existing = await prisma.vaultEntry.findUnique({ where: { id } });
   if (!existing || existing.userId !== req.user!.id) throw new ApiError(404, "Vault entry not found");
@@ -54,7 +55,7 @@ router.patch("/:id", validateBody(updateVaultEntrySchema), async (req, res) => {
   res.json(entry);
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requirePermission("password", "delete"), async (req, res) => {
   const id = Number(req.params.id);
   const existing = await prisma.vaultEntry.findUnique({ where: { id } });
   if (!existing || existing.userId !== req.user!.id) throw new ApiError(404, "Vault entry not found");
@@ -64,7 +65,7 @@ router.delete("/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
-router.post("/:id/reveal", async (req, res) => {
+router.post("/:id/reveal", requirePermission("password", "view"), async (req, res) => {
   const id = Number(req.params.id);
   const entry = await prisma.vaultEntry.findUnique({ where: { id } });
   if (!entry || entry.userId !== req.user!.id) throw new ApiError(404, "Vault entry not found");

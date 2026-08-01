@@ -81,7 +81,11 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="stack gap-3">
+    <div className="stack gap-3 relative">
+      <div className="dashboard-ambient" aria-hidden="true">
+        <span /><span /><span />
+      </div>
+
       <div className="page-header">
         <div>
           <h1 className="page-title">Dashboard</h1>
@@ -92,7 +96,7 @@ export function DashboardPage() {
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={layout.map((w) => w.id)} strategy={rectSortingStrategy}>
-          <div className="widget-grid">
+          <div className="widget-grid relative z-[1]">
             {layout.map((item) => {
               const def = WIDGET_CATALOG.find((w) => w.id === item.id);
               if (!def) return null;

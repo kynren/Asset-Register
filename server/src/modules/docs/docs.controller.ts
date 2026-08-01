@@ -192,6 +192,36 @@ export async function remove(req: Request, res: Response) {
   res.json({ ok: true });
 }
 
+// Created unpublished (and never git-synced, since externalKey stays null) — a duplicate is a
+// starting point to edit further, not a second copy of a live SOP the library should surface as
+// equally authoritative until someone reviews and publishes it.
+export async function duplicate(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const source = await prisma.document.findUnique({ where: { id } });
+  if (!source) throw new ApiError(404, "Document not found");
+
+  const title = `${source.title} (Copy)`;
+  const sections = source.sections as Record<string, unknown>;
+  const clone = await prisma.document.create({
+    data: {
+      title,
+      docType: source.docType,
+      category: source.category,
+      collectionId: source.collectionId,
+      summary: source.summary,
+      sections: sections as Prisma.InputJsonValue,
+      tags: source.tags,
+      isPublished: false,
+      reviewDueDate: source.reviewDueDate,
+      searchText: buildSearchText({ title, summary: source.summary, sections, tags: source.tags }),
+      createdById: req.user!.id,
+    },
+    include: detailInclude,
+  });
+  await logAudit({ userId: req.user!.id, action: "docs.duplicate", entityType: "Document", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+}
+
 export async function uploadAttachment(req: Request, res: Response) {
   const documentId = Number(req.params.id);
   if (!req.file) throw new ApiError(400, "No file uploaded");

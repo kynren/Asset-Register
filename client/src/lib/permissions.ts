@@ -11,6 +11,7 @@ export const MODULES = [
   "virtual-assistant",
   "docs",
   "admin",
+  "password",
 ] as const;
 
 export type ModuleName = (typeof MODULES)[number];

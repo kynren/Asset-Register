@@ -74,46 +74,62 @@ export const updateDeviceIconSchema = z.object({
   icon: z.string().nullable(),
 });
 
-// ───────────────────────── Scenes ─────────────────────────
+// ───────────────────────── Scenes / Automations shared: device actions ─────────────────────────
+// Both a Scene activation and a DEVICE-type Automation apply the same shape of action — turn a
+// device on/off (and set brightness for dimmable lights) — across one or more devices at once.
 
-const sceneActionSchema = z.object({
+export const deviceActionSchema = z.object({
   deviceId: z.number().int(),
   turnOn: z.boolean(),
   brightness: z.number().int().min(0).max(100).nullable().optional(),
 });
 
+// ───────────────────────── Scenes ─────────────────────────
+
 export const createSceneSchema = z.object({
   name: z.string().min(1),
   icon: z.string().optional(),
-  actions: z.array(sceneActionSchema).default([]),
+  actions: z.array(deviceActionSchema).default([]),
 });
 
 export const updateSceneSchema = z.object({
   name: z.string().min(1).optional(),
   icon: z.string().optional(),
-  actions: z.array(sceneActionSchema).optional(),
+  actions: z.array(deviceActionSchema).optional(),
 });
 
 // ───────────────────────── Automations ─────────────────────────
+
+const timeOfDaySchema = z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Use 24-hour HH:mm");
 
 export const createAutomationSchema = z
   .object({
     name: z.string().min(1),
     isEnabled: z.boolean().optional(),
     daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1),
-    timeOfDay: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Use 24-hour HH:mm"),
+    timeOfDay: timeOfDaySchema,
     actionType: z.enum(["DEVICE", "SCENE"]),
-    targetDeviceId: z.number().int().nullable().optional(),
+    // DEVICE actions can target multiple devices at once, same as a Scene.
+    actions: z.array(deviceActionSchema).optional(),
     targetSceneId: z.number().int().nullable().optional(),
-    turnOn: z.boolean().nullable().optional(),
+    // Optional paired "off" trigger — DEVICE automations only, turns every action device off.
+    offTimeOfDay: timeOfDaySchema.nullable().optional(),
   })
-  .refine((v) => v.actionType !== "DEVICE" || (v.targetDeviceId != null && v.turnOn != null), {
-    message: "A device action needs a target device and an on/off value.",
-    path: ["targetDeviceId"],
+  .refine((v) => v.actionType !== "DEVICE" || (v.actions != null && v.actions.length > 0), {
+    message: "A device action needs at least one target device.",
+    path: ["actions"],
   })
   .refine((v) => v.actionType !== "SCENE" || v.targetSceneId != null, {
     message: "A scene action needs a target scene.",
     path: ["targetSceneId"],
+  })
+  .refine((v) => v.actionType === "DEVICE" || v.offTimeOfDay == null, {
+    message: "An off time is only supported for device automations.",
+    path: ["offTimeOfDay"],
+  })
+  .refine((v) => v.offTimeOfDay == null || v.offTimeOfDay !== v.timeOfDay, {
+    message: "Off time must be different from the on time.",
+    path: ["offTimeOfDay"],
   });
 
 // ───────────────────────── ZigBee (scaffold) ─────────────────────────
@@ -126,9 +142,9 @@ export const updateAutomationSchema = z.object({
   name: z.string().min(1).optional(),
   isEnabled: z.boolean().optional(),
   daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1).optional(),
-  timeOfDay: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Use 24-hour HH:mm").optional(),
+  timeOfDay: timeOfDaySchema.optional(),
   actionType: z.enum(["DEVICE", "SCENE"]).optional(),
-  targetDeviceId: z.number().int().nullable().optional(),
+  actions: z.array(deviceActionSchema).optional(),
   targetSceneId: z.number().int().nullable().optional(),
-  turnOn: z.boolean().nullable().optional(),
+  offTimeOfDay: timeOfDaySchema.nullable().optional(),
 });

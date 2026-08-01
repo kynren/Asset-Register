@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, closestCenter, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
@@ -6,6 +6,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
+import { KpiCard } from "../../components/KpiCard";
+import { RadialGauge } from "../../components/RadialGauge";
+import { SimpleBarChart } from "../../components/ChartWrapper";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
@@ -18,11 +21,24 @@ interface LightingGroup {
   sortOrder: number;
 }
 
+interface DashboardSummary {
+  totalDevices: number;
+  devicesOn: number;
+  totalPowerW: number;
+  roomsCount: number;
+  automationsActiveCount: number;
+  devicesPerRoom: { roomId: number; roomName: string; icon: string | null; deviceCount: number; devicesOn: number }[];
+  activityByDay: { day: string; count: number }[];
+}
+
 const ICON_CHOICES = ["bulb", "home", "layers", "cpu", "star", "diamond", "sun", "moon", "wifi", "plug", "gauge", "briefcase", "camera", "mapPin", "grid", "bookmark"];
 
 const UNGROUPED_DROP_ID = "ungrouped-drop";
+type RoomSelection = number | "ungrouped";
 
 export function DashboardTab() {
+  const [view, setView] = useState<"overview" | "manage">("overview");
+  const [selectedRoom, setSelectedRoom] = useState<RoomSelection | null>(null);
   const [addingGroup, setAddingGroup] = useState(false);
   const [renamingGroup, setRenamingGroup] = useState<LightingGroup | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<LightingGroup | null>(null);
@@ -38,6 +54,12 @@ export function DashboardTab() {
   const { data: devices, isLoading: devicesLoading } = useQuery({
     queryKey: ["lighting-devices"],
     queryFn: async () => (await axiosClient.get("/lighting/devices")).data as LightingDevice[],
+    refetchInterval: 30_000,
+  });
+  const { data: summary, isLoading: summaryLoading } = useQuery({
+    queryKey: ["lighting-dashboard-summary"],
+    queryFn: async () => (await axiosClient.get("/lighting/dashboard-summary")).data as DashboardSummary,
+    refetchInterval: 30_000,
   });
 
   function invalidateGroups() {
@@ -45,35 +67,35 @@ export function DashboardTab() {
   }
   function invalidateDevices() {
     queryClient.invalidateQueries({ queryKey: ["lighting-devices"] });
+    queryClient.invalidateQueries({ queryKey: ["lighting-dashboard-summary"] });
   }
 
   const moveMutation = useMutation({
     mutationFn: ({ deviceId, groupId }: { deviceId: number; groupId: number | null }) => axiosClient.patch(`/lighting/devices/${deviceId}/move`, { groupId }),
     onSuccess: invalidateDevices,
   });
-
   const reorderGroupsMutation = useMutation({
     mutationFn: (ids: number[]) => axiosClient.post("/lighting/groups/reorder", { ids }),
     onSuccess: invalidateGroups,
   });
-
   const deviceIconMutation = useMutation({
     mutationFn: ({ deviceId, icon }: { deviceId: number; icon: string | null }) => axiosClient.patch(`/lighting/devices/${deviceId}/icon`, { icon }),
     onSuccess: () => { invalidateDevices(); setPickingIconFor(null); },
   });
-
   const groupIconMutation = useMutation({
     mutationFn: ({ groupId, icon }: { groupId: number; icon: string | null }) => axiosClient.patch(`/lighting/groups/${groupId}`, { icon }),
     onSuccess: () => { invalidateGroups(); setPickingIconFor(null); },
   });
-
   const deleteGroupMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/lighting/groups/${id}`),
     onSuccess: () => { invalidateGroups(); invalidateDevices(); setDeletingGroup(null); },
   });
-
   const powerMutation = useMutation({
     mutationFn: ({ id, on }: { id: number; on: boolean }) => axiosClient.post(`/lighting/devices/${id}/power`, { on }),
+    onSuccess: invalidateDevices,
+  });
+  const brightnessMutation = useMutation({
+    mutationFn: ({ id, value }: { id: number; value: number }) => axiosClient.post(`/lighting/devices/${id}/brightness`, { value }),
     onSuccess: invalidateDevices,
   });
 
@@ -90,6 +112,19 @@ export function DashboardTab() {
   const sortedGroups = useMemo(() => [...(groups ?? [])].sort((a, b) => a.sortOrder - b.sortOrder), [groups]);
   const ungroupedDevices = devicesByGroup.get(null) ?? [];
   const activeDevice = devices?.find((d) => d.id === activeDeviceId) ?? null;
+
+  // Default to the first real room, falling back to "Ungrouped" once data has loaded.
+  useEffect(() => {
+    if (selectedRoom !== null) return;
+    if (sortedGroups.length > 0) setSelectedRoom(sortedGroups[0].id);
+    else if (ungroupedDevices.length > 0) setSelectedRoom("ungrouped");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedGroups.length, ungroupedDevices.length]);
+
+  const selectedRoomDevices = selectedRoom === "ungrouped" ? ungroupedDevices : devices?.filter((d) => d.groupId === selectedRoom) ?? [];
+  const selectedRoomLabel = selectedRoom === "ungrouped" ? "Ungrouped" : sortedGroups.find((g) => g.id === selectedRoom)?.name ?? null;
+  const selectedRoomIcon = selectedRoom === "ungrouped" ? "layers" : sortedGroups.find((g) => g.id === selectedRoom)?.icon ?? "home";
+  const dimmableLight = selectedRoomDevices.find((d) => d.kind === "LIGHT" && d.protocol !== "GENERIC_HTTP");
 
   function handleDragStart(event: DragStartEvent) {
     const data = event.active.data.current as { type?: string; deviceId?: number } | undefined;
@@ -114,7 +149,6 @@ export function DashboardTab() {
       return;
     }
 
-    // Otherwise this was a group-card drag (card ids are "group-<id>") — reorder.
     if (String(active.id).startsWith("group-") && String(over.id).startsWith("group-") && active.id !== over.id) {
       const ids = sortedGroups.map((g) => g.id);
       const oldIndex = sortedGroups.findIndex((g) => `group-${g.id}` === active.id);
@@ -127,56 +161,237 @@ export function DashboardTab() {
 
   return (
     <div className="stack gap-3">
-      <div className="row gap-2" style={{ justifyContent: "flex-end" }}>
+      <div className="row gap-2" style={{ justifyContent: "space-between" }}>
+        <div className="row gap-2">
+          <button className={`btn btn-sm ${view === "overview" ? "btn-primary" : "btn-secondary"}`} onClick={() => setView("overview")}>Overview</button>
+          <button className={`btn btn-sm ${view === "manage" ? "btn-primary" : "btn-secondary"}`} onClick={() => setView("manage")}>Manage Locations</button>
+        </div>
         <PermissionGate module="lighting" action="create">
-          <button className="btn btn-primary" onClick={() => setAddingGroup(true)}><Icon name="plus" size={14} /> Add Group</button>
+          <button className="btn btn-primary" onClick={() => setAddingGroup(true)}><Icon name="plus" size={14} /> Add Location</button>
         </PermissionGate>
       </div>
 
-      {isLoading && (
-        <div className="grid grid-cols-3 gap-3">
-          <Skeleton height={160} /><Skeleton height={160} /><Skeleton height={160} />
-        </div>
-      )}
+      {view === "overview" ? (
+        <div className="stack gap-3">
+          <div className="grid grid-cols-5 gap-3">
+            <KpiCard label="Total Devices" value={summary?.totalDevices ?? "—"} icon="plug" tone="primary" />
+            <KpiCard label="Devices On" value={summary?.devicesOn ?? "—"} icon="power" tone="success" live={(summary?.devicesOn ?? 0) > 0} />
+            <KpiCard label="Power Draw" value={summary ? `${summary.totalPowerW} W` : "—"} icon="gauge" tone="warning" />
+            <KpiCard label="Locations" value={summary?.roomsCount ?? "—"} icon="layers" tone="primary" />
+            <KpiCard label="Automations Active" value={summary?.automationsActiveCount ?? "—"} icon="clock" tone="primary" />
+          </div>
 
-      {!isLoading && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <SortableContext items={sortedGroups.map((g) => `group-${g.id}`)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-3 gap-3">
-              {sortedGroups.map((group) => (
-                <GroupCard
-                  key={group.id}
-                  group={group}
-                  devices={devicesByGroup.get(group.id) ?? []}
-                  onToggleDevice={(id, on) => powerMutation.mutate({ id, on })}
-                  onPickIcon={(current) => setPickingIconFor({ kind: "group", id: group.id, current })}
-                  onPickDeviceIcon={(deviceId, current) => setPickingIconFor({ kind: "device", id: deviceId, current })}
-                  onRename={() => setRenamingGroup(group)}
-                  onDelete={() => setDeletingGroup(group)}
-                />
-              ))}
-            </div>
-          </SortableContext>
-
-          <UngroupedCard
-            devices={ungroupedDevices}
-            onToggleDevice={(id, on) => powerMutation.mutate({ id, on })}
-            onPickDeviceIcon={(deviceId, current) => setPickingIconFor({ kind: "device", id: deviceId, current })}
-          />
-
-          <DragOverlay>
-            {activeDevice && (
-              <div className="card" style={{ padding: "6px 10px", display: "inline-flex", alignItems: "center", gap: 6, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
-                <Icon name={activeDevice.icon ?? (activeDevice.kind === "LIGHT" ? "bulb" : "plug")} size={14} />
-                <span style={{ fontSize: 12 }}>{activeDevice.name}</span>
+          <div className="grid grid-cols-5 gap-3">
+            <div className="card" style={{ gridColumn: "span 2" }}>
+              <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 10 }}>
+                <strong style={{ fontSize: 14 }}>Locations</strong>
               </div>
-            )}
-          </DragOverlay>
-        </DndContext>
-      )}
+              {isLoading && <Skeleton height={200} />}
+              {!isLoading && (
+                <div className="stack gap-1">
+                  {sortedGroups.length === 0 && ungroupedDevices.length === 0 && (
+                    <p className="muted" style={{ fontSize: 12 }}>No locations yet — add one to get started.</p>
+                  )}
+                  {sortedGroups.map((g) => {
+                    const roomDevices = devicesByGroup.get(g.id) ?? [];
+                    const anyOn = roomDevices.some((d) => d.isOn);
+                    return (
+                      <button
+                        key={g.id}
+                        className="row gap-2"
+                        onClick={() => setSelectedRoom(g.id)}
+                        style={{
+                          alignItems: "center", justifyContent: "space-between", padding: "10px 10px", borderRadius: 8, cursor: "pointer",
+                          border: "1px solid " + (selectedRoom === g.id ? "var(--color-primary)" : "var(--color-border)"),
+                          background: selectedRoom === g.id ? "var(--color-primary-soft)" : "transparent", textAlign: "left",
+                        }}
+                      >
+                        <span className="row gap-2" style={{ alignItems: "center" }}>
+                          <Icon name={g.icon ?? "layers"} size={16} />
+                          <span>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{g.name}</div>
+                            <div className="muted" style={{ fontSize: 11 }}>{roomDevices.length} device{roomDevices.length === 1 ? "" : "s"}</div>
+                          </span>
+                        </span>
+                        {anyOn && <span style={{ color: "var(--color-success)" }}><Icon name="check" size={14} /></span>}
+                      </button>
+                    );
+                  })}
+                  {ungroupedDevices.length > 0 && (
+                    <button
+                      className="row gap-2"
+                      onClick={() => setSelectedRoom("ungrouped")}
+                      style={{
+                        alignItems: "center", justifyContent: "space-between", padding: "10px 10px", borderRadius: 8, cursor: "pointer",
+                        border: "1px solid " + (selectedRoom === "ungrouped" ? "var(--color-primary)" : "var(--color-border)"),
+                        background: selectedRoom === "ungrouped" ? "var(--color-primary-soft)" : "transparent", textAlign: "left",
+                      }}
+                    >
+                      <span className="row gap-2" style={{ alignItems: "center" }}>
+                        <Icon name="layers" size={16} />
+                        <span>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>Ungrouped</div>
+                          <div className="muted" style={{ fontSize: 11 }}>{ungroupedDevices.length} device{ungroupedDevices.length === 1 ? "" : "s"}</div>
+                        </span>
+                      </span>
+                      {ungroupedDevices.some((d) => d.isOn) && <span style={{ color: "var(--color-success)" }}><Icon name="check" size={14} /></span>}
+                    </button>
+                  )}
+                  <PermissionGate module="lighting" action="create">
+                    <button className="btn btn-secondary btn-sm" style={{ marginTop: 4 }} onClick={() => setAddingGroup(true)}>
+                      <Icon name="plus" size={12} /> Add location
+                    </button>
+                  </PermissionGate>
+                </div>
+              )}
+            </div>
 
-      {!isLoading && sortedGroups.length === 0 && ungroupedDevices.length === 0 && (
-        <div className="empty-state card">No lighting devices yet — add one under the Devices tab, then group it here.</div>
+            <div className="card" style={{ gridColumn: "span 3" }}>
+              {!selectedRoomLabel ? (
+                <p className="muted" style={{ fontSize: 12 }}>Select a location to control its devices.</p>
+              ) : (
+                <div className="stack gap-3">
+                  <div className="row gap-2" style={{ alignItems: "center" }}>
+                    <Icon name={selectedRoomIcon ?? "home"} size={18} />
+                    <strong style={{ fontSize: 15 }}>{selectedRoomLabel}</strong>
+                    <span className="muted" style={{ fontSize: 12 }}>{selectedRoomDevices.length} device{selectedRoomDevices.length === 1 ? "" : "s"}</span>
+                  </div>
+
+                  {dimmableLight && (
+                    <div className="card" style={{ background: "var(--color-bg)" }}>
+                      <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 4 }}>
+                        <strong style={{ fontSize: 13 }}>{dimmableLight.name}</strong>
+                        <label className="form-toggle-switch" style={{ cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={dimmableLight.isOn}
+                            disabled={dimmableLight.status === "OFFLINE"}
+                            onChange={(e) => powerMutation.mutate({ id: dimmableLight.id, on: e.target.checked })}
+                          />
+                          <span className="form-toggle-switch-track" />
+                        </label>
+                      </div>
+                      <RadialGauge value={dimmableLight.brightness ?? 0} tone="warning" size={140} sublabel="Brightness" />
+                      <div className="row gap-2" style={{ justifyContent: "center", marginTop: 8 }}>
+                        <button
+                          className="btn btn-secondary btn-sm btn-icon"
+                          disabled={!dimmableLight.isOn || brightnessMutation.isPending}
+                          onClick={() => brightnessMutation.mutate({ id: dimmableLight.id, value: Math.max(0, (dimmableLight.brightness ?? 0) - 10) })}
+                        >
+                          −
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm btn-icon"
+                          disabled={!dimmableLight.isOn || brightnessMutation.isPending}
+                          onClick={() => brightnessMutation.mutate({ id: dimmableLight.id, value: Math.min(100, (dimmableLight.brightness ?? 0) + 10) })}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="stack gap-1">
+                    {selectedRoomDevices.length === 0 && <p className="muted" style={{ fontSize: 12 }}>No devices in this location yet.</p>}
+                    {selectedRoomDevices.map((d) => (
+                      <div key={d.id} className="row gap-2" style={{ alignItems: "center", padding: "8px 4px", borderBottom: "1px solid var(--color-border)" }}>
+                        <Icon name={d.icon ?? (d.kind === "LIGHT" ? "bulb" : "plug")} size={16} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13 }}>{d.name}</div>
+                          <div className="muted" style={{ fontSize: 11 }}>
+                            {d.status === "OFFLINE" ? "Offline" : d.powerW !== null ? `${d.powerW.toFixed(1)} W` : d.isOn ? "On" : "Off"}
+                          </div>
+                        </div>
+                        <label className="form-toggle-switch" style={{ cursor: "pointer" }}>
+                          <input type="checkbox" checked={d.isOn} disabled={d.status === "OFFLINE"} onChange={(e) => powerMutation.mutate({ id: d.id, on: e.target.checked })} />
+                          <span className="form-toggle-switch-track" />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-5 gap-3">
+            <div className="card" style={{ gridColumn: "span 3" }}>
+              <strong style={{ fontSize: 14 }}>Lighting Activity (Last 7 Days)</strong>
+              <p className="muted" style={{ fontSize: 11, margin: "2px 0 8px" }}>Times a device was switched on, from the activity log.</p>
+              {summaryLoading ? <Skeleton height={180} /> : <SimpleBarChart data={summary?.activityByDay ?? []} xKey="day" yKey="count" glow />}
+            </div>
+
+            <div className="card" style={{ gridColumn: "span 2" }}>
+              <strong style={{ fontSize: 14 }}>Quick Toggle</strong>
+              <div className="stack gap-1" style={{ marginTop: 8 }}>
+                {(devices ?? []).length === 0 && <p className="muted" style={{ fontSize: 12 }}>No devices yet.</p>}
+                {(devices ?? []).slice(0, 3).map((d) => (
+                  <div key={d.id} className="row gap-2" style={{ alignItems: "center", padding: "8px 4px", borderBottom: "1px solid var(--color-border)" }}>
+                    <Icon name={d.icon ?? (d.kind === "LIGHT" ? "bulb" : "plug")} size={16} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13 }}>{d.name}</div>
+                      <div className="muted" style={{ fontSize: 11 }}>
+                        {d.status === "OFFLINE" ? "Offline" : d.kind === "LIGHT" && d.brightness !== null && d.isOn ? `${d.brightness}%` : d.isOn ? "On" : "Off"}
+                      </div>
+                    </div>
+                    <label className="form-toggle-switch" style={{ cursor: "pointer" }}>
+                      <input type="checkbox" checked={d.isOn} disabled={d.status === "OFFLINE"} onChange={(e) => powerMutation.mutate({ id: d.id, on: e.target.checked })} />
+                      <span className="form-toggle-switch-track" />
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="stack gap-3">
+          {isLoading && (
+            <div className="grid grid-cols-3 gap-3">
+              <Skeleton height={160} /><Skeleton height={160} /><Skeleton height={160} />
+            </div>
+          )}
+
+          {!isLoading && (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+              <SortableContext items={sortedGroups.map((g) => `group-${g.id}`)} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-3 gap-3">
+                  {sortedGroups.map((group) => (
+                    <GroupCard
+                      key={group.id}
+                      group={group}
+                      devices={devicesByGroup.get(group.id) ?? []}
+                      onToggleDevice={(id, on) => powerMutation.mutate({ id, on })}
+                      onPickIcon={(current) => setPickingIconFor({ kind: "group", id: group.id, current })}
+                      onPickDeviceIcon={(deviceId, current) => setPickingIconFor({ kind: "device", id: deviceId, current })}
+                      onRename={() => setRenamingGroup(group)}
+                      onDelete={() => setDeletingGroup(group)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+
+              <UngroupedCard
+                devices={ungroupedDevices}
+                onToggleDevice={(id, on) => powerMutation.mutate({ id, on })}
+                onPickDeviceIcon={(deviceId, current) => setPickingIconFor({ kind: "device", id: deviceId, current })}
+              />
+
+              <DragOverlay>
+                {activeDevice && (
+                  <div className="card" style={{ padding: "6px 10px", display: "inline-flex", alignItems: "center", gap: 6, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+                    <Icon name={activeDevice.icon ?? (activeDevice.kind === "LIGHT" ? "bulb" : "plug")} size={14} />
+                    <span style={{ fontSize: 12 }}>{activeDevice.name}</span>
+                  </div>
+                )}
+              </DragOverlay>
+            </DndContext>
+          )}
+
+          {!isLoading && sortedGroups.length === 0 && ungroupedDevices.length === 0 && (
+            <div className="empty-state card">No lighting devices yet — add one under the Devices tab, then group it here.</div>
+          )}
+        </div>
       )}
 
       {(addingGroup || renamingGroup) && (
@@ -221,7 +436,7 @@ export function DashboardTab() {
 
       {deletingGroup && (
         <ConfirmDialog
-          title="Delete group"
+          title="Delete location"
           message={`Delete "${deletingGroup.name}"? Its devices are kept, just ungrouped. This cannot be undone.`}
           danger
           loading={deleteGroupMutation.isPending}
@@ -337,7 +552,7 @@ function GroupFormModal({ group, onClose, onSaved }: { group: LightingGroup | nu
     onSuccess: () => { onSaved(); onClose(); },
   });
   return (
-    <FormModal title={group ? "Rename Group" : "Add Group"} onClose={onClose} onSubmit={() => mutation.mutate()} submitting={mutation.isPending} submitDisabled={!name.trim()}>
+    <FormModal title={group ? "Rename Location" : "Add Location"} onClose={onClose} onSubmit={() => mutation.mutate()} submitting={mutation.isPending} submitDisabled={!name.trim()}>
       <div className="field"><label>Name *</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Kitchen, Living Room" autoFocus /></div>
     </FormModal>
   );

@@ -103,6 +103,16 @@ export function DeviceManagementTab() {
     onSuccess: () => { invalidate(); setDeletingCamera(null); },
   });
 
+  const duplicateNvrMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/nvr/${id}/duplicate`),
+    onSuccess: invalidate,
+  });
+
+  const duplicateCameraMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/nvr/cameras/${id}/duplicate`),
+    onSuccess: invalidate,
+  });
+
   function stripBlankPassword<T extends { password: string }>(values: T) {
     const { password, ...rest } = values;
     return password ? values : rest;
@@ -149,6 +159,7 @@ export function DeviceManagementTab() {
               </PermissionGate>
               <PermissionGate module="nvr" action="create">
                 <button className="btn btn-secondary btn-sm" onClick={() => setCameraNvrId(nvr.id)}><Icon name="plus" size={12} /> Add Camera</button>
+                <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateNvrMutation.mutate(nvr.id)}><Icon name="paperclip" size={12} /></button>
               </PermissionGate>
               <PermissionGate module="nvr" action="delete">
                 <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeletingNvr(nvr)}><Icon name="trash" size={13} /></button>
@@ -185,6 +196,11 @@ export function DeviceManagementTab() {
                           {cam.ptzEnabled && (
                             <button className="btn btn-secondary btn-sm" onClick={() => setPtzCamera(cam)}>PTZ</button>
                           )}
+                        </PermissionGate>
+                        <PermissionGate module="nvr" action="create">
+                          <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateCameraMutation.mutate(cam.id)}>
+                            <Icon name="paperclip" size={12} />
+                          </button>
                         </PermissionGate>
                         <PermissionGate module="nvr" action="delete">
                           <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeletingCamera(cam)} title="Delete camera">

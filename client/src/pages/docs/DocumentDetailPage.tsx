@@ -57,6 +57,14 @@ export function DocumentDetailPage() {
     onSuccess: () => navigate("/docs"),
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: async () => (await axiosClient.post(`/docs/${id}/duplicate`)).data as DocumentFull,
+    onSuccess: (clone) => {
+      queryClient.invalidateQueries({ queryKey: ["docs"] });
+      navigate(`/docs/${clone.id}`);
+    },
+  });
+
   const uploadMutation = useMutation({
     mutationFn: (file: File) => {
       const fd = new FormData();
@@ -123,6 +131,11 @@ export function DocumentDetailPage() {
           <PermissionGate module="docs" action="edit">
             <button className="ad-btn ad-btn-primary" onClick={() => setEditing(true)}>
               <Icon name="edit" size={13} /> Edit
+            </button>
+          </PermissionGate>
+          <PermissionGate module="docs" action="create">
+            <button className="ad-btn" title="Duplicate" onClick={() => duplicateMutation.mutate()}>
+              <Icon name="paperclip" size={13} /> Duplicate
             </button>
           </PermissionGate>
           <PermissionGate module="docs" action="delete">

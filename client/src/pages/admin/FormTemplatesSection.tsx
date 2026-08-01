@@ -40,6 +40,11 @@ export function FormTemplatesSection() {
     },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/asset-form-templates/${id}/duplicate`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["asset-form-templates"] }),
+  });
+
   const columns: ColumnDef<FormTemplate, any>[] = [
     { header: "Form Name", accessorKey: "name" },
     {
@@ -67,6 +72,9 @@ export function FormTemplatesSection() {
           </button>
           <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setRenaming(row.original)} title="Rename">
             <Icon name="edit" size={12} />
+          </button>
+          <button className="btn btn-secondary btn-sm btn-icon" onClick={() => duplicateMutation.mutate(row.original.id)} title="Duplicate">
+            <Icon name="paperclip" size={12} />
           </button>
           <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
             <Icon name="trash" size={13} />

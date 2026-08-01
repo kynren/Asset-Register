@@ -66,6 +66,10 @@ export function ProcurementTab() {
     mutationFn: (id: number) => axiosClient.patch(`/procurement/purchase-orders/${id}`, { status: "CANCELLED" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["purchase-orders"] }),
   });
+  const duplicateSupplierMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/procurement/suppliers/${id}/duplicate`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["suppliers"] }),
+  });
 
   return (
     <div className="stack gap-3">
@@ -78,7 +82,7 @@ export function ProcurementTab() {
         </div>
         {suppliers && suppliers.length > 0 ? (
           <table className="ad-table">
-            <thead><tr><th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Orders</th></tr></thead>
+            <thead><tr><th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Orders</th><th></th></tr></thead>
             <tbody>
               {suppliers.map((s) => (
                 <tr key={s.id}>
@@ -87,6 +91,13 @@ export function ProcurementTab() {
                   <td>{s.email ?? "—"}</td>
                   <td>{s.phone ?? "—"}</td>
                   <td>{s._count.purchaseOrders}</td>
+                  <td>
+                    <PermissionGate module="stock" action="create">
+                      <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateSupplierMutation.mutate(s.id)}>
+                        <Icon name="paperclip" size={12} />
+                      </button>
+                    </PermissionGate>
+                  </td>
                 </tr>
               ))}
             </tbody>

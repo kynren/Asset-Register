@@ -7,6 +7,7 @@ import { PermissionGate } from "../../auth/PermissionGate";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
 import { LightingDevice } from "./LightingDeviceCard";
+import { DeviceActionPicker, DraftAction, actionsToDrafts, draftsToActions } from "./DeviceActionPicker";
 
 interface SceneAction {
   id: number;
@@ -52,6 +53,11 @@ export function ScenesTab() {
     mutationFn: (id: number) => axiosClient.post(`/lighting/scenes/${id}/activate`),
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/lighting/scenes/${id}/duplicate`),
+    onSuccess: invalidate,
+  });
+
   return (
     <div className="stack gap-3">
       <div className="row gap-2" style={{ justifyContent: "flex-end" }}>
@@ -82,6 +88,9 @@ export function ScenesTab() {
                 </button>
                 <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setEditing(scene)}><Icon name="edit" size={12} /></button>
               </PermissionGate>
+              <PermissionGate module="lighting" action="create">
+                <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(scene.id)}><Icon name="paperclip" size={12} /></button>
+              </PermissionGate>
               <PermissionGate module="lighting" action="delete">
                 <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(scene)}><Icon name="trash" size={12} /></button>
               </PermissionGate>
@@ -108,39 +117,14 @@ export function ScenesTab() {
   );
 }
 
-interface DraftAction {
-  turnOn: boolean;
-  brightness: number | null;
-}
-
 function SceneFormModal({ scene, devices, onClose, onSaved }: { scene: Scene | null; devices: LightingDevice[]; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(scene?.name ?? "");
   const [icon, setIcon] = useState(scene?.icon ?? "star");
-  const [drafts, setDrafts] = useState<Map<number, DraftAction>>(
-    new Map((scene?.actions ?? []).map((a) => [a.deviceId, { turnOn: a.turnOn, brightness: a.brightness }]))
-  );
-
-  function toggleIncluded(deviceId: number, on: boolean, kind: "SWITCH" | "LIGHT" | null) {
-    setDrafts((prev) => {
-      const next = new Map(prev);
-      if (on) next.set(deviceId, { turnOn: true, brightness: kind === "LIGHT" ? 100 : null });
-      else next.delete(deviceId);
-      return next;
-    });
-  }
-  function updateAction(deviceId: number, patch: Partial<DraftAction>) {
-    setDrafts((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(deviceId);
-      if (existing) next.set(deviceId, { ...existing, ...patch });
-      return next;
-    });
-  }
+  const [drafts, setDrafts] = useState<Map<number, DraftAction>>(actionsToDrafts(scene?.actions ?? []));
 
   const mutation = useMutation({
     mutationFn: () => {
-      const actions = [...drafts.entries()].map(([deviceId, a]) => ({ deviceId, turnOn: a.turnOn, brightness: a.brightness }));
-      const body = { name, icon, actions };
+      const body = { name, icon, actions: draftsToActions(drafts) };
       return scene ? axiosClient.patch(`/lighting/scenes/${scene.id}`, body) : axiosClient.post("/lighting/scenes", body);
     },
     onSuccess: () => { onSaved(); onClose(); },
@@ -162,45 +146,7 @@ function SceneFormModal({ scene, devices, onClose, onSaved }: { scene: Scene | n
         </div>
       </div>
 
-      <div className="field">
-        <label>Devices ({drafts.size} included)</label>
-        <div className="stack gap-2" style={{ maxHeight: 320, overflowY: "auto", border: "1px solid var(--color-border)", borderRadius: 8, padding: 10 }}>
-          {devices.length === 0 && <p className="muted" style={{ fontSize: 12 }}>No devices yet.</p>}
-          {devices.map((d) => {
-            const draft = drafts.get(d.id);
-            const included = draft !== undefined;
-            return (
-              <div key={d.id} className="stack gap-1">
-                <label className="row gap-2" style={{ fontSize: 13, cursor: "pointer", alignItems: "center" }}>
-                  <input type="checkbox" checked={included} onChange={(e) => toggleIncluded(d.id, e.target.checked, d.kind)} />
-                  {d.name}
-                </label>
-                {included && (
-                  <div className="row gap-2" style={{ marginLeft: 24, alignItems: "center" }}>
-                    <select className="select" style={{ width: "auto", fontSize: 12 }} value={draft!.turnOn ? "on" : "off"} onChange={(e) => updateAction(d.id, { turnOn: e.target.value === "on" })}>
-                      <option value="on">Turn On</option>
-                      <option value="off">Turn Off</option>
-                    </select>
-                    {d.kind === "LIGHT" && draft!.turnOn && (
-                      <>
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={draft!.brightness ?? 100}
-                          onChange={(e) => updateAction(d.id, { brightness: Number(e.target.value) })}
-                          style={{ width: 100 }}
-                        />
-                        <span className="muted" style={{ fontSize: 11 }}>{draft!.brightness ?? 100}%</span>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <DeviceActionPicker devices={devices} drafts={drafts} onChange={setDrafts} />
     </FormModal>
   );
 }

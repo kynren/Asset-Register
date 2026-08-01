@@ -49,6 +49,11 @@ export function StockPage() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["stock"] }); setShowForm(false); },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/stock/${id}/duplicate`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["stock"] }),
+  });
+
   const columns: ColumnDef<StockItem, any>[] = [
     { header: "SKU", accessorKey: "sku" },
     { header: "Name", accessorKey: "name" },
@@ -72,6 +77,9 @@ export function StockPage() {
             <button className="btn btn-secondary btn-sm" onClick={() => setTxItem(row.original)}>Manage Stock</button>
           </PermissionGate>
           <button className="btn btn-secondary btn-sm btn-icon" title="Print QR label" onClick={() => setQrItem(row.original)}><Icon name="grid" size={12} /></button>
+          <PermissionGate module="stock" action="create">
+            <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}><Icon name="paperclip" size={12} /></button>
+          </PermissionGate>
         </div>
       ),
     },

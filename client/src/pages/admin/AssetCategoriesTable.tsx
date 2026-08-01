@@ -42,6 +42,11 @@ export function AssetCategoriesTable() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["asset-categories"] }); setDeleting(null); },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/asset-categories/${id}/duplicate`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["asset-categories"] }),
+  });
+
   const columns: ColumnDef<AssetCategory, any>[] = [
     { header: "Name", accessorKey: "name" },
     {
@@ -82,6 +87,9 @@ export function AssetCategoriesTable() {
         <div className="row gap-1">
           <button className="btn btn-secondary btn-sm" onClick={() => setEditing(row.original)}>
             <Icon name="edit" size={12} /> Edit
+          </button>
+          <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
+            <Icon name="paperclip" size={12} />
           </button>
           <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
             <Icon name="trash" size={13} />

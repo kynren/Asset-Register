@@ -44,6 +44,11 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [queryKey] }); setDeleting(null); },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`${url}/${id}/duplicate`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [queryKey] }),
+  });
+
   function startEdit(item: ListItem) {
     setEditingId(item.id);
     setName(item.name);
@@ -66,6 +71,9 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
         <div className="row gap-1">
           <button className="btn btn-secondary btn-sm btn-icon" onClick={() => startEdit(row.original)}>
             <Icon name="edit" size={13} />
+          </button>
+          <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
+            <Icon name="paperclip" size={13} />
           </button>
           <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
             <Icon name="trash" size={13} />

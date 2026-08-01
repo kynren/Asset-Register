@@ -40,6 +40,7 @@ const ROLE_DEFS: { name: string; description: string; isSystem: boolean; perms: 
       "virtual-assistant": VIEW_ONLY,
       docs: ALL_TRUE,
       admin: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
+      password: ALL_TRUE,
     },
   },
   {
@@ -59,6 +60,7 @@ const ROLE_DEFS: { name: string; description: string; isSystem: boolean; perms: 
       "virtual-assistant": VIEW_ONLY,
       docs: { canView: true, canCreate: true, canEdit: true, canDelete: false, canExport: false },
       admin: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
+      password: ALL_TRUE,
     },
   },
   {
@@ -78,6 +80,7 @@ const ROLE_DEFS: { name: string; description: string; isSystem: boolean; perms: 
       "virtual-assistant": VIEW_ONLY,
       docs: { canView: true, canCreate: true, canEdit: true, canDelete: false, canExport: false },
       admin: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
+      password: ALL_TRUE,
     },
   },
   {
@@ -97,6 +100,7 @@ const ROLE_DEFS: { name: string; description: string; isSystem: boolean; perms: 
       "virtual-assistant": VIEW_ONLY,
       docs: VIEW_ONLY,
       admin: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
+      password: ALL_TRUE,
     },
   },
 ];

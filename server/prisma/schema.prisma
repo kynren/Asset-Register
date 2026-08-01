@@ -1199,7 +1199,7 @@ model LightingDevice {
   lastCheckedAt  DateTime?
   createdAt      DateTime            @default(now())
   sceneActions   LightingSceneAction[]
-  automations    LightingAutomation[]
+  automationActions LightingAutomationAction[]
 }
 
 // A user-defined grouping of lighting devices, shown as a card on the Lighting Dashboard —
@@ -1253,16 +1253,36 @@ model LightingAutomation {
   daysOfWeek     Int[]
   timeOfDay      String
   actionType     LightingAutomationActionType
-  targetDeviceId Int?
-  targetDevice   LightingDevice?               @relation(fields: [targetDeviceId], references: [id], onDelete: Cascade)
+  // DEVICE actions target one or more devices at once (same shape as LightingSceneAction) —
+  // matches how Scenes already let one activation touch a whole set of devices.
+  actions        LightingAutomationAction[]
   targetSceneId  Int?
   targetScene    LightingScene?                @relation(fields: [targetSceneId], references: [id], onDelete: Cascade)
-  turnOn         Boolean?
+  // Optional paired "off" trigger for DEVICE automations — at this time, every device in
+  // `actions` is turned off, so one automation can cover "on at 18:00, off at 23:00" instead of
+  // needing two separate automations. Not applicable to SCENE automations (a scene has no
+  // inherent inverse state), so this stays null for those.
+  offTimeOfDay   String?
   // "YYYY-MM-DD" of the last date this fired — the scheduler ticks every minute but this dedup
   // key stops it from re-firing the same automation more than once on the same day.
   lastRunDate    String?
+  // Separate dedup key for the offTimeOfDay trigger, since the on- and off-legs of the same
+  // automation fire independently and both may legitimately run on the same day.
+  lastRunDateOff String?
   createdAt      DateTime                      @default(now())
   updatedAt      DateTime                      @updatedAt
+}
+
+model LightingAutomationAction {
+  id            Int                @id @default(autoincrement())
+  automationId  Int
+  automation    LightingAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  deviceId      Int
+  device        LightingDevice     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  turnOn        Boolean
+  brightness    Int?
+
+  @@unique([automationId, deviceId])
 }
 
 // ───────────────────────── ZigBee (shared scaffold: Lighting + Access Control) ─────────────────────────

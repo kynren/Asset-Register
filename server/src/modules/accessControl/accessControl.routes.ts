@@ -180,23 +180,26 @@ async function discoverDoors(deviceId: number, ipAddress: string, port: number |
         continue;
       }
       if (result.notFound) break; // ran off the end of this controller's real doors
-      if (!result.ok) {
-        // Without a capability count, a status-read failure on doors 2+ genuinely doesn't tell us
-        // whether that door exists — so probing still stops here rather than guessing further.
-        // Door 1 is the one exception: an access *control device* by definition controls at least
-        // one door, so if even door 1's status read fails, this device almost certainly still has
-        // a door 1 that the user needs to be able to see and manage (e.g. via manual door
-        // control) — the same door they could otherwise only get to by clicking "Add Door"
-        // themselves. Leaving the list empty here just forces that manual step for something the
-        // device has already implicitly confirmed by responding on this address/port/credentials.
-        if (doorNumber === 1 && doorsFound === 0) {
-          await upsertDoorPlaceholder(deviceId, 1);
-          doorsFound++;
-          statusReadFailures++;
-        }
+
+      // Wrong credentials or the device itself unreachable — these say nothing about individual
+      // doors, they mean nothing here can be trusted, so stop rather than guess at more doors.
+      if (result.authFailed || result.unreachable) {
         firstFailureMessage = result.message;
         break;
       }
+
+      // Any other non-404, non-401 failure (commonly HTTP 400) does NOT prove this door number
+      // doesn't exist — real multi-door Hikvision panels have been observed returning exactly
+      // this kind of error for every door's status read, door 1 included, despite genuinely
+      // having that many doors wired up. Treating it as "door probably exists, status just isn't
+      // readable this way" and continuing is what lets a real 4-door controller whose firmware
+      // never answers this endpoint successfully still get all 4 doors added instead of just
+      // door 1 (or none) — the user has to be able to see and control every physical door, not
+      // just the first one this probe happened to reach before giving up.
+      await upsertDoorPlaceholder(deviceId, doorNumber);
+      doorsFound++;
+      statusReadFailures++;
+      firstFailureMessage = firstFailureMessage ?? result.message;
     }
   }
 
@@ -267,6 +270,28 @@ router.delete("/devices/:id", requirePermission("access-control", "delete"), asy
   await prisma.accessControlDevice.delete({ where: { id: Number(req.params.id) } });
   await logAudit({ userId: req.user!.id, action: "accessControlDevice.delete", entityType: "AccessControlDevice", entityId: Number(req.params.id) });
   res.json({ ok: true });
+});
+
+// ipAddress stays blank on the clone (same reasoning as NVR/Camera duplicate) — and since doors
+// are only ever discovered live from a real controller's IP, the clone starts with none until
+// someone sets its own address and runs Refresh Doors.
+router.post("/devices/:id/duplicate", requirePermission("access-control", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.accessControlDevice.findUnique({ where: { id } });
+  if (!source) throw new ApiError(404, "Access control device not found");
+
+  const clone = await prisma.accessControlDevice.create({
+    data: {
+      name: `${source.name} (Copy)`,
+      locationId: source.locationId,
+      model: source.model,
+      notes: source.notes,
+      status: "UNKNOWN",
+    },
+    select: deviceSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "accessControlDevice.duplicate", entityType: "AccessControlDevice", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
 });
 
 // Generic ISAPI reachability check — reuses the same /ISAPI/System/deviceInfo call already
@@ -640,6 +665,40 @@ router.delete("/persons/:id", requirePermission("access-control", "delete"), asy
   res.json({ ok: true });
 });
 
+// Cards aren't copied — a PersonCard's cardNumber is a physical card's unique identity, and a
+// duplicate person hasn't been issued one yet.
+router.post("/persons/:id/duplicate", requirePermission("access-control", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.person.findUnique({ where: { id } });
+  if (!source) throw new ApiError(404, "Person not found");
+
+  let newPersonId = `${source.personId}-COPY`;
+  let suffix = 1;
+  while (await prisma.person.findUnique({ where: { personId: newPersonId } })) {
+    suffix += 1;
+    newPersonId = `${source.personId}-COPY${suffix}`;
+  }
+
+  const clone = await prisma.person.create({
+    data: {
+      personId: newPersonId,
+      name: `${source.name} (Copy)`,
+      gender: source.gender,
+      email: source.email,
+      phone: source.phone,
+      organizationId: source.organizationId,
+      validFrom: source.validFrom,
+      validTo: source.validTo,
+      longTermEffective: source.longTermEffective,
+      remark: source.remark,
+      photoUrl: source.photoUrl,
+    },
+    select: personSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "person.duplicate", entityType: "Person", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
+});
+
 router.post("/persons/:id/cards", requirePermission("access-control", "edit"), validateBody(createPersonCardSchema), async (req, res) => {
   const personId = Number(req.params.id);
   const card = await prisma.personCard.create({ data: { personId, cardNumber: req.body.cardNumber, cardType: req.body.cardType ?? "Normal Card" } });
@@ -703,6 +762,29 @@ router.delete("/groups/:id", requirePermission("access-control", "delete"), asyn
   await prisma.accessGroup.delete({ where: { id: Number(req.params.id) } });
   await logAudit({ userId: req.user!.id, action: "accessGroup.delete", entityType: "AccessGroup", entityId: Number(req.params.id) });
   res.json({ ok: true });
+});
+
+router.post("/groups/:id/duplicate", requirePermission("access-control", "create"), async (req, res) => {
+  const id = Number(req.params.id);
+  const source = await prisma.accessGroup.findUnique({
+    where: { id },
+    include: { members: true, doors: true },
+  });
+  if (!source) throw new ApiError(404, "Access group not found");
+
+  // lastAppliedAt stays null — the clone hasn't been pushed to any controller yet, even though
+  // its member/door composition matches the source group.
+  const clone = await prisma.accessGroup.create({
+    data: {
+      name: `${source.name} (Copy)`,
+      planTemplateNo: source.planTemplateNo,
+      members: { create: source.members.map((m) => ({ personId: m.personId })) },
+      doors: { create: source.doors.map((d) => ({ doorId: d.doorId })) },
+    },
+    select: accessGroupSelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "accessGroup.duplicate", entityType: "AccessGroup", entityId: clone.id, metadata: { sourceId: id } });
+  res.status(201).json(clone);
 });
 
 // Pushes this group's RightPlan (its doors, on its schedule template) to every member's

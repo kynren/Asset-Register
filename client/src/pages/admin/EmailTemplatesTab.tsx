@@ -49,6 +49,10 @@ export function EmailTemplatesTab() {
     mutationFn: (id: number) => axiosClient.delete(`/email-templates/${id}`),
     onSuccess: () => { invalidate(); setDeleting(null); },
   });
+  const duplicateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/email-templates/${id}/duplicate`),
+    onSuccess: invalidate,
+  });
 
   const columns: ColumnDef<EmailTemplate, any>[] = [
     { header: "Name", accessorKey: "name" },
@@ -83,6 +87,9 @@ export function EmailTemplatesTab() {
           )}
           <button className="btn btn-secondary btn-sm btn-icon" title="Send test email" onClick={() => setTesting(row.original)}>
             <Icon name="mail" size={12} />
+          </button>
+          <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
+            <Icon name="paperclip" size={12} />
           </button>
           <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
             <Icon name="trash" size={13} />
