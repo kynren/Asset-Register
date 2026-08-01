@@ -7,7 +7,8 @@ import { decryptSecret } from "../../lib/crypto";
 import { ipToLong } from "../../lib/ipRange";
 import { applyRelayResults } from "./scan.service";
 import { processCompletedMonitorScan } from "../../lib/networkMonitor";
-import { relayCompleteSchema, relayProgressSchema } from "./network.schema";
+import { resolveTopologyForDevices } from "../../lib/topologyEngine";
+import { relayCompleteSchema, relayDiscoverySchema, relayProgressSchema } from "./network.schema";
 
 // On-prem relay agent protocol (agent/kynren_network_relay.py). A cloud-hosted server has no
 // route into a private office LAN — no code running on it can ping/ARP/SNMP-poll local devices,
@@ -68,7 +69,18 @@ router.post("/jobs/:id/complete", validateBody(relayCompleteSchema), async (req,
 
   const { results, snmpResults } = req.body as {
     results: { ipAddress: string; alive: boolean; hostname: string | null; macAddress: string | null; openPorts: number[]; responseTimeMs: number | null }[];
-    snmpResults: { deviceId: number; sysDescr: string | null; upTimeTicks: number | null; interfaces: Record<string, unknown>[]; error: string | null }[];
+    snmpResults: {
+      deviceId: number;
+      sysDescr: string | null;
+      upTimeTicks: number | null;
+      interfaces: Record<string, unknown>[];
+      error: string | null;
+      sysName: string | null;
+      macTable: { mac: string; port: string }[];
+      lldpNeighbors: { localPort: string | null; remoteChassisId: string | null; remotePortId: string | null; remoteSysName: string | null; protocol: "LLDP" | "CDP" }[];
+      vlans: { vlanId: number | string; name: string | null }[];
+      poeStatus: { port: string; status: string }[];
+    }[];
   };
 
   const { aliveHosts, scannedHosts } = await applyRelayResults(id, results);
@@ -82,8 +94,13 @@ router.post("/jobs/:id/complete", validateBody(relayCompleteSchema), async (req,
           ? { snmpLastError: r.error, snmpLastPolledAt: new Date() }
           : {
               snmpSysDescr: r.sysDescr,
+              snmpSysName: r.sysName,
               snmpUpTimeTicks: r.upTimeTicks != null ? BigInt(r.upTimeTicks) : null,
               snmpInterfaces: r.interfaces as unknown as object,
+              snmpMacTable: r.macTable as unknown as object,
+              snmpLldpNeighbors: r.lldpNeighbors as unknown as object,
+              snmpVlans: r.vlans as unknown as object,
+              snmpPoeStatus: r.poeStatus as unknown as object,
               snmpLastPolledAt: new Date(),
               snmpLastError: null,
             },
@@ -97,6 +114,28 @@ router.post("/jobs/:id/complete", validateBody(relayCompleteSchema), async (req,
     await processCompletedMonitorScan(id, { skipSnmp: true });
   }
 
+  // Fire-and-forget: try to resolve any freshly-reported LLDP/CDP neighbors into real
+  // NetworkNode/NetworkEdge topology. Never blocks or fails the relay's own success response —
+  // this is a nice-to-have enrichment, not something the relay protocol depends on.
+  resolveTopologyForDevices(snmpResults.map((r) => r.deviceId)).catch(() => undefined);
+
+  res.json({ ok: true });
+});
+
+// Best-effort report of subnets the relay's own machine sees as locally connected (see
+// discover_local_subnets() in the Python agent) — purely informational, upserted so repeated
+// reports from the same relay just refresh lastSeenAt instead of accumulating duplicates.
+router.post("/discovery", validateBody(relayDiscoverySchema), async (req, res) => {
+  const { subnets } = req.body as { subnets: { cidr: string; label?: string | null }[] };
+  for (const s of subnets) {
+    await prisma.relayDiscoveredSubnet
+      .upsert({
+        where: { cidr: s.cidr },
+        update: { label: s.label ?? undefined, lastSeenAt: new Date() },
+        create: { cidr: s.cidr, label: s.label ?? undefined },
+      })
+      .catch(() => undefined);
+  }
   res.json({ ok: true });
 });
 

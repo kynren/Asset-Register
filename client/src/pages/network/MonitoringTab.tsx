@@ -10,6 +10,25 @@ import { PermissionGate } from "../../auth/PermissionGate";
 
 dayjs.extend(relativeTime);
 
+// Converts a CIDR block from a relay's discovered-subnets report into a plain start/end IP range
+// (skipping the network/broadcast addresses for anything smaller than a /31) for the "Add as
+// Range" convenience button — client-side only, no need for a server round trip for this.
+function cidrToRange(cidr: string): { startIp: string; endIp: string } | null {
+  const [base, prefixStr] = cidr.split("/");
+  const prefix = Number(prefixStr);
+  const parts = (base ?? "").split(".").map(Number);
+  if (Number.isNaN(prefix) || prefix < 0 || prefix > 32 || parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)) return null;
+  const baseInt = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+  const hostBits = 32 - prefix;
+  const mask = hostBits === 0 ? 0xffffffff : (0xffffffff << hostBits) >>> 0;
+  const network = baseInt & mask;
+  const broadcast = hostBits === 0 ? network : (network | (~mask >>> 0)) >>> 0;
+  const toIp = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".");
+  const startInt = hostBits > 1 ? network + 1 : network;
+  const endInt = hostBits > 1 ? broadcast - 1 : broadcast;
+  return { startIp: toIp(startInt), endIp: toIp(endInt) };
+}
+
 interface MonitorRange {
   startIp: string;
   endIp: string;
@@ -34,6 +53,29 @@ interface SnmpInterface {
   outOctets: number | null;
 }
 
+interface SnmpMacTableEntry {
+  mac: string;
+  port: string;
+}
+
+interface SnmpLldpNeighbor {
+  localPort: string | null;
+  remoteChassisId: string | null;
+  remotePortId: string | null;
+  remoteSysName: string | null;
+  protocol: "LLDP" | "CDP";
+}
+
+interface SnmpVlan {
+  vlanId: number | string;
+  name: string | null;
+}
+
+interface SnmpPoeStatus {
+  port: string;
+  status: string;
+}
+
 interface MonitoredDevice {
   id: number;
   key: string;
@@ -51,10 +93,22 @@ interface MonitoredDevice {
   snmpConfigured: boolean;
   snmpPort: number;
   snmpSysDescr: string | null;
+  snmpSysName: string | null;
   snmpUpTimeTicks: string | null;
   snmpInterfaces: SnmpInterface[] | null;
+  snmpMacTable: SnmpMacTableEntry[] | null;
+  snmpLldpNeighbors: SnmpLldpNeighbor[] | null;
+  snmpVlans: SnmpVlan[] | null;
+  snmpPoeStatus: SnmpPoeStatus[] | null;
   snmpLastPolledAt: string | null;
   snmpLastError: string | null;
+}
+
+interface DiscoveredSubnet {
+  id: number;
+  cidr: string;
+  label: string | null;
+  lastSeenAt: string;
 }
 
 // Continuous, Domotz-style network monitoring: unlike the on-demand IP Range Scanner, this
@@ -79,6 +133,12 @@ export function MonitoringTab() {
     queryKey: ["network-monitor-devices"],
     queryFn: async () => (await axiosClient.get("/network/monitor/devices")).data as MonitoredDevice[],
     refetchInterval: 15000,
+  });
+
+  const { data: discoveredSubnets } = useQuery({
+    queryKey: ["network-discovered-subnets"],
+    queryFn: async () => (await axiosClient.get("/network/discovered-subnets")).data as DiscoveredSubnet[],
+    refetchInterval: 30000,
   });
 
   useEffect(() => {
@@ -121,6 +181,13 @@ export function MonitoringTab() {
   function removeRange(index: number) {
     if (!draft) return;
     setDraft({ ...draft, ranges: draft.ranges.filter((_, i) => i !== index) });
+  }
+
+  function addSubnetAsRange(subnet: DiscoveredSubnet) {
+    if (!draft) return;
+    const range = cidrToRange(subnet.cidr);
+    if (!range) return;
+    setDraft({ ...draft, ranges: [...draft.ranges, { ...range, label: subnet.label ?? subnet.cidr }] });
   }
 
   function openSnmp(device: MonitoredDevice) {
@@ -249,6 +316,34 @@ export function MonitoringTab() {
         )}
       </div>
 
+      {discoveredSubnets && discoveredSubnets.length > 0 && (
+        <div className="card">
+          <h3 className="mt-0">Subnets Detected by Relay</h3>
+          <p className="muted" style={{ marginTop: -6 }}>
+            Reported by the on-prem network relay agent's own local network interfaces (see Admin & Setup → System Settings →
+            Network Relay Agent). Purely informational — nothing here is added to the ranges above automatically.
+          </p>
+          <div className="stack gap-1">
+            {discoveredSubnets.map((s) => (
+              <div key={s.id} className="row gap-2" style={{ alignItems: "center", justifyContent: "space-between", fontSize: 13, padding: "4px 0" }}>
+                <span>
+                  <span style={{ fontFamily: "monospace" }}>{s.cidr}</span>
+                  {s.label && <span className="muted"> — {s.label}</span>}
+                </span>
+                <span className="row gap-2" style={{ alignItems: "center" }}>
+                  <span className="muted" style={{ fontSize: 11 }}>seen {dayjs(s.lastSeenAt).fromNow()}</span>
+                  <PermissionGate module="network" action="edit">
+                    <button className="btn btn-secondary btn-sm" disabled={!draft} onClick={() => addSubnetAsRange(s)}>
+                      <Icon name="plus" size={11} /> Add as Range
+                    </button>
+                  </PermissionGate>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <h3 className="mt-0">Monitored Devices</h3>
         <DataTable
@@ -297,21 +392,79 @@ export function MonitoringTab() {
 
       {detailsDevice && (
         <div className="modal-overlay" onClick={() => setDetailsDevice(null)}>
-          <div className="modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 style={{ margin: 0 }}>{detailsDevice.hostname || detailsDevice.ipAddress} — SNMP Detail</h3>
+              <h3 style={{ margin: 0 }}>{detailsDevice.snmpSysName || detailsDevice.hostname || detailsDevice.ipAddress} — SNMP Detail</h3>
               <button className="modal-close" onClick={() => setDetailsDevice(null)}><Icon name="close" size={16} /></button>
             </div>
             <p className="muted" style={{ fontSize: 12 }}>{detailsDevice.snmpSysDescr}</p>
-            <div className="stack gap-1" style={{ maxHeight: 320, overflowY: "auto" }}>
-              {(detailsDevice.snmpInterfaces ?? []).map((iface) => (
-                <div key={iface.index} className="row gap-2" style={{ justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid var(--color-border)" }}>
-                  <span>{iface.name}</span>
-                  <span className={`badge ${iface.operStatus === "up" ? "badge-success" : "badge-neutral"}`}>{iface.operStatus}</span>
-                  <span className="muted">{iface.speedMbps ? `${iface.speedMbps} Mbps` : "—"}</span>
+            <div className="stack gap-3" style={{ maxHeight: 420, overflowY: "auto" }}>
+              <div>
+                <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", marginBottom: 4 }}>Interfaces</div>
+                <div className="stack gap-1">
+                  {(detailsDevice.snmpInterfaces ?? []).map((iface) => (
+                    <div key={iface.index} className="row gap-2" style={{ justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid var(--color-border)" }}>
+                      <span>{iface.name}</span>
+                      <span className={`badge ${iface.operStatus === "up" ? "badge-success" : "badge-neutral"}`}>{iface.operStatus}</span>
+                      <span className="muted">{iface.speedMbps ? `${iface.speedMbps} Mbps` : "—"}</span>
+                    </div>
+                  ))}
+                  {(!detailsDevice.snmpInterfaces || detailsDevice.snmpInterfaces.length === 0) && <p className="muted" style={{ fontSize: 12 }}>No interface data returned.</p>}
                 </div>
-              ))}
-              {(!detailsDevice.snmpInterfaces || detailsDevice.snmpInterfaces.length === 0) && <p className="muted">No interface data returned.</p>}
+              </div>
+
+              {detailsDevice.snmpLldpNeighbors && detailsDevice.snmpLldpNeighbors.length > 0 && (
+                <div>
+                  <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", marginBottom: 4 }}>LLDP / CDP Neighbors</div>
+                  <div className="stack gap-1">
+                    {detailsDevice.snmpLldpNeighbors.map((n, i) => (
+                      <div key={i} className="row gap-2" style={{ justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid var(--color-border)" }}>
+                        <span>Port {n.localPort ?? "—"}</span>
+                        <span className="muted">{n.remoteSysName || n.remoteChassisId || "unknown neighbor"}{n.remotePortId ? ` (${n.remotePortId})` : ""}</span>
+                        <span className="badge badge-neutral">{n.protocol}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {detailsDevice.snmpMacTable && detailsDevice.snmpMacTable.length > 0 && (
+                <div>
+                  <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", marginBottom: 4 }}>MAC Address Table ({detailsDevice.snmpMacTable.length})</div>
+                  <div className="stack gap-1" style={{ maxHeight: 140, overflowY: "auto" }}>
+                    {detailsDevice.snmpMacTable.map((m, i) => (
+                      <div key={i} className="row gap-2" style={{ justifyContent: "space-between", fontSize: 12, padding: "2px 0" }}>
+                        <span style={{ fontFamily: "monospace" }}>{m.mac}</span>
+                        <span className="muted">port {m.port}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {((detailsDevice.snmpVlans && detailsDevice.snmpVlans.length > 0) || (detailsDevice.snmpPoeStatus && detailsDevice.snmpPoeStatus.length > 0)) && (
+                <div className="row gap-4">
+                  {detailsDevice.snmpVlans && detailsDevice.snmpVlans.length > 0 && (
+                    <div style={{ flex: 1 }}>
+                      <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", marginBottom: 4 }}>VLANs</div>
+                      {detailsDevice.snmpVlans.map((v, i) => (
+                        <div key={i} style={{ fontSize: 12 }}>{v.vlanId} — {v.name || "unnamed"}</div>
+                      ))}
+                    </div>
+                  )}
+                  {detailsDevice.snmpPoeStatus && detailsDevice.snmpPoeStatus.length > 0 && (
+                    <div style={{ flex: 1 }}>
+                      <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", marginBottom: 4 }}>PoE</div>
+                      {detailsDevice.snmpPoeStatus.map((p, i) => (
+                        <div key={i} className="row gap-2" style={{ fontSize: 12 }}>
+                          <span>Port {p.port}</span>
+                          <span className={`badge ${p.status === "delivering" ? "badge-success" : "badge-neutral"}`}>{p.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-primary" onClick={() => setDetailsDevice(null)}>Close</button>

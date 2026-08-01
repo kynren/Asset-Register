@@ -229,6 +229,15 @@ function shapeMonitoredDevice(d: Awaited<ReturnType<typeof prisma.monitoredNetwo
   return { ...rest, snmpUpTimeTicks: rest.snmpUpTimeTicks != null ? rest.snmpUpTimeTicks.toString() : null, snmpConfigured: Boolean(snmpCommunity) };
 }
 
+// Subnets the on-prem relay agent has reported seeing on its own local network interfaces (see
+// discover_local_subnets() in agent/kynren_network_relay.py) — read-only convenience data for the
+// Monitoring tab so an admin can pick a real, present range instead of typing one blind. Never
+// used to auto-populate or auto-trigger anything on its own.
+router.get("/discovered-subnets", requirePermission("network", "view"), async (_req, res) => {
+  const subnets = await prisma.relayDiscoveredSubnet.findMany({ orderBy: { lastSeenAt: "desc" } });
+  res.json(subnets);
+});
+
 router.get("/monitor/settings", requirePermission("network", "view"), async (_req, res) => {
   const settings = await prisma.networkMonitorSettings.upsert({
     where: { id: 1 },

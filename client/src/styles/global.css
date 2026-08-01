@@ -157,7 +157,7 @@
   }
 
   .page-header {
-    @apply flex items-center justify-between mb-5 gap-3 flex-wrap;
+    @apply flex items-center justify-between mb-5 gap-3 flex-wrap sticky top-0 z-10 bg-surface;
   }
 
   .page-title {
