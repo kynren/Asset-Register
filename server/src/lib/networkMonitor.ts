@@ -5,7 +5,8 @@ import { runScheduledScan, enqueueRelayScan, isNetworkRelayEnabled } from "../mo
 import { ipToLong } from "./ipRange";
 import { pollDevice } from "./snmp";
 import { decryptSecret } from "./crypto";
-import { notifyUsers, getUserIdsWithPermission } from "./notify";
+import { notifyUsers } from "./notify";
+import { sendEventEmail } from "./emailNotify";
 
 interface MonitorRange {
   startIp: string;
@@ -30,32 +31,41 @@ function formatSince(d: Date): string {
   return d.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+// Delivery is opt-in and explicit: in-app notifications go only to the users configured in
+// NetworkMonitorSettings.notifyUserIds, emails go only to the raw addresses in notifyEmails (which
+// may not correspond to app accounts, so they're sent directly via sendEventEmail rather than
+// through notifyUsers). No fallback to a permission-based audience — an empty list means nobody
+// hears about it, which is the point of letting an admin scope this down.
 async function notifyStatusChange(device: { hostname: string | null; ipAddress: string; deviceType: string | null }, status: "OFFLINE" | "ONLINE", changedAt: Date) {
-  const userIds = await getUserIdsWithPermission("network", "canEdit");
-  if (userIds.length === 0) return;
+  const settings = await prisma.networkMonitorSettings.findUnique({ where: { id: 1 } });
+  const notifyUserIds = (settings?.notifyUserIds as number[] | undefined) ?? [];
+  const notifyEmails = (settings?.notifyEmails as string[] | undefined) ?? [];
+  if (notifyUserIds.length === 0 && notifyEmails.length === 0) return;
 
   const deviceName = device.hostname ? `${device.hostname} (${device.ipAddress})` : device.ipAddress;
   const monitorUrl = `${env.CLIENT_ORIGIN}/network`;
   const message = status === "OFFLINE" ? `${deviceName} went offline.` : `${deviceName} is back online.`;
+  const eventType = status === "OFFLINE" ? "DEVICE_OFFLINE" : "DEVICE_ONLINE";
+  const fallbackSubject = status === "OFFLINE" ? `Device offline: ${deviceName}` : `Device back online: ${deviceName}`;
+  const fallbackText = `${message}\n\nView network monitoring: ${monitorUrl}`;
+  const variables = {
+    deviceName,
+    ipAddress: device.ipAddress,
+    deviceType: device.deviceType ?? "Unclassified Device",
+    sinceTime: formatSince(changedAt),
+    monitorUrl,
+  };
 
-  await notifyUsers({
-    userIds,
-    type: status === "OFFLINE" ? "device_offline" : "device_online",
-    message,
-    linkUrl: "/network",
-    email: {
-      eventType: status === "OFFLINE" ? "DEVICE_OFFLINE" : "DEVICE_ONLINE",
-      fallbackSubject: status === "OFFLINE" ? `Device offline: ${deviceName}` : `Device back online: ${deviceName}`,
-      fallbackText: `${message}\n\nView network monitoring: ${monitorUrl}`,
-      variables: {
-        deviceName,
-        ipAddress: device.ipAddress,
-        deviceType: device.deviceType ?? "Unclassified Device",
-        sinceTime: formatSince(changedAt),
-        monitorUrl,
-      },
-    },
-  });
+  if (notifyUserIds.length > 0) {
+    const activeUsers = await prisma.user.findMany({ where: { id: { in: notifyUserIds }, isActive: true }, select: { id: true } });
+    if (activeUsers.length > 0) {
+      await notifyUsers({ userIds: activeUsers.map((u) => u.id), type: status === "OFFLINE" ? "device_offline" : "device_online", message, linkUrl: "/network" });
+    }
+  }
+
+  if (notifyEmails.length > 0) {
+    await Promise.all(notifyEmails.map((to) => sendEventEmail({ eventType, to, variables, fallbackSubject, fallbackText })));
+  }
 }
 
 // Direct-mode SNMP polling only — the server does its own UDP polling here, which requires the

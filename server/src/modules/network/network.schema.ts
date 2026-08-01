@@ -32,6 +32,8 @@ export const updateMonitorSettingsSchema = z.object({
   enabled: z.boolean(),
   intervalMinutes: z.number().int().min(1).max(1440),
   ranges: z.array(monitorRangeSchema),
+  notifyUserIds: z.array(z.number().int()).optional(),
+  notifyEmails: z.array(z.string().email()).optional(),
 });
 
 export const updateSnmpConfigSchema = z.object({

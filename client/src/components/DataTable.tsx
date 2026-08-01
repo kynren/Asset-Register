@@ -3,6 +3,12 @@ import { ColumnDef, SortingState, flexRender, getCoreRowModel, getSortedRowModel
 import { Icon } from "./Icon";
 import { SkeletonTableRows } from "./Skeleton";
 
+interface SelectionProps<T> {
+  selectedIds: Set<number>;
+  onSelectedIdsChange: (ids: Set<number>) => void;
+  getRowId: (row: T) => number;
+}
+
 interface DataTableProps<T> {
   columns: ColumnDef<T, any>[];
   data: T[];
@@ -14,6 +20,8 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   /** When page/totalPages/onPageChange are not supplied, paginate `data` client-side at this page size. */
   clientPageSize?: number;
+  /** Adds a checkbox column and select-all header checkbox for bulk actions (see BulkActionsBar). */
+  selection?: SelectionProps<T>;
 }
 
 export function DataTable<T>({
@@ -26,6 +34,7 @@ export function DataTable<T>({
   onPageChange,
   onRowClick,
   clientPageSize,
+  selection,
 }: DataTableProps<T>) {
   const [clientPage, setClientPage] = useState(1);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -62,6 +71,21 @@ export function DataTable<T>({
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
+                {selection && (
+                  <th style={{ width: 32 }}>
+                    <input
+                      type="checkbox"
+                      checked={pagedData.length > 0 && pagedData.every((row) => selection.selectedIds.has(selection.getRowId(row)))}
+                      onChange={() => {
+                        const allSelected = pagedData.length > 0 && pagedData.every((row) => selection.selectedIds.has(selection.getRowId(row)));
+                        const next = new Set(selection.selectedIds);
+                        if (allSelected) pagedData.forEach((row) => next.delete(selection.getRowId(row)));
+                        else pagedData.forEach((row) => next.add(selection.getRowId(row)));
+                        selection.onSelectedIdsChange(next);
+                      }}
+                    />
+                  </th>
+                )}
                 {headerGroup.headers.map((header) => {
                   const sortable = header.column.getCanSort();
                   const sortDir = header.column.getIsSorted();
@@ -84,10 +108,10 @@ export function DataTable<T>({
             ))}
           </thead>
           <tbody>
-            {isLoading && <SkeletonTableRows columns={columns.length} />}
+            {isLoading && <SkeletonTableRows columns={columns.length + (selection ? 1 : 0)} />}
             {!isLoading && data.length === 0 && (
               <tr>
-                <td colSpan={columns.length}>
+                <td colSpan={columns.length + (selection ? 1 : 0)}>
                   <div className="empty-state">{emptyMessage}</div>
                 </td>
               </tr>
@@ -95,6 +119,21 @@ export function DataTable<T>({
             {!isLoading &&
               table.getRowModel().rows.map((row) => (
                 <tr key={row.id} onClick={() => onRowClick?.(row.original)} style={{ cursor: onRowClick ? "pointer" : undefined }}>
+                  {selection && (
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selection.selectedIds.has(selection.getRowId(row.original))}
+                        onChange={() => {
+                          const id = selection.getRowId(row.original);
+                          const next = new Set(selection.selectedIds);
+                          if (next.has(id)) next.delete(id);
+                          else next.add(id);
+                          selection.onSelectedIdsChange(next);
+                        }}
+                      />
+                    </td>
+                  )}
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                   ))}

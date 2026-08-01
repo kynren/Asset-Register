@@ -42,6 +42,7 @@ router.get("/client-info", async (req, res) => {
       deviceHostname: agentDevice.hostname,
       deviceLastSeen: agentDevice.lastSeen,
       appVersion: "1.0.0",
+      serverTime: new Date().toISOString(),
     });
     return;
   }
@@ -55,6 +56,7 @@ router.get("/client-info", async (req, res) => {
     protocol: req.protocol,
     host: req.get("host"),
     appVersion: "1.0.0",
+    serverTime: new Date().toISOString(),
   });
 });
 

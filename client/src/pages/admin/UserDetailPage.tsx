@@ -31,6 +31,7 @@ export function UserDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [roleId, setRoleId] = useState<number | "">("");
@@ -58,6 +59,7 @@ export function UserDetailPage() {
 
   useEffect(() => {
     if (user) {
+      setEmail(user.email);
       setFirstName(user.firstName);
       setLastName(user.lastName);
       setRoleId(user.roleId);
@@ -65,7 +67,7 @@ export function UserDetailPage() {
   }, [user]);
 
   const saveMutation = useMutation({
-    mutationFn: () => axiosClient.patch(`/users/${id}`, { firstName, lastName, roleId: Number(roleId) }),
+    mutationFn: () => axiosClient.patch(`/users/${id}`, { email, firstName, lastName, roleId: Number(roleId) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user", id] });
       setSaved(true);
@@ -139,6 +141,10 @@ export function UserDetailPage() {
         <div className="card">
           <h3 className="mt-0">Profile & Role</h3>
           {saved && <div className="alert alert-success">Saved.</div>}
+          {saveMutation.isError && (
+            <div className="alert alert-danger">{(saveMutation.error as any)?.response?.data?.error ?? "Could not save changes."}</div>
+          )}
+          <div className="field"><label>Email</label><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
           <div className="grid grid-cols-2">
             <div className="field"><label>First Name</label><input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
             <div className="field"><label>Last Name</label><input className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>

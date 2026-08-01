@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../auth/AuthContext";
 import { useBranding } from "../theme/BrandingContext";
 import { useBattery } from "../hooks/useBattery";
+import { useClientInfo } from "../hooks/useClientInfo";
 import { useUserPreference } from "../hooks/useUserPreference";
 import { NavItem, settingsNav, systemConsoleNav } from "./navConfig";
 
@@ -50,6 +51,43 @@ function SidebarBattery({ collapsed }: { collapsed: boolean }) {
         <div className="sidebar-battery-bar-fill" style={{ width: `${levelPct}%`, background: color }} />
       </div>
       <span className="sidebar-battery-pct">{levelPct}%</span>
+    </div>
+  );
+}
+
+// Ticks a local clock anchored to the server's clock rather than the browser's — offset is
+// recomputed on every client-info poll (every 3s) so drift never accumulates, but the displayed
+// time itself updates every second locally so it doesn't wait on the next poll to move.
+function SidebarClock({ collapsed }: { collapsed: boolean }) {
+  const { data } = useClientInfo();
+  const [now, setNow] = useState(() => new Date());
+
+  const offsetMs = useMemo(() => (data ? new Date(data.serverTime).getTime() - Date.now() : null), [data]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  if (offsetMs === null) return null;
+
+  const serverNow = new Date(now.getTime() + offsetMs);
+  const time = serverNow.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const date = serverNow.toLocaleDateString([], { day: "2-digit", month: "short" });
+
+  if (collapsed) {
+    return (
+      <div className="sidebar-battery sidebar-battery-collapsed" title={`Server time: ${serverNow.toLocaleString()}`}>
+        <Icon name="clock" size={16} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="sidebar-battery" title={`Server time: ${serverNow.toLocaleString()}`}>
+      <Icon name="clock" size={15} />
+      <span className="sidebar-battery-pct" style={{ fontVariantNumeric: "tabular-nums" }}>{time}</span>
+      <span className="muted" style={{ fontSize: 11 }}>{date}</span>
     </div>
   );
 }
@@ -108,10 +146,10 @@ export function Sidebar({ pageTitle }: { pageTitle: string }) {
       </nav>
 
       <SidebarBattery collapsed={collapsed} />
+      <SidebarClock collapsed={collapsed} />
 
-      <button className="sidebar-collapse-btn" onClick={() => setCollapsed((c) => !c)}>
+      <button className="sidebar-collapse-btn" title={collapsed ? "Expand" : "Collapse"} onClick={() => setCollapsed((c) => !c)}>
         <Icon name={collapsed ? "chevronRight" : "chevronLeft"} size={16} />
-        {!collapsed && <span>Collapse</span>}
       </button>
     </aside>
   );

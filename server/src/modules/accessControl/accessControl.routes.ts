@@ -57,7 +57,19 @@ const deviceSelect = {
   lastCheckedAt: true,
   lastEventSyncAt: true,
   createdAt: true,
-  doors: { select: { id: true, deviceId: true, doorNumber: true, name: true, lockState: true, doorState: true, lastCheckedAt: true }, orderBy: { doorNumber: "asc" as const } },
+  doors: {
+    select: {
+      id: true,
+      deviceId: true,
+      doorNumber: true,
+      name: true,
+      lockState: true,
+      doorState: true,
+      lastCheckedAt: true,
+      cameras: { select: { id: true, name: true, channel: true, ipAddress: true, streamUrl: true, ptzEnabled: true } },
+    },
+    orderBy: { doorNumber: "asc" as const },
+  },
   credentials: {
     select: {
       id: true,
@@ -366,6 +378,28 @@ router.patch("/doors/:doorId", requirePermission("access-control", "edit"), vali
   res.json(door);
 });
 
+// Re-attempts a live status read for just this one door — "Refresh Doors" re-runs full
+// discovery for the whole device, which is overkill (and slow) when only one door came back
+// unknown. Uses the same getDoorStatus() call discovery itself uses, so it succeeds/fails for
+// exactly the same reasons — this doesn't work around a device that genuinely can't answer this
+// endpoint, it just gives a fast, targeted way to retry without waiting on the others.
+router.post("/doors/:doorId/refresh-status", requirePermission("access-control", "edit"), async (req, res) => {
+  const doorId = Number(req.params.doorId);
+  const door = await prisma.door.findUnique({ where: { id: doorId } });
+  if (!door) throw new ApiError(404, "Door not found");
+  const device = await loadDeviceWithSecret(door.deviceId);
+  if (!device.ipAddress) throw new ApiError(400, "This device has no IP address set");
+
+  const result = await getDoorStatus(device.ipAddress, device.port, device.username ?? "", devicePassword(device), door.doorNumber);
+  if (result.ok && result.door) {
+    await upsertDoorFromStatus(device.id, result.door);
+  } else {
+    await prisma.door.update({ where: { id: doorId }, data: { lastCheckedAt: new Date() } });
+  }
+  const updated = await prisma.door.findUnique({ where: { id: doorId } });
+  res.json({ ok: result.ok, message: result.message, door: updated });
+});
+
 router.delete("/doors/:doorId", requirePermission("access-control", "delete"), async (req, res) => {
   await prisma.door.delete({ where: { id: Number(req.params.doorId) } });
   await logAudit({ userId: req.user!.id, action: "door.delete", entityType: "Door", entityId: Number(req.params.doorId) });
@@ -376,7 +410,13 @@ router.delete("/doors/:doorId", requirePermission("access-control", "delete"), a
 // audit log (who pressed the button) and as an AccessEvent (so it shows up in the same event
 // timeline as door-reported grants/denials).
 router.post("/doors/:doorId/control", requirePermission("access-control", "edit"), validateBody(doorControlSchema), async (req, res) => {
-  const door = await prisma.door.findUnique({ where: { id: Number(req.params.doorId) }, include: { device: true } });
+  const door = await prisma.door.findUnique({
+    where: { id: Number(req.params.doorId) },
+    include: {
+      device: true,
+      cameras: { select: { id: true, name: true, channel: true, ipAddress: true, streamUrl: true, ptzEnabled: true } },
+    },
+  });
   if (!door) throw new ApiError(404, "Door not found");
   if (!door.device.ipAddress) throw new ApiError(400, "This device has no IP address set");
 
@@ -400,7 +440,40 @@ router.post("/doors/:doorId/control", requirePermission("access-control", "edit"
     const lockState = req.body.action === "open" || req.body.action === "alwaysOpen" ? "UNLOCKED" : req.body.action === "resume" ? "UNKNOWN" : "LOCKED";
     await prisma.door.update({ where: { id: door.id }, data: { lockState, lastCheckedAt: new Date() } });
   }
-  res.json(result);
+  res.json({ ...result, cameras: door.cameras });
+});
+
+// Cameras an operator wants popped up whenever this door is remote-opened. Linking/unlinking
+// just manages the implicit m:n join — the popup itself is triggered client-side off a
+// successful "open" control call, since Hikvision ISAPI door-open sensor event strings are
+// vendor/device-specific and unverified, so we don't try to pattern-match them here.
+router.post("/doors/:doorId/cameras", requirePermission("access-control", "edit"), async (req, res) => {
+  const doorId = Number(req.params.doorId);
+  const cameraId = Number(req.body.cameraId);
+  const door = await prisma.door.findUnique({ where: { id: doorId } });
+  if (!door) throw new ApiError(404, "Door not found");
+  const camera = await prisma.camera.findUnique({ where: { id: cameraId } });
+  if (!camera) throw new ApiError(404, "Camera not found");
+
+  await prisma.door.update({ where: { id: doorId }, data: { cameras: { connect: { id: cameraId } } } });
+  await logAudit({ userId: req.user!.id, action: "door.linkCamera", entityType: "Door", entityId: doorId, metadata: { cameraId } });
+  const updated = await prisma.door.findUnique({
+    where: { id: doorId },
+    select: { cameras: { select: { id: true, name: true, channel: true, ipAddress: true, streamUrl: true, ptzEnabled: true } } },
+  });
+  res.json(updated);
+});
+
+router.delete("/doors/:doorId/cameras/:cameraId", requirePermission("access-control", "edit"), async (req, res) => {
+  const doorId = Number(req.params.doorId);
+  const cameraId = Number(req.params.cameraId);
+  await prisma.door.update({ where: { id: doorId }, data: { cameras: { disconnect: { id: cameraId } } } });
+  await logAudit({ userId: req.user!.id, action: "door.unlinkCamera", entityType: "Door", entityId: doorId, metadata: { cameraId } });
+  const updated = await prisma.door.findUnique({
+    where: { id: doorId },
+    select: { cameras: { select: { id: true, name: true, channel: true, ipAddress: true, streamUrl: true, ptzEnabled: true } } },
+  });
+  res.json(updated);
 });
 
 // ───────────────────────── Credentials ─────────────────────────
