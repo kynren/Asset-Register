@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ColumnDef } from "@tanstack/react-table";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
+import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
 import { PermissionGate } from "../../auth/PermissionGate";
@@ -9,6 +11,24 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
 import { LightingDevice } from "./LightingDeviceCard";
 import { DeviceActionPicker, DraftAction, actionsToDrafts, draftsToActions } from "./DeviceActionPicker";
+
+interface AutomationRun {
+  id: number;
+  automationId: number | null;
+  automationName: string;
+  trigger: "ON" | "OFF";
+  status: "SUCCESS" | "PARTIAL" | "FAILED";
+  deviceCount: number;
+  failedCount: number;
+  message: string | null;
+  ranAt: string;
+}
+
+const RUN_STATUS_TONE: Record<AutomationRun["status"], string> = {
+  SUCCESS: "badge-success",
+  PARTIAL: "badge-warning",
+  FAILED: "badge-danger",
+};
 
 interface Scene {
   id: number;
@@ -56,7 +76,8 @@ function actionSummary(a: Automation): string {
 }
 
 export function AutomationsTab() {
-  const [view, setView] = useState<"list" | "calendar">("list");
+  const [view, setView] = useState<"list" | "calendar" | "log">("list");
+  const [logPage, setLogPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Automation | null>(null);
   const [deleting, setDeleting] = useState<Automation | null>(null);
@@ -69,6 +90,13 @@ export function AutomationsTab() {
   });
   const { data: devices } = useQuery({ queryKey: ["lighting-devices"], queryFn: async () => (await axiosClient.get("/lighting/devices")).data as LightingDevice[] });
   const { data: scenes } = useQuery({ queryKey: ["lighting-scenes"], queryFn: async () => (await axiosClient.get("/lighting/scenes")).data as Scene[] });
+
+  const { data: runsPage, isLoading: runsLoading } = useQuery({
+    queryKey: ["lighting-automation-runs", logPage],
+    queryFn: async () => (await axiosClient.get(`/lighting/automations/runs?page=${logPage}&pageSize=25`)).data as { runs: AutomationRun[]; total: number; page: number; pageSize: number },
+    enabled: view === "log",
+    refetchInterval: view === "log" ? 15000 : false,
+  });
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["lighting-automations"] });
@@ -87,6 +115,15 @@ export function AutomationsTab() {
     onSuccess: invalidate,
   });
 
+  const runColumns: ColumnDef<AutomationRun, any>[] = [
+    { header: "Time", accessorFn: (r) => r.ranAt, cell: ({ row }) => dayjs(row.original.ranAt).format("DD MMM, HH:mm:ss") },
+    { header: "Automation", accessorFn: (r) => r.automationName },
+    { header: "Trigger", cell: ({ row }) => <span className="badge badge-neutral">{row.original.trigger}</span> },
+    { header: "Status", cell: ({ row }) => <span className={`badge ${RUN_STATUS_TONE[row.original.status]}`}>{row.original.status}</span> },
+    { header: "Devices", accessorFn: (r) => `${r.deviceCount - r.failedCount}/${r.deviceCount} succeeded` },
+    { header: "Detail", accessorFn: (r) => r.message ?? "—" },
+  ];
+
   const calendarCells = useMemo(() => {
     const startOfGrid = month.startOf("month").startOf("week");
     return Array.from({ length: 42 }, (_, i) => startOfGrid.add(i, "day"));
@@ -98,6 +135,7 @@ export function AutomationsTab() {
         <div className="row gap-2">
           <button className={`btn btn-sm ${view === "list" ? "btn-primary" : "btn-secondary"}`} onClick={() => setView("list")}>List</button>
           <button className={`btn btn-sm ${view === "calendar" ? "btn-primary" : "btn-secondary"}`} onClick={() => setView("calendar")}>Calendar</button>
+          <button className={`btn btn-sm ${view === "log" ? "btn-primary" : "btn-secondary"}`} onClick={() => setView("log")}>Log</button>
         </div>
         <PermissionGate module="lighting" action="create">
           <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" size={14} /> Add Automation</button>
@@ -180,6 +218,28 @@ export function AutomationsTab() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {view === "log" && (
+        <div className="card">
+          <h3 className="mt-0">Automation Run Log</h3>
+          <p className="muted" style={{ marginTop: -6 }}>
+            One row per time the scheduler actually fired an automation's on- or off-leg, with a per-run device success/failure count.
+          </p>
+          <DataTable
+            columns={runColumns}
+            data={runsPage?.runs ?? []}
+            isLoading={runsLoading}
+            emptyMessage="No automations have fired yet."
+          />
+          {runsPage && runsPage.total > runsPage.pageSize && (
+            <div className="row gap-2" style={{ justifyContent: "flex-end", alignItems: "center", marginTop: 8 }}>
+              <button className="btn btn-secondary btn-sm" disabled={logPage <= 1} onClick={() => setLogPage((p) => p - 1)}>‹ Prev</button>
+              <span className="muted" style={{ fontSize: 12 }}>Page {runsPage.page} of {Math.max(1, Math.ceil(runsPage.total / runsPage.pageSize))}</span>
+              <button className="btn btn-secondary btn-sm" disabled={logPage * runsPage.pageSize >= runsPage.total} onClick={() => setLogPage((p) => p + 1)}>Next ›</button>
+            </div>
+          )}
         </div>
       )}
 

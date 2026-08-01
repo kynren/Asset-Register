@@ -8,7 +8,13 @@ import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { Skeleton } from "../../components/Skeleton";
+import { MatrixTile, MatrixCamera } from "../nvr/MatrixTile";
 
+interface Nvr {
+  id: number;
+  name: string;
+  cameras: MatrixCamera[];
+}
 interface Door {
   id: number;
   deviceId: number;
@@ -17,6 +23,7 @@ interface Door {
   lockState: "LOCKED" | "UNLOCKED" | "UNKNOWN";
   doorState: "OPEN" | "CLOSED" | "UNKNOWN";
   lastCheckedAt: string | null;
+  cameras: MatrixCamera[];
 }
 interface Device {
   id: number;
@@ -54,12 +61,20 @@ export function DoorStatusTab() {
   const [pageInput, setPageInput] = useState("1");
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [activeDoor, setActiveDoor] = useState<DoorRow | null>(null);
+  const [cameraPicker, setCameraPicker] = useState(false);
+  const [openPopupCameras, setOpenPopupCameras] = useState<MatrixCamera[] | null>(null);
   const queryClient = useQueryClient();
 
   const { data: devices, isLoading } = useQuery({
     queryKey: ["access-control-devices"],
     queryFn: async () => (await axiosClient.get("/access-control/devices")).data as Device[],
   });
+
+  const { data: nvrs } = useQuery({
+    queryKey: ["nvrs"],
+    queryFn: async () => (await axiosClient.get("/nvr")).data as Nvr[],
+  });
+  const allCameras = useMemo(() => (nvrs ?? []).flatMap((n) => n.cameras), [nvrs]);
 
   const { data: events } = useQuery({
     queryKey: ["access-events", ""],
@@ -99,7 +114,39 @@ export function DoorStatusTab() {
 
   const singleControlMutation = useMutation({
     mutationFn: (action: DoorAction) => controlMutation.mutateAsync({ doorId: activeDoor!.id, action }),
-    onSuccess: () => { invalidate(); queryClient.invalidateQueries({ queryKey: ["access-events"] }); setActiveDoor(null); },
+    onSuccess: (res, action) => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["access-events"] });
+      const data = res.data as { ok: boolean; cameras?: MatrixCamera[] };
+      if (action === "open" && data.ok && data.cameras && data.cameras.length > 0) setOpenPopupCameras(data.cameras);
+      setActiveDoor(null);
+    },
+  });
+
+  const linkCameraMutation = useMutation({
+    mutationFn: (cameraId: number) => axiosClient.post(`/access-control/doors/${activeDoor!.id}/cameras`, { cameraId }),
+    onSuccess: (res) => {
+      invalidate();
+      const cameras = (res.data as { cameras: MatrixCamera[] }).cameras;
+      setActiveDoor((d) => (d ? { ...d, cameras } : d));
+    },
+  });
+
+  const unlinkCameraMutation = useMutation({
+    mutationFn: (cameraId: number) => axiosClient.delete(`/access-control/doors/${activeDoor!.id}/cameras/${cameraId}`),
+    onSuccess: (res) => {
+      invalidate();
+      const cameras = (res.data as { cameras: MatrixCamera[] }).cameras;
+      setActiveDoor((d) => (d ? { ...d, cameras } : d));
+    },
+  });
+
+  // ISAPI's card-capture endpoint is scoped to the controller, not an individual door/reader —
+  // Hikvision doesn't expose a way to target one reader on a multi-door panel, so this reads
+  // "whatever card is presented at this door's controller" rather than that specific door's
+  // reader in isolation. Blocks for several seconds on the device side until a card is tapped.
+  const captureCardMutation = useMutation({
+    mutationFn: () => axiosClient.post(`/access-control/devices/${activeDoor!.deviceId}/capture-card`),
   });
 
   function toggleSelected(id: number) {
@@ -181,7 +228,7 @@ export function DoorStatusTab() {
             const isOpen = door.doorState === "OPEN";
             const isUnlocked = door.lockState === "UNLOCKED";
             return (
-              <div key={door.id} className="card" style={{ padding: "10px 12px", cursor: "pointer" }} onClick={() => setActiveDoor(door)}>
+              <div key={door.id} className="card" style={{ padding: "10px 12px", cursor: "pointer" }} onClick={() => { captureCardMutation.reset(); setActiveDoor(door); }}>
                 <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ position: "relative", width: 44, height: 44 }}>
                     <div
@@ -282,9 +329,79 @@ export function DoorStatusTab() {
               <button className="btn btn-secondary" disabled={singleControlMutation.isPending} onClick={() => singleControlMutation.mutate("resume")}>
                 Resume Schedule
               </button>
+              <button className="btn btn-secondary" disabled={captureCardMutation.isPending} onClick={() => captureCardMutation.mutate()}>
+                <Icon name="creditCard" size={13} /> {captureCardMutation.isPending ? "Waiting for card tap..." : "Read Card"}
+              </button>
+              {captureCardMutation.data && (
+                <div className={`alert ${(captureCardMutation.data.data as any)?.ok ? "alert-success" : "alert-danger"}`} style={{ margin: 0 }}>
+                  {(captureCardMutation.data.data as any)?.ok
+                    ? `Card ${(captureCardMutation.data.data as any).cardNo}`
+                    : (captureCardMutation.data.data as any)?.message ?? "No card read."}
+                </div>
+              )}
+              {captureCardMutation.isError && (
+                <div className="alert alert-danger" style={{ margin: 0 }}>
+                  {(captureCardMutation.error as any)?.response?.data?.error ?? "Could not read a card from this door's controller."}
+                </div>
+              )}
             </div>
           </PermissionGate>
-          <button className="btn btn-secondary" style={{ marginTop: 12, width: "100%" }} onClick={() => setActiveDoor(null)}>Close</button>
+
+          <div className="stack gap-2" style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--color-border)" }}>
+            <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "center" }}>
+              <strong style={{ fontSize: 12 }}>Linked Cameras</strong>
+              <PermissionGate module="access-control" action="edit">
+                <button className="btn btn-secondary btn-sm" onClick={() => setCameraPicker((v) => !v)}>
+                  <Icon name="plus" size={12} /> Add
+                </button>
+              </PermissionGate>
+            </div>
+            {activeDoor.cameras.length === 0 && !cameraPicker && (
+              <p className="muted" style={{ fontSize: 11, margin: 0 }}>No cameras linked — link one to pop up its live feed whenever this door is remote-opened.</p>
+            )}
+            {activeDoor.cameras.map((cam) => (
+              <div key={cam.id} className="row gap-2" style={{ justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
+                <span className="row gap-1" style={{ alignItems: "center" }}><Icon name="camera" size={13} /> {cam.name}</span>
+                <PermissionGate module="access-control" action="edit">
+                  <button className="btn btn-secondary btn-sm" disabled={unlinkCameraMutation.isPending} onClick={() => unlinkCameraMutation.mutate(cam.id)}>
+                    <Icon name="close" size={11} />
+                  </button>
+                </PermissionGate>
+              </div>
+            ))}
+            {cameraPicker && (
+              <div className="row gap-2" style={{ alignItems: "center" }}>
+                <select
+                  className="input"
+                  style={{ flex: 1 }}
+                  defaultValue=""
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    if (id) { linkCameraMutation.mutate(id); setCameraPicker(false); }
+                  }}
+                >
+                  <option value="" disabled>Select a camera…</option>
+                  {allCameras.filter((c) => !activeDoor.cameras.some((lc) => lc.id === c.id)).map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <button className="btn btn-secondary" style={{ marginTop: 12, width: "100%" }} onClick={() => { captureCardMutation.reset(); setCameraPicker(false); setActiveDoor(null); }}>Close</button>
+        </FormModal>
+      )}
+
+      {openPopupCameras && (
+        <FormModal title="Linked Camera Feeds" onClose={() => setOpenPopupCameras(null)} hideFooter>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(2, openPopupCameras.length)}, 1fr)` }}>
+            {openPopupCameras.map((cam, i) => (
+              <div key={cam.id} style={{ aspectRatio: "16 / 9", position: "relative" }}>
+                <MatrixTile slotIndex={i} camera={cam} focused={false} muted onFocus={() => undefined} onClose={() => undefined} registerSnap={() => undefined} />
+              </div>
+            ))}
+          </div>
         </FormModal>
       )}
     </div>

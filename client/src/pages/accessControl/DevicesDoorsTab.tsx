@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
@@ -7,6 +7,7 @@ import { Icon } from "../../components/Icon";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
+import { FormModal } from "../../components/FormModal";
 import { DeviceFormModal, DeviceFormValues } from "./DeviceFormModal";
 import { DoorFormModal, DoorFormValues } from "./DoorFormModal";
 
@@ -50,6 +51,11 @@ export function DevicesDoorsTab() {
   const [deletingDevice, setDeletingDevice] = useState<Device | null>(null);
   const [doorDeviceId, setDoorDeviceId] = useState<number | null>(null);
   const [deletingDoor, setDeletingDoor] = useState<Door | null>(null);
+  const [renamingDoor, setRenamingDoor] = useState<Door | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  // Keyed by door id — same pattern as discoveryResults below, but for a single door's forced
+  // status re-read instead of a whole device's rediscovery.
+  const [doorStatusResults, setDoorStatusResults] = useState<Record<number, { ok: boolean; message: string }>>({});
   // Keyed by device id — lets "Refresh Doors" (and door discovery right after adding a device)
   // explain *why* no doors showed up (auth failure, unreachable, unsupported firmware) instead
   // of silently leaving the door list empty with no explanation.
@@ -121,6 +127,20 @@ export function DevicesDoorsTab() {
   const deleteDoorMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/access-control/doors/${id}`),
     onSuccess: () => { invalidate(); setDeletingDoor(null); },
+  });
+
+  const renameDoorMutation = useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) => axiosClient.patch(`/access-control/doors/${id}`, { name }),
+    onSuccess: () => { invalidate(); setRenamingDoor(null); },
+  });
+
+  const refreshDoorStatusMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/access-control/doors/${id}/refresh-status`),
+    onSuccess: (res, id) => {
+      const { ok, message } = res.data as { ok: boolean; message: string };
+      setDoorStatusResults((r) => ({ ...r, [id]: { ok, message } }));
+      invalidate();
+    },
   });
 
   const controlDoorMutation = useMutation({
@@ -197,55 +217,81 @@ export function DevicesDoorsTab() {
               <thead><tr><th>Door #</th><th>Name</th><th>Door State</th><th>Lock State</th><th>Last Checked</th><th></th></tr></thead>
               <tbody>
                 {device.doors.map((door) => (
-                  <tr key={door.id}>
-                    <td>{door.doorNumber}</td>
-                    <td>{door.name}</td>
-                    <td><span className={`badge ${door.doorState === "OPEN" ? "badge-warning" : "badge-neutral"}`}>{door.doorState}</span></td>
-                    <td><span className={`badge ${LOCK_TONE[door.lockState]}`}>{door.lockState}</span></td>
-                    <td className="muted">{door.lastCheckedAt ? dayjs(door.lastCheckedAt).format("DD MMM, HH:mm:ss") : "—"}</td>
-                    <td>
-                      <div className="row gap-1">
-                        <PermissionGate module="access-control" action="edit">
-                          <button
-                            className="btn btn-primary btn-sm"
-                            disabled={controlDoorMutation.isPending}
-                            onClick={() => controlDoorMutation.mutate({ doorId: door.id, action: "open" })}
-                            title="Remotely open this door"
-                          >
-                            <Icon name="key" size={12} /> Open
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            disabled={controlDoorMutation.isPending}
-                            onClick={() => controlDoorMutation.mutate({ doorId: door.id, action: "close" })}
-                            title="Remotely close this door"
-                          >
-                            Close
-                          </button>
-                          <select
-                            className="select"
-                            style={{ width: "auto", fontSize: 12, padding: "4px 8px" }}
-                            value=""
-                            disabled={controlDoorMutation.isPending}
-                            title="Always-unlock / always-lock override, or resume the door's own schedule"
-                            onChange={(e) => {
-                              if (!e.target.value) return;
-                              controlDoorMutation.mutate({ doorId: door.id, action: e.target.value as DoorAction });
-                              e.target.value = "";
-                            }}
-                          >
-                            <option value="">More...</option>
-                            {MORE_DOOR_ACTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-                          </select>
-                        </PermissionGate>
-                        <PermissionGate module="access-control" action="delete">
-                          <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeletingDoor(door)} title="Delete door">
-                            <Icon name="trash" size={12} />
-                          </button>
-                        </PermissionGate>
-                      </div>
-                    </td>
-                  </tr>
+                  <Fragment key={door.id}>
+                    <tr>
+                      <td>{door.doorNumber}</td>
+                      <td>{door.name}</td>
+                      <td><span className={`badge ${door.doorState === "OPEN" ? "badge-warning" : "badge-neutral"}`}>{door.doorState}</span></td>
+                      <td><span className={`badge ${LOCK_TONE[door.lockState]}`}>{door.lockState}</span></td>
+                      <td className="muted">{door.lastCheckedAt ? dayjs(door.lastCheckedAt).format("DD MMM, HH:mm:ss") : "—"}</td>
+                      <td>
+                        <div className="row gap-1">
+                          <PermissionGate module="access-control" action="edit">
+                            <button
+                              className="btn btn-primary btn-sm"
+                              disabled={controlDoorMutation.isPending}
+                              onClick={() => controlDoorMutation.mutate({ doorId: door.id, action: "open" })}
+                              title="Remotely open this door"
+                            >
+                              <Icon name="key" size={12} /> Open
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              disabled={controlDoorMutation.isPending}
+                              onClick={() => controlDoorMutation.mutate({ doorId: door.id, action: "close" })}
+                              title="Remotely close this door"
+                            >
+                              Close
+                            </button>
+                            <select
+                              className="select"
+                              style={{ width: "auto", fontSize: 12, padding: "4px 8px" }}
+                              value=""
+                              disabled={controlDoorMutation.isPending}
+                              title="Always-unlock / always-lock override, or resume the door's own schedule"
+                              onChange={(e) => {
+                                if (!e.target.value) return;
+                                controlDoorMutation.mutate({ doorId: door.id, action: e.target.value as DoorAction });
+                                e.target.value = "";
+                              }}
+                            >
+                              <option value="">More...</option>
+                              {MORE_DOOR_ACTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                            </select>
+                            <button
+                              className="btn btn-secondary btn-sm btn-icon"
+                              disabled={refreshDoorStatusMutation.isPending}
+                              onClick={() => refreshDoorStatusMutation.mutate(door.id)}
+                              title="Force a live status read for this door"
+                            >
+                              <Icon name="refresh" size={12} />
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm btn-icon"
+                              onClick={() => { setRenamingDoor(door); setRenameValue(door.name); }}
+                              title="Rename door"
+                            >
+                              <Icon name="edit" size={12} />
+                            </button>
+                          </PermissionGate>
+                          <PermissionGate module="access-control" action="delete">
+                            <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeletingDoor(door)} title="Delete door">
+                              <Icon name="trash" size={12} />
+                            </button>
+                          </PermissionGate>
+                        </div>
+                      </td>
+                    </tr>
+                    {doorStatusResults[door.id] && (
+                      <tr>
+                        <td colSpan={6} style={{ paddingTop: 0 }}>
+                          <div className={`alert ${doorStatusResults[door.id].ok ? "alert-success" : "alert-danger"}`} style={{ fontSize: 12, margin: 0 }}>
+                            {doorStatusResults[door.id].message}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -276,6 +322,20 @@ export function DevicesDoorsTab() {
       )}
       {doorDeviceId !== null && (
         <DoorFormModal onClose={() => setDoorDeviceId(null)} onSubmit={(v) => createDoorMutation.mutate(v)} submitting={createDoorMutation.isPending} />
+      )}
+      {renamingDoor && (
+        <FormModal
+          title="Rename Door"
+          onClose={() => setRenamingDoor(null)}
+          onSubmit={() => renameDoorMutation.mutate({ id: renamingDoor.id, name: renameValue })}
+          submitting={renameDoorMutation.isPending}
+          submitDisabled={!renameValue.trim()}
+        >
+          <div className="field">
+            <label>Name *</label>
+            <input className="input" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} autoFocus />
+          </div>
+        </FormModal>
       )}
 
       {deletingDevice && (

@@ -7,6 +7,7 @@ import { DataTable } from "../../components/DataTable";
 import { AssetCategoriesTable } from "./AssetCategoriesTable";
 import { FormTemplatesSection } from "./FormTemplatesSection";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { BulkActionsBar, BulkDeleteButton } from "../../components/BulkActionsBar";
 
 interface ListItem {
   id: number;
@@ -19,6 +20,7 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
   const [extra, setExtra] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<ListItem | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({ queryKey: [queryKey], queryFn: async () => (await axiosClient.get(url)).data as ListItem[] });
@@ -98,7 +100,23 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
           <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>Cancel</button>
         )}
       </form>
-      <DataTable columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={5} emptyMessage="None added yet." />
+      <BulkActionsBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+        <BulkDeleteButton
+          selectedIds={[...selectedIds]}
+          baseUrl={url}
+          entityLabel={title.replace(/ies$/i, "y").replace(/s$/i, "").toLowerCase()}
+          invalidateKeys={[[queryKey]]}
+          onDone={() => setSelectedIds(new Set())}
+        />
+      </BulkActionsBar>
+      <DataTable
+        columns={columns}
+        data={data ?? []}
+        isLoading={isLoading}
+        clientPageSize={5}
+        emptyMessage="None added yet."
+        selection={{ selectedIds, onSelectedIdsChange: setSelectedIds, getRowId: (r) => r.id }}
+      />
 
       {deleting && (
         <ConfirmDialog

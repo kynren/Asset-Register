@@ -9,6 +9,7 @@ export interface ClientInfo {
   protocol?: string;
   host?: string;
   appVersion: string;
+  serverTime: string;
 }
 
 // Polls the server's view of this connection continuously (even while the tab is backgrounded)

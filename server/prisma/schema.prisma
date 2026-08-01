@@ -629,6 +629,10 @@ model NetworkMonitorSettings {
   intervalMinutes Int       @default(15)
   // Array of { startIp: string, endIp: string, label?: string }.
   ranges          Json      @default("[]")
+  // Array of user ids to notify in-app on a status change. Empty = nobody.
+  notifyUserIds   Json      @default("[]")
+  // Array of raw email addresses to notify on a status change (may not correspond to app accounts). Empty = nobody.
+  notifyEmails    Json      @default("[]")
   lastRunAt       DateTime?
   updatedById     Int?
   updatedBy       User?     @relation(fields: [updatedById], references: [id])
@@ -939,6 +943,10 @@ model Camera {
   lastCheckedAt     DateTime?
   events            CameraEvent[]
   recordings        CameraRecording[]
+  // Implicit many-to-many — a camera covering an entrance can reasonably be linked to more than
+  // one door (e.g. a lobby camera facing two adjacent doors), and a door can have more than one
+  // linked camera (inside + outside view).
+  doors             Door[]
 }
 
 model CameraRecording {
@@ -1022,6 +1030,9 @@ model Door {
   events         AccessEvent[]
   credentialRights AccessCredentialDoorRight[]
   groupDoors     AccessGroupDoor[]
+  // Cameras an operator wants to see pop up when this door opens — see the "Read Card"/status
+  // routes in accessControl.routes.ts for how these get surfaced.
+  cameras        Camera[]
 
   @@unique([deviceId, doorNumber])
 }
@@ -1289,6 +1300,39 @@ model LightingAutomation {
   lastRunDateOff String?
   createdAt      DateTime                      @default(now())
   updatedAt      DateTime                      @updatedAt
+  runs           LightingAutomationRun[]
+}
+
+// One row per time the scheduler actually fires an automation (on- or off-leg) — gives visibility
+// beyond the single lastRunDate/lastRunDateOff dedup string, which only ever remembers "the last
+// date", not what happened or whether every device actually responded. automationId is nullable
+// with onDelete: SetNull (and the name snapshotted separately) so this history survives deleting
+// the automation itself.
+model LightingAutomationRun {
+  id             Int                @id @default(autoincrement())
+  automationId   Int?
+  automation     LightingAutomation? @relation(fields: [automationId], references: [id], onDelete: SetNull)
+  automationName String
+  trigger        LightingAutomationRunTrigger
+  status         LightingAutomationRunStatus
+  deviceCount    Int                @default(0)
+  failedCount    Int                @default(0)
+  message        String?
+  ranAt          DateTime           @default(now())
+
+  @@index([ranAt])
+  @@index([automationId])
+}
+
+enum LightingAutomationRunTrigger {
+  ON
+  OFF
+}
+
+enum LightingAutomationRunStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
 }
 
 model LightingAutomationAction {

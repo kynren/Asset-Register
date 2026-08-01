@@ -96,7 +96,11 @@ export async function update(req: Request, res: Response) {
   if (id === req.user!.id && req.body.isActive === false) {
     throw new ApiError(400, "You cannot deactivate your own account");
   }
-  const user = await prisma.user.update({ where: { id }, data: req.body, select: userSelect });
+  const { email, ...rest } = req.body;
+  // Lowercased to match verifyCredentials()/create()'s lookup convention — otherwise a
+  // mixed-case edit here would silently break that user's next login.
+  const data = email !== undefined ? { ...rest, email: email.toLowerCase() } : rest;
+  const user = await prisma.user.update({ where: { id }, data, select: userSelect });
   await logAudit({ userId: req.user!.id, action: "user.update", entityType: "User", entityId: id, metadata: req.body });
   res.json(user);
 }

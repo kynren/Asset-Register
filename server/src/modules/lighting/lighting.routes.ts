@@ -551,6 +551,24 @@ router.post("/automations/:id/duplicate", requirePermission("lighting", "create"
   res.status(201).json(clone);
 });
 
+// Paginated history of every time the scheduler actually fired an automation — see
+// LightingAutomationRun in schema.prisma. Distinct from the automation list's single
+// lastRunDate/lastRunDateOff dedup strings, which only ever remember "the last date", not what
+// happened or whether every device actually responded.
+router.get("/automations/runs", requirePermission("lighting", "view"), async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
+  const [runs, total] = await Promise.all([
+    prisma.lightingAutomationRun.findMany({
+      orderBy: { ranAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.lightingAutomationRun.count(),
+  ]);
+  res.json({ runs, total, page, pageSize });
+});
+
 // ───────────────────────── Dashboard summary ─────────────────────────
 // Backs the redesigned Dashboard tab's stat row/bar chart with real data only — this app has no
 // climate or solar-panel integration, so there is no "indoor temp"/"solar energy" to report; the

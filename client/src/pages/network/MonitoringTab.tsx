@@ -40,7 +40,16 @@ interface MonitorSettings {
   enabled: boolean;
   intervalMinutes: number;
   ranges: MonitorRange[];
+  notifyUserIds: number[];
+  notifyEmails: string[];
   lastRunAt: string | null;
+}
+
+interface DirectoryUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
 }
 
 interface SnmpInterface {
@@ -117,7 +126,8 @@ interface DiscoveredSubnet {
 // MIB-II interface health. All server-side in server/src/lib/networkMonitor.ts.
 export function MonitoringTab() {
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<{ enabled: boolean; intervalMinutes: number; ranges: MonitorRange[] } | null>(null);
+  const [draft, setDraft] = useState<{ enabled: boolean; intervalMinutes: number; ranges: MonitorRange[]; notifyUserIds: number[]; notifyEmails: string[] } | null>(null);
+  const [newEmail, setNewEmail] = useState("");
   const [snmpDeviceId, setSnmpDeviceId] = useState<number | null>(null);
   const [snmpCommunity, setSnmpCommunity] = useState("");
   const [snmpPort, setSnmpPort] = useState(161);
@@ -141,12 +151,26 @@ export function MonitoringTab() {
     refetchInterval: 30000,
   });
 
+  const { data: directory } = useQuery({
+    queryKey: ["users-directory"],
+    queryFn: async () => (await axiosClient.get("/users/directory")).data as DirectoryUser[],
+  });
+
   useEffect(() => {
-    if (settings && !draft) setDraft({ enabled: settings.enabled, intervalMinutes: settings.intervalMinutes, ranges: settings.ranges ?? [] });
+    if (settings && !draft) {
+      setDraft({
+        enabled: settings.enabled,
+        intervalMinutes: settings.intervalMinutes,
+        ranges: settings.ranges ?? [],
+        notifyUserIds: settings.notifyUserIds ?? [],
+        notifyEmails: settings.notifyEmails ?? [],
+      });
+    }
   }, [settings, draft]);
 
   const saveMutation = useMutation({
-    mutationFn: (payload: { enabled: boolean; intervalMinutes: number; ranges: MonitorRange[] }) => axiosClient.put("/network/monitor/settings", payload),
+    mutationFn: (payload: { enabled: boolean; intervalMinutes: number; ranges: MonitorRange[]; notifyUserIds: number[]; notifyEmails: string[] }) =>
+      axiosClient.put("/network/monitor/settings", payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["network-monitor-settings"] }),
   });
 
@@ -181,6 +205,23 @@ export function MonitoringTab() {
   function removeRange(index: number) {
     if (!draft) return;
     setDraft({ ...draft, ranges: draft.ranges.filter((_, i) => i !== index) });
+  }
+
+  function toggleNotifyUser(userId: number) {
+    if (!draft) return;
+    const has = draft.notifyUserIds.includes(userId);
+    setDraft({ ...draft, notifyUserIds: has ? draft.notifyUserIds.filter((id) => id !== userId) : [...draft.notifyUserIds, userId] });
+  }
+  function addNotifyEmail() {
+    if (!draft) return;
+    const email = newEmail.trim().toLowerCase();
+    if (!email || draft.notifyEmails.includes(email)) return;
+    setDraft({ ...draft, notifyEmails: [...draft.notifyEmails, email] });
+    setNewEmail("");
+  }
+  function removeNotifyEmail(email: string) {
+    if (!draft) return;
+    setDraft({ ...draft, notifyEmails: draft.notifyEmails.filter((e) => e !== email) });
   }
 
   function addSubnetAsRange(subnet: DiscoveredSubnet) {
@@ -300,6 +341,53 @@ export function MonitoringTab() {
               <button className="btn btn-secondary btn-sm" style={{ alignSelf: "flex-start" }} onClick={addRange}>
                 <Icon name="plus" size={12} /> Add Range
               </button>
+            </div>
+
+            <div className="stack gap-2" style={{ marginBottom: 12, paddingTop: 12, borderTop: "1px solid var(--color-border)" }}>
+              <strong style={{ fontSize: 13 }}>Alert Delivery</strong>
+              <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+                Only the users and addresses below are notified on a device status change. Leave both empty to send nothing.
+              </p>
+
+              <div className="field">
+                <label style={{ fontSize: 12 }}>Notify Users (in-app)</label>
+                <div className="stack gap-1" style={{ maxHeight: 140, overflowY: "auto", border: "1px solid var(--color-border)", borderRadius: 6, padding: 8 }}>
+                  {(directory ?? []).map((u) => (
+                    <label key={u.id} className="row gap-2" style={{ alignItems: "center", fontSize: 12, cursor: "pointer" }}>
+                      <input type="checkbox" checked={draft.notifyUserIds.includes(u.id)} onChange={() => toggleNotifyUser(u.id)} />
+                      {u.firstName} {u.lastName} <span className="muted">({u.email})</span>
+                    </label>
+                  ))}
+                  {(!directory || directory.length === 0) && <span className="muted" style={{ fontSize: 12 }}>No active users.</span>}
+                </div>
+              </div>
+
+              <div className="field">
+                <label style={{ fontSize: 12 }}>Notify Emails</label>
+                <div className="row gap-2 flex-wrap" style={{ marginBottom: 6 }}>
+                  {draft.notifyEmails.map((email) => (
+                    <span key={email} className="badge badge-neutral row gap-1" style={{ alignItems: "center" }}>
+                      {email}
+                      <button className="nt-icon-btn" style={{ padding: 0 }} title="Remove" onClick={() => removeNotifyEmail(email)}>
+                        <Icon name="close" size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="row gap-2">
+                  <input
+                    className="input"
+                    style={{ width: 220 }}
+                    placeholder="name@example.com"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addNotifyEmail(); } }}
+                  />
+                  <button className="btn btn-secondary btn-sm" onClick={addNotifyEmail}>
+                    <Icon name="plus" size={12} /> Add
+                  </button>
+                </div>
+              </div>
             </div>
 
             <PermissionGate module="network" action="edit">
