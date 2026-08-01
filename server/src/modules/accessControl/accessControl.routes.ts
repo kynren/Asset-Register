@@ -117,23 +117,42 @@ async function upsertDoorFromStatus(deviceId: number, door: IsapiDoorStatus) {
   });
 }
 
-// A Hikvision access controller comes with one or more physical doors wired to it — this reads
-// each one straight from the device and upserts a Door row per doorNumber, so the user doesn't
-// have to know or manually enter how many doors a given controller has. Existing doors get their
-// doorState/lockState refreshed; a doorNumber never seen before gets created with a default name
-// ("Door N") the user can rename. Called both right after a device is added and from the
-// "Refresh Doors" button.
+// Used when getDoorCapabilities has confirmed a doorNumber exists but getDoorStatus couldn't read
+// its live state (see hikvisionIsapi.ts — that call isn't independently documented and real
+// hardware has returned HTTP 400 for it). The capability count is the authoritative source for
+// door *existence*; a door shouldn't be hidden from the user just because a separate, unconfirmed
+// status call failed. Existing rows are left untouched (a prior real status read, or a manual
+// control action, shouldn't be reset back to unknown by this).
+async function upsertDoorPlaceholder(deviceId: number, doorNumber: number) {
+  await prisma.door.upsert({
+    where: { deviceId_doorNumber: { deviceId, doorNumber } },
+    update: {},
+    create: { deviceId, doorNumber, name: `Door ${doorNumber}`, doorState: "UNKNOWN", lockState: "UNKNOWN" },
+  });
+}
+
+// A Hikvision access controller comes with one or more physical doors wired to it — this creates
+// a Door row per doorNumber the controller's capabilities report, so the user doesn't have to
+// know or manually enter how many doors a given controller has. Existing doors get their
+// doorState/lockState refreshed when a live status read succeeds; a doorNumber never seen before
+// gets created with a default name ("Door N") the user can rename. Called both right after a
+// device is added and from the "Refresh Doors" button.
 //
-// getDoorStatus is a per-door call (see hikvisionIsapi.ts for why — confirmed against a real
-// controller that rejects a bulk "all doors" query), so this first asks getDoorCapabilities how
-// many doors the panel has and reads each one; if the device doesn't report a capability count
-// either, it falls back to probing door numbers 1, 2, 3... until one comes back "not found".
+// getDoorStatus (this file's per-door live-status read) isn't a documented/confirmed endpoint —
+// see its doc comment — so its failure is NOT treated as proof a door doesn't exist: when
+// getDoorCapabilities reports a count, every doorNumber in that range gets a row regardless of
+// whether the status read for it also succeeds (falling back to "unknown" state). Only when the
+// device doesn't report a capability count at all does this fall back to incremental probing
+// door numbers 1, 2, 3... until one comes back "not found" — there, a status-read failure (as
+// opposed to a clean 404) does stop the probe, since without a capability count a failure gives
+// no way to distinguish "this door exists but status is unreadable" from "ran off the end".
 async function discoverDoors(deviceId: number, ipAddress: string, port: number | null, username: string, password: string) {
   const capabilities = await getDoorCapabilities(ipAddress, port, username, password);
   if (!capabilities.ok) return { ok: false, message: capabilities.message };
 
   const PROBE_LIMIT = 16;
   let doorsFound = 0;
+  let statusReadFailures = 0;
   let firstFailureMessage: string | null = null;
 
   if (capabilities.count) {
@@ -142,11 +161,15 @@ async function discoverDoors(deviceId: number, ipAddress: string, port: number |
       if (result.ok && result.door) {
         await upsertDoorFromStatus(deviceId, result.door);
         doorsFound++;
-      } else if (!result.ok) {
+      } else if (result.ok && result.notFound) {
+        // A per-door 404 despite capabilities claiming this doorNumber exists is left alone
+        // rather than guessed at — Refresh Doors will pick it up once the device reports it.
+      } else {
+        await upsertDoorPlaceholder(deviceId, doorNumber);
+        doorsFound++;
+        statusReadFailures++;
         firstFailureMessage = firstFailureMessage ?? result.message;
       }
-      // A per-door 404 despite capabilities claiming this doorNumber exists is left alone rather
-      // than guessed at — Refresh Doors will pick it up once the device actually reports it.
     }
   } else {
     for (let doorNumber = 1; doorNumber <= PROBE_LIMIT; doorNumber++) {
@@ -165,6 +188,12 @@ async function discoverDoors(deviceId: number, ipAddress: string, port: number |
   }
 
   if (doorsFound === 0 && firstFailureMessage) return { ok: false, message: firstFailureMessage };
+  if (statusReadFailures > 0) {
+    return {
+      ok: true,
+      message: `Added ${doorsFound} door(s) from this controller's reported capabilities, but live status couldn't be read (${firstFailureMessage}) — shown as unknown until this succeeds.`,
+    };
+  }
   return { ok: true, message: doorsFound > 0 ? `Read status for ${doorsFound} door(s).` : "This controller did not report any doors." };
 }
 

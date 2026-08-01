@@ -246,16 +246,21 @@ export interface IsapiDoorStatus {
 }
 
 /**
- * GET /ISAPI/AccessControl/Door/status/<doorNo> — real-time physical door state for one door.
+ * GET /ISAPI/AccessControl/Door/status/<doorNo> — attempted real-time physical door state for
+ * one door.
  *
- * This used to be a single bulk call with no door number, mirroring how getDoorCapabilities'
- * DoorStatusPlan endpoint works. Verified against a real Hikvision controller (this app's own
- * hardware testing, 2026-08): the bulk form returns HTTP 400, while every other per-resource
- * ISAPI AccessControl endpoint in this file (DoorStatusPlan/<DoorNo>, RemoteControl/door/<doorNo>)
- * requires the door number in the URL path — so this now follows that same, confirmed-working
- * convention instead. discoverDoors (accessControl.routes.ts) loops this over every door number
- * the controller's capabilities report (falling back to incremental probing if capabilities are
- * unavailable) to build the door list.
+ * Unlike this file's other AccessControl endpoints, this one is NOT independently documented —
+ * no path-segment "Door/status/<doorNo>" GET appears in Hikvision's own community-referenced
+ * ISAPI guides, which only document PUT RemoteControl/door/<doorNo> for door *control*, never a
+ * GET for door *status*. It was inferred by analogy with DoorStatusPlan/<DoorNo>. Real hardware
+ * testing (2026-08) has since falsified both forms tried: the bulk "all doors" query returned
+ * HTTP 400, and this per-door path form also returns HTTP 400 on the same controller (firmware
+ * V1.1.1, generic "Access Controller" model) — while /ISAPI/System/deviceInfo and the ISAPI
+ * digest-auth handshake itself work fine on that device, so this is specifically about this
+ * resource, not connectivity/auth. Treat a failure here as "live status unavailable", not proof
+ * the door itself doesn't exist — discoverDoors (accessControl.routes.ts) still adds a door row
+ * from getDoorCapabilities' count even when this call fails, just without a known open/locked
+ * state.
  */
 export async function getDoorStatus(
   hostname: string,
