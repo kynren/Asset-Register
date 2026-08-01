@@ -1,2 +1,6 @@
 requests>=2.31.0
 python-dotenv>=1.0.0
+# Windows-only, used by kynren_network_relay_service.py to run this agent as a real Windows
+# Service (auto-start at boot, auto-restart on failure) instead of a Task Scheduler console job —
+# same optional dependency convention already used by the other agent's requirements.txt.
+pywin32>=306; sys_platform == 'win32'

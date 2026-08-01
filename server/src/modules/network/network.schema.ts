@@ -62,9 +62,32 @@ const relaySnmpResultSchema = z.object({
   upTimeTicks: z.number().nullable().default(null),
   interfaces: z.array(z.record(z.any())).default([]),
   error: z.string().nullable().default(null),
+  // Topology fields added alongside the original sysDescr/uptime/interfaces GET — see
+  // agent/kynren_network_relay.py's snmp_get_topology(). All optional/defaulted since older
+  // relay agent builds won't send them, and a relay that only got as far as the basic sysDescr
+  // GET (sysInfoError set) sends these as empty rather than omitting the keys.
+  sysName: z.string().nullable().default(null),
+  macTable: z.array(z.object({ mac: z.string(), port: z.string() })).default([]),
+  lldpNeighbors: z
+    .array(
+      z.object({
+        localPort: z.string().nullable(),
+        remoteChassisId: z.string().nullable(),
+        remotePortId: z.string().nullable(),
+        remoteSysName: z.string().nullable(),
+        protocol: z.enum(["LLDP", "CDP"]),
+      })
+    )
+    .default([]),
+  vlans: z.array(z.object({ vlanId: z.union([z.number(), z.string()]), name: z.string().nullable() })).default([]),
+  poeStatus: z.array(z.object({ port: z.string(), status: z.string() })).default([]),
 });
 
 export const relayCompleteSchema = z.object({
   results: z.array(relayHostResultSchema),
   snmpResults: z.array(relaySnmpResultSchema).default([]),
+});
+
+export const relayDiscoverySchema = z.object({
+  subnets: z.array(z.object({ cidr: z.string().min(1), label: z.string().nullable().optional() })).default([]),
 });

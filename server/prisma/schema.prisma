@@ -536,6 +536,14 @@ model NetworkEdge {
   target        NetworkNode @relation("EdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
   label         String?
   bandwidthMbps Float?
+  // Which physical interface on each end this edge represents, when known (e.g. from an LLDP
+  // neighbor entry's local/remote port). Null for manually-drawn edges, which have no real port.
+  sourcePort    String?
+  targetPort    String?
+  // How this edge came to exist: null/omitted means manually drawn (the original behavior); real
+  // values are "LLDP", "CDP", or "MAC_TABLE" — see lib/topologyEngine.ts. Kept as a plain string
+  // rather than an enum since new discovery methods may be added without a migration.
+  discoveredVia String?
 }
 
 enum ScanStatus {
@@ -638,13 +646,41 @@ model MonitoredNetworkDevice {
   snmpCommunity    String?
   snmpPort         Int              @default(161)
   snmpSysDescr     String?
+  snmpSysName      String?
   snmpUpTimeTicks  BigInt?
   // Array of { index, name, adminStatus, operStatus, speedMbps, inOctets, outOctets }.
   snmpInterfaces   Json?
+  // Array of { mac, port } — bridge/forwarding-table entries (dot1dTpFdbTable), i.e. which MAC
+  // addresses this switch has actually seen on which of its own ports. Populated by the network
+  // relay agent's SNMP walk (agent/kynren_network_relay.py); the direct (non-relay) SNMP poll in
+  // lib/snmp.ts stays MIB-II-only (sysDescr/uptime/ifTable) and does not populate this.
+  snmpMacTable      Json?
+  // Array of { localPort, remoteChassisId, remotePortId, remoteSysName, protocol } — LLDP-MIB
+  // (and best-effort Cisco CDP) neighbor table. `protocol` is "LLDP" or "CDP". Consumed by
+  // lib/topologyEngine.ts to resolve neighbors into NetworkNode/NetworkEdge rows.
+  snmpLldpNeighbors Json?
+  // Array of { vlanId, name } — best-effort (dot1qVlanStaticName, falls back to Cisco vmVlan);
+  // not every switch exposes this, so an empty array here just means "not read", not "no VLANs".
+  snmpVlans         Json?
+  // Array of { port, status } — PoE delivery state per port (pethPsePortTable), where status is
+  // one of "delivering" | "searching" | "disabled" | "fault" | "unknown".
+  snmpPoeStatus     Json?
   snmpLastPolledAt DateTime?
   snmpLastError    String?
 
   statusEvents NetworkDeviceStatusEvent[]
+}
+
+// Subnets the on-prem network relay agent discovered on its own local routing table (e.g.
+// `route print` on Windows) — surfaced to admins as a convenience so they can pick real, actually
+// -present ranges for NetworkMonitorSettings.ranges instead of guessing/typing them blind. Purely
+// informational: nothing here ever auto-triggers a scan on its own, since a subnet being
+// technically routable doesn't mean an admin wants it monitored.
+model RelayDiscoveredSubnet {
+  id         Int      @id @default(autoincrement())
+  cidr       String   @unique
+  label      String?
+  lastSeenAt DateTime @default(now())
 }
 
 model NetworkDeviceStatusEvent {
