@@ -53,3 +53,18 @@ export async function sendEmail(message: EmailMessage): Promise<{ delivered: boo
   });
   return { delivered: true };
 }
+
+// Used by the System Status health check (see lib/systemStatusMonitor.ts) — distinguishes "SMTP
+// isn't configured" (expected/degraded, sendEmail already falls back to console logging) from
+// "SMTP is configured but the server can't actually reach/auth to it" (a real outage) by asking
+// nodemailer to open and verify the connection without sending anything.
+export async function verifyEmailTransport(): Promise<{ configured: boolean; ok: boolean; error?: string }> {
+  const client = getTransporter();
+  if (!client) return { configured: false, ok: false };
+  try {
+    await client.verify();
+    return { configured: true, ok: true };
+  } catch (err) {
+    return { configured: true, ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

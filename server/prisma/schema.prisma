@@ -1556,3 +1556,44 @@ model DocumentAttachment {
   url        String
   createdAt  DateTime @default(now())
 }
+
+// ───────────────────────── System Status ─────────────────────────
+
+enum SystemComponentStatus {
+  OPERATIONAL
+  DEGRADED
+  OUTAGE
+}
+
+// One row per health-checked subsystem (API, database, email, NVR relay, network monitor — see
+// lib/systemStatusMonitor.ts for the actual checks). Static-ish reference data upserted by the
+// scheduler on first run; the interesting history lives in SystemComponentDailyStatus below.
+model SystemComponent {
+  id            Int                           @id @default(autoincrement())
+  key           String                        @unique
+  name          String
+  sortOrder     Int                           @default(0)
+  createdAt     DateTime                      @default(now())
+  dailyStatuses SystemComponentDailyStatus[]
+}
+
+// One row per (component, calendar day in UTC) — upserted every time the periodic health check
+// runs that day, so the Admin & Setup "System Status" uptime strip (styled after status.claude.com)
+// is a simple date-range read instead of aggregating potentially thousands of individual check
+// rows. `status` is the worst status observed that day (an outage anywhere in the day marks the
+// whole day red, matching how public status pages summarize a day); checksOk/checksTotal back the
+// displayed uptime percentage.
+model SystemComponentDailyStatus {
+  id          Int                    @id @default(autoincrement())
+  componentId Int
+  component   SystemComponent        @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  date        DateTime
+  status      SystemComponentStatus  @default(OPERATIONAL)
+  checksOk    Int                    @default(0)
+  checksTotal Int                    @default(0)
+  lastMessage String?
+  updatedAt   DateTime               @updatedAt
+
+  @@unique([componentId, date])
+  @@index([date])
+}
