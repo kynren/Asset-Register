@@ -13,7 +13,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
-    "docs:import": "tsx scripts/importDocsExport.ts"
+    "docs:import": "tsx scripts/importDocsExport.ts",
+    "migrate:all-schemas": "tsx scripts/migrateAllSchemas.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -5,6 +5,9 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { DataTable } from "../../components/DataTable";
+import { useToast } from "../../components/toast/ToastProvider";
+import { PublishOrScheduleModal } from "./PublishOrScheduleModal";
+import { ScheduledChangeRow } from "./scheduledChangeTypes";
 
 function BrandingUploader({ type, label, currentUrl }: { type: "appIcon" | "favicon"; label: string; currentUrl: string | null }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,18 +49,48 @@ function BrandingUploader({ type, label, currentUrl }: { type: "appIcon" | "favi
   );
 }
 
-export function SystemSettingsTab() {
+export function SystemSettingsTab({
+  editingScheduledChange,
+  onDoneEditingScheduledChange,
+}: {
+  editingScheduledChange?: ScheduledChangeRow | null;
+  onDoneEditingScheduledChange?: () => void;
+} = {}) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const { data: settings } = useQuery({ queryKey: ["system-settings"], queryFn: async () => (await axiosClient.get("/settings")).data });
   const [values, setValues] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
 
-  useEffect(() => { if (settings) setValues(settings); }, [settings]);
+  // While editing a pending scheduled change, the form is seeded from ITS payload instead of the
+  // live settings — so Save re-targets that same change instead of publishing live or scheduling
+  // a brand new one.
+  useEffect(() => {
+    if (editingScheduledChange) setValues(editingScheduledChange.payload.values ?? {});
+    else if (settings) setValues(settings);
+  }, [settings, editingScheduledChange]);
 
   const saveMutation = useMutation({
     mutationFn: () => axiosClient.put("/settings", { values }),
     onSuccess: () => { setSaved(true); queryClient.invalidateQueries({ queryKey: ["system-settings"] }); setTimeout(() => setSaved(false), 2000); },
   });
+
+  const updateScheduledMutation = useMutation({
+    mutationFn: () => axiosClient.patch(`/scheduled-changes/${editingScheduledChange!.id}`, { payload: { values } }),
+    onSuccess: () => {
+      showToast({ variant: "success", title: "Scheduled change updated", message: "The changes you made were saved to the pending schedule." });
+      queryClient.invalidateQueries({ queryKey: ["scheduled-changes"] });
+      onDoneEditingScheduledChange?.();
+    },
+  });
+
+  function handleSaveClick() {
+    if (editingScheduledChange) updateScheduledMutation.mutate();
+    else setShowPublishModal(true);
+  }
+
+  const saving = editingScheduledChange ? updateScheduledMutation.isPending : saveMutation.isPending;
 
   const { data: agentKeys } = useQuery({ queryKey: ["agent-keys"], queryFn: async () => (await axiosClient.get("/settings/agent-keys")).data });
   // The create response is the ONLY place the full key is ever available — the list below always
@@ -103,6 +136,13 @@ export function SystemSettingsTab() {
 
   return (
     <div className="stack gap-3">
+      {editingScheduledChange && (
+        <div className="alert alert-warning row gap-2" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <span>Editing scheduled change #{editingScheduledChange.id} — saving here updates the scheduled change, it does not apply anything live.</span>
+          <button className="btn btn-secondary btn-sm" onClick={onDoneEditingScheduledChange}>Stop editing</button>
+        </div>
+      )}
+
       <div className="card" style={{ maxWidth: 480 }}>
         <h3 className="mt-0">General Settings</h3>
         {saved && <div className="alert alert-success">Settings saved.</div>}
@@ -110,7 +150,9 @@ export function SystemSettingsTab() {
         <div className="field"><label>Minimum Password Length</label><input className="input" type="number" value={values.passwordMinLength ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordMinLength: e.target.value }))} /></div>
         <div className="field"><label>Device Offline Threshold (minutes)</label><input className="input" type="number" value={values.deviceOfflineThresholdMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, deviceOfflineThresholdMinutes: e.target.value }))} /></div>
         <div className="field"><label>Camera Recording Retention (days)</label><input className="input" type="number" value={values.cameraRetentionDays ?? ""} onChange={(e) => setValues((v) => ({ ...v, cameraRetentionDays: e.target.value }))} /></div>
-        <button className="btn btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>Save</button>
+        <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
+          {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
+        </button>
       </div>
 
       <div className="card" style={{ maxWidth: 480 }}>
@@ -129,7 +171,9 @@ export function SystemSettingsTab() {
         <div className="field"><label>Prevent Reuse of Last N Passwords</label><input className="input" type="number" value={values.passwordHistoryCount ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordHistoryCount: e.target.value }))} /></div>
         <div className="field"><label>Max Failed Login Attempts</label><input className="input" type="number" value={values.maxFailedLoginAttempts ?? ""} onChange={(e) => setValues((v) => ({ ...v, maxFailedLoginAttempts: e.target.value }))} /></div>
         <div className="field"><label>Lockout Duration (minutes)</label><input className="input" type="number" value={values.lockoutDurationMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, lockoutDurationMinutes: e.target.value }))} /></div>
-        <button className="btn btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>Save</button>
+        <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
+          {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
+        </button>
       </div>
 
       <div className="card" style={{ maxWidth: 480 }}>
@@ -159,7 +203,9 @@ export function SystemSettingsTab() {
             Route network scans through an on-prem relay agent
           </label>
         </div>
-        <button className="btn btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>Save</button>
+        <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
+          {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
+        </button>
       </div>
 
       <div className="card">
@@ -183,6 +229,18 @@ export function SystemSettingsTab() {
         )}
         <DataTable columns={agentKeyColumns} data={agentKeys ?? []} clientPageSize={5} />
       </div>
+
+      {showPublishModal && (
+        <PublishOrScheduleModal
+          title="Save System Settings"
+          changeType="SYSTEM_SETTINGS"
+          payload={{ values }}
+          onPublishNow={async () => { await saveMutation.mutateAsync(); }}
+          publishing={saveMutation.isPending}
+          onScheduled={() => setShowPublishModal(false)}
+          onClose={() => setShowPublishModal(false)}
+        />
+      )}
     </div>
   );
 }

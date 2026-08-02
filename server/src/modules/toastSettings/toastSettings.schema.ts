@@ -15,6 +15,8 @@ export const NOTIFICATION_TYPE_SLUGS = [
   "device_offline",
   "device_online",
   "lighting_automation_start",
+  "scheduled_change_published",
+  "scheduled_change_failed",
 ] as const;
 
 export const updateToastSettingSchema = z.object({

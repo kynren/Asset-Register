@@ -10,6 +10,7 @@ import { startSystemStatusScheduler } from "./lib/systemStatusMonitor";
 import { backfillHarnessPermission } from "./lib/backfillHarnessPermission";
 import { backfillSystemAdmin } from "./lib/backfillSystemAdmin";
 import { startBackupScheduler } from "./lib/backupScheduler";
+import { startScheduledChangeScheduler } from "./lib/scheduledChangeScheduler";
 
 const app = createApp();
 
@@ -28,6 +29,7 @@ bootstrapControlPlane()
       startLightingAutomationScheduler();
       startSystemStatusScheduler();
       startBackupScheduler();
+      startScheduledChangeScheduler();
       backfillHarnessPermission().catch((err) => {
         // eslint-disable-next-line no-console
         console.error("Harness permission backfill failed:", err);

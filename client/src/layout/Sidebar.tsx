@@ -199,12 +199,14 @@ export function Sidebar({ pageTitle }: { pageTitle: string }) {
         ))}
       </nav>
 
-      <SidebarBattery collapsed={collapsed} />
-      <SidebarClock collapsed={collapsed} />
+      <div className="sidebar-bottom-group">
+        <SidebarBattery collapsed={collapsed} />
+        <SidebarClock collapsed={collapsed} />
 
-      <button className="sidebar-collapse-btn" title={collapsed ? "Expand" : "Collapse"} onClick={() => setCollapsed((c) => !c)}>
-        <Icon name={collapsed ? "chevronRight" : "chevronLeft"} size={16} />
-      </button>
+        <button className="sidebar-collapse-btn" title={collapsed ? "Expand" : "Collapse"} onClick={() => setCollapsed((c) => !c)}>
+          <Icon name={collapsed ? "chevronRight" : "chevronLeft"} size={16} />
+        </button>
+      </div>
     </aside>
   );
 }

@@ -106,7 +106,7 @@ export function DevicesTab() {
       )}
       {!isLoading && devices?.length === 0 && <div className="empty-state card">No lighting devices added yet.</div>}
 
-      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 4 }}>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
         {devices?.map((device) => (
           <LightingDeviceTile
             key={device.id}
