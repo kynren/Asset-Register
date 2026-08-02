@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import { parseStringPromise } from "xml2js";
+import { isNetworkRelayEnabled } from "../modules/network/scan.service";
+import { relayAwareFetch } from "./relayTransport";
 
 /**
  * Real client for Hikvision's ISAPI (Intelligent Security API) — the same documented,
@@ -32,15 +34,27 @@ function parseWwwAuthenticate(header: string): DigestChallenge | null {
   return { realm, nonce, qop: get("qop"), opaque: get("opaque") };
 }
 
-/** Issues an HTTP request, transparently handling a Digest (or Basic) auth challenge. */
+/**
+ * Issues an HTTP request, transparently handling a Digest (or Basic) auth challenge. When the
+ * on-prem relay agent is enabled, the whole two-roundtrip digest dance happens on the agent's
+ * side of the LAN instead (Python `requests`' HTTPDigestAuth does this internally in one call) —
+ * the server never sees the device's 401/challenge, it just gets back the final result.
+ */
 async function digestFetch(
   method: string,
   url: string,
   username: string,
   password: string,
   options?: { body?: string; contentType?: string; timeoutMs?: number }
-): Promise<Response> {
+): Promise<{ status: number; ok: boolean; headers: { get(name: string): string | null }; text(): Promise<string>; json(): Promise<unknown> }> {
   const { body, contentType, timeoutMs = 6000 } = options ?? {};
+
+  if (await isNetworkRelayEnabled()) {
+    const headers: Record<string, string> = {};
+    if (body && contentType) headers["Content-Type"] = contentType;
+    return relayAwareFetch(url, { method, headers, body, digestAuth: { username, password }, timeoutMs });
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const baseHeaders: Record<string, string> = {};

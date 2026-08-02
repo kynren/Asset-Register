@@ -6,6 +6,8 @@
  */
 import { detectShelly, getShellyStatus, setShellyBrightness, setShellyPower } from "./shellyApi";
 import { detectTasmota, getTasmotaStatus, setTasmotaBrightness, setTasmotaPower } from "./tasmotaApi";
+import { isNetworkRelayEnabled } from "../modules/network/scan.service";
+import { relayAwareFetch } from "./relayTransport";
 
 export type LightingProtocolName = "SHELLY" | "TASMOTA" | "GENERIC_HTTP" | "ZIGBEE";
 export type LightingKindName = "SWITCH" | "LIGHT";
@@ -144,6 +146,15 @@ function isOnValue(value: unknown): boolean {
 /** `path` is a simple dot-notation lookup into the JSON response, e.g. "power" or "state.on".
  * Left blank, the whole response body just has to be JSON-truthy. */
 async function fetchGenericStatus(url: string, path: string | null): Promise<boolean> {
+  if (await isNetworkRelayEnabled()) {
+    const res = await relayAwareFetch(url, { timeoutMs: GENERIC_TIMEOUT_MS });
+    if (!res.ok) throw new Error(`Status URL responded with HTTP ${res.status}.`);
+    const data = await res.json().catch(() => null);
+    if (!path) return isOnValue(data);
+    const value = path.split(".").reduce<any>((acc, key) => (acc == null ? undefined : acc[key]), data);
+    return isOnValue(value);
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GENERIC_TIMEOUT_MS);
   try {
@@ -161,6 +172,12 @@ async function fetchGenericStatus(url: string, path: string | null): Promise<boo
 }
 
 async function fetchGenericControl(url: string): Promise<void> {
+  if (await isNetworkRelayEnabled()) {
+    const res = await relayAwareFetch(url, { timeoutMs: GENERIC_TIMEOUT_MS });
+    if (!res.ok) throw new Error(`Control URL responded with HTTP ${res.status}.`);
+    return;
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GENERIC_TIMEOUT_MS);
   try {

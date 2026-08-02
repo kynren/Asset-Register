@@ -188,9 +188,10 @@ export function SystemSettingsTab({
         <h3 className="mt-0">Network Relay Agent</h3>
         <p className="muted" style={{ fontSize: 12, marginTop: -6 }}>
           If this app is hosted on a cloud VPS, it has no network route into your office's private LAN — the IP Range
-          Scanner, ICMP Pinger, and continuous Monitoring can't reach local devices no matter what runs on the server.
-          Enable this once you have <code>agent/kynren_network_relay.py</code> running on a machine inside the LAN: scans
-          then queue up for that relay to actually execute, instead of running (and failing) directly on the server.
+          Scanner, ICMP Pinger, continuous Monitoring, NVR/Camera and Access Control device calls, Lighting device
+          control, and Asset ping/heartbeat can't reach local devices no matter what runs on the server. Enable this
+          once you have <code>agent/kynren_network_relay.py</code> running on a machine inside the LAN: every one of
+          those device calls then routes through that relay instead of running (and failing) directly on the server.
           Not needed if this app is self-hosted on a machine already inside the LAN.
         </p>
         <div className="field">

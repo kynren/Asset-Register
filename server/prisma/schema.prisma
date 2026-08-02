@@ -98,6 +98,7 @@ model User {
   scheduledChangesCancelled     ScheduledChange[]        @relation("ScheduledChangeCancelledBy")
   teamMemberships               TeamMember[]
   emailIngestFallbackFor        EmailIngestSettings[]
+  systemStatusSettingsUpdates   SystemStatusSettings[]
 }
 
 model RefreshSession {
@@ -710,6 +711,51 @@ model RelayDiscoveredSubnet {
   cidr       String   @unique
   label      String?
   lastSeenAt DateTime @default(now())
+}
+
+enum RelayDeviceJobKind {
+  PING
+  HTTP
+}
+
+enum RelayDeviceJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// A single on-demand relay-executed network call (ICMP ping, or one HTTP request against a
+// device — ISAPI digest-auth call, Shelly/Tasmota/generic lighting control) — the generic,
+// request/response counterpart to NetworkScan's relay job above. Short-lived: created, claimed
+// within ~3s by the relay agent's poll loop (see relay.routes.ts's GET /next-device-job), and
+// deleted by the awaiting caller (server/src/lib/relayDeviceJobs.ts) once it reads a terminal
+// status — rows are not meant to accumulate. digestPasswordEncrypted mirrors
+// Nvr.encryptedPassword's at-rest encryption (see lib/crypto.ts's encryptSecret/decryptSecret) —
+// decrypted only when building the /next-device-job response the agent consumes over HTTPS.
+// For PING jobs, responseBodyBase64 carries base64(JSON.stringify({alive, responseTimeMs})) —
+// reusing the one generic result field rather than adding ping-specific columns.
+model RelayDeviceJob {
+  id                      Int                   @id @default(autoincrement())
+  kind                    RelayDeviceJobKind
+  status                  RelayDeviceJobStatus  @default(PENDING)
+  target                  String                // PING: host/IP. HTTP: host:port
+  method                  String?
+  path                    String?
+  protocolScheme          String?               @default("http")
+  requestHeaders          Json?
+  requestBody             String?
+  digestUsername          String?
+  digestPasswordEncrypted String?
+  timeoutMs               Int                   @default(8000)
+  responseStatus          Int?
+  responseHeaders         Json?
+  responseBodyBase64      String?
+  errorMessage            String?
+  createdAt               DateTime              @default(now())
+  completedAt             DateTime?
+
+  @@index([status, createdAt])
 }
 
 model NetworkDeviceStatusEvent {
@@ -1745,6 +1791,18 @@ enum SystemComponentStatus {
 // One row per health-checked subsystem (API, database, email, NVR relay, network monitor — see
 // lib/systemStatusMonitor.ts for the actual checks). Static-ish reference data upserted by the
 // scheduler on first run; the interesting history lives in SystemComponentDailyStatus below.
+// Singleton (id always 1), mirrors NetworkMonitorSettings/BackupSettings/EmailIngestSettings'
+// pattern — one row controlling how often runSystemStatusCheck() actually re-checks every
+// component (see systemStatusMonitor.ts's startSystemStatusScheduler()).
+model SystemStatusSettings {
+  id                   Int       @id @default(1)
+  checkIntervalMinutes Int       @default(60)
+  lastRunAt            DateTime?
+  updatedById          Int?
+  updatedBy            User?     @relation(fields: [updatedById], references: [id])
+  updatedAt            DateTime  @updatedAt
+}
+
 model SystemComponent {
   id            Int                          @id @default(autoincrement())
   key           String                       @unique

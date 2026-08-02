@@ -18,6 +18,9 @@
  * module's scope (unauthenticated local API only, same as the Shelly driver).
  */
 
+import { isNetworkRelayEnabled } from "../modules/network/scan.service";
+import { relayAwareFetch } from "./relayTransport";
+
 const TIMEOUT_MS = 4000;
 
 export class TasmotaError extends Error {}
@@ -33,6 +36,18 @@ function connectionErrorMessage(err: unknown): string {
 
 async function cmnd(ip: string, port: number | null | undefined, command: string): Promise<any> {
   const url = `http://${ip}:${port ?? 80}/cm?cmnd=${encodeURIComponent(command)}`;
+
+  if (await isNetworkRelayEnabled()) {
+    try {
+      const res = await relayAwareFetch(url, { timeoutMs: TIMEOUT_MS });
+      if (!res.ok) throw new TasmotaError(`Device responded with HTTP ${res.status}.`);
+      return await res.json().catch(() => ({}) as any);
+    } catch (err) {
+      if (err instanceof TasmotaError) throw err;
+      throw new TasmotaError(err instanceof Error ? err.message : "Relay request failed.");
+    }
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {

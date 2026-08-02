@@ -8,7 +8,7 @@ import { ipToLong } from "../../lib/ipRange";
 import { applyRelayResults } from "./scan.service";
 import { processCompletedMonitorScan } from "../../lib/networkMonitor";
 import { resolveTopologyForDevices } from "../../lib/topologyEngine";
-import { relayCompleteSchema, relayDiscoverySchema, relayProgressSchema } from "./network.schema";
+import { relayCompleteSchema, relayDeviceJobCompleteSchema, relayDiscoverySchema, relayProgressSchema } from "./network.schema";
 
 // On-prem relay agent protocol (agent/kynren_network_relay.py). A cloud-hosted server has no
 // route into a private office LAN — no code running on it can ping/ARP/SNMP-poll local devices,
@@ -136,6 +136,59 @@ router.post("/discovery", validateBody(relayDiscoverySchema), async (req, res) =
       })
       .catch(() => undefined);
   }
+  res.json({ ok: true });
+});
+
+// ───────────────────────── Generic device job (PING/HTTP) ─────────────────────────
+//
+// The counterpart to /next-job above, but for the generic on-demand relay jobs created by
+// server/src/lib/relayDeviceJobs.ts (ISAPI calls, Shelly/Tasmota/generic lighting control, asset
+// ping — see relayTransport.ts's relayAwareFetch/relayAwarePing, the single choke point every
+// direct device call in this codebase now goes through). Separate endpoints from the scan-job
+// pair above deliberately — different payload shape, different cadence, no reason to entangle
+// the two protocols.
+
+router.get("/next-device-job", async (_req, res) => {
+  const pending = await prisma.relayDeviceJob.findFirst({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" } });
+  if (!pending) {
+    res.status(204).end();
+    return;
+  }
+
+  const claimed = await prisma.relayDeviceJob.updateMany({ where: { id: pending.id, status: "PENDING" }, data: { status: "RUNNING" } });
+  if (claimed.count === 0) {
+    res.status(204).end();
+    return;
+  }
+
+  res.json({
+    id: pending.id,
+    kind: pending.kind,
+    target: pending.target,
+    method: pending.method,
+    path: pending.path,
+    protocolScheme: pending.protocolScheme,
+    requestHeaders: pending.requestHeaders,
+    requestBody: pending.requestBody,
+    digestUsername: pending.digestUsername,
+    digestPassword: pending.digestPasswordEncrypted ? decryptSecret(pending.digestPasswordEncrypted) : null,
+    timeoutMs: pending.timeoutMs,
+  });
+});
+
+router.post("/device-jobs/:id/complete", validateBody(relayDeviceJobCompleteSchema), async (req, res) => {
+  const id = Number(req.params.id);
+  await prisma.relayDeviceJob.updateMany({
+    where: { id, status: "RUNNING" },
+    data: {
+      status: req.body.status,
+      responseStatus: req.body.responseStatus,
+      responseHeaders: req.body.responseHeaders,
+      responseBodyBase64: req.body.responseBodyBase64,
+      errorMessage: req.body.errorMessage,
+      completedAt: new Date(),
+    },
+  });
   res.json({ ok: true });
 });
 

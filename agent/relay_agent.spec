@@ -7,9 +7,9 @@
 # the target Windows machine (inside the LAN you want it to scan) and double-click it; see
 # README.md's "Network Relay Agent" section for the full walkthrough.
 #
-# win32timezone/win32ctypes are pulled in explicitly: PyInstaller's pywin32 hook doesn't always
-# discover them since kynren_network_relay_service.py imports servicemanager/win32serviceutil
-# rather than win32timezone directly, but pywin32's own service bookkeeping needs it at runtime.
+# No pywin32/service hidden imports here — kynren_relay_agent_main.py runs the agent as a plain
+# console loop (same code path as `python kynren_network_relay.py`), not as a Windows Service, so
+# there's nothing pywin32-specific for PyInstaller to bundle.
 block_cipher = None
 
 a = Analysis(
@@ -17,15 +17,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=[
-        "win32timezone",
-        "win32service",
-        "win32serviceutil",
-        "win32event",
-        "servicemanager",
-        "pywintypes",
-        "win32ctypes.pywin32",
-    ],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

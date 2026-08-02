@@ -14,6 +14,7 @@ import { startBackupScheduler } from "./lib/backupScheduler";
 import { startScheduledChangeScheduler } from "./lib/scheduledChangeScheduler";
 import { startEmailIngestScheduler } from "./lib/emailIngestScheduler";
 import { startAssetHeartbeatScheduler } from "./lib/assetHeartbeat";
+import { startRelayDeviceJobCleanupScheduler } from "./lib/relayDeviceJobs";
 
 const app = createApp();
 
@@ -35,6 +36,7 @@ bootstrapControlPlane()
       startScheduledChangeScheduler();
       startEmailIngestScheduler();
       startAssetHeartbeatScheduler();
+      startRelayDeviceJobCleanupScheduler();
       backfillHarnessPermission().catch((err) => {
         // eslint-disable-next-line no-console
         console.error("Harness permission backfill failed:", err);

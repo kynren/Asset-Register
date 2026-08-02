@@ -1,7 +1,9 @@
 import os from "os";
 import { Router } from "express";
+import { z } from "zod";
 import { verifyJwt } from "../../middleware/auth";
 import { requirePermission } from "../../middleware/rbac";
+import { validateBody } from "../../middleware/validate";
 import { getLocalNicIp, resolveClientIp } from "../../lib/network";
 import { prisma } from "../../config/prisma";
 import { runSystemStatusCheck } from "../../lib/systemStatusMonitor";
@@ -130,11 +132,39 @@ router.get("/status", requirePermission("app-settings", "view"), async (_req, re
   res.json({ overall, components: result });
 });
 
-// Lets an admin force an immediate health check instead of waiting for the next 5-minute cycle —
+// Lets an admin force an immediate health check instead of waiting for the next scheduled cycle —
 // useful right after fixing something (e.g. configuring SMTP) to confirm it actually took effect.
 router.post("/status/check-now", requirePermission("app-settings", "view"), async (_req, res) => {
   await runSystemStatusCheck();
+  await prisma.systemStatusSettings.upsert({
+    where: { id: 1 },
+    update: { lastRunAt: new Date() },
+    create: { id: 1, lastRunAt: new Date() },
+  });
   res.json({ ok: true });
 });
+
+router.get("/status/settings", requirePermission("app-settings", "view"), async (_req, res) => {
+  const settings = await prisma.systemStatusSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1 },
+  });
+  res.json({ checkIntervalMinutes: settings.checkIntervalMinutes });
+});
+
+router.put(
+  "/status/settings",
+  requirePermission("app-settings", "edit"),
+  validateBody(z.object({ checkIntervalMinutes: z.number().int().min(1).max(1440) })),
+  async (req, res) => {
+    const settings = await prisma.systemStatusSettings.upsert({
+      where: { id: 1 },
+      update: { checkIntervalMinutes: req.body.checkIntervalMinutes, updatedById: req.user!.id },
+      create: { id: 1, checkIntervalMinutes: req.body.checkIntervalMinutes, updatedById: req.user!.id },
+    });
+    res.json({ checkIntervalMinutes: settings.checkIntervalMinutes });
+  }
+);
 
 export default router;

@@ -2,7 +2,7 @@ import { Response } from "express";
 import { prisma, currentSchemaName } from "../config/prisma";
 import { runForEachOrganization } from "../config/controlPlane";
 import { mapLimit } from "./concurrency";
-import { pingHost } from "./ping";
+import { relayAwarePing } from "./relayTransport";
 
 export interface AssetHeartbeatResult {
   id: number;
@@ -64,7 +64,7 @@ async function tick(): Promise<void> {
   }
 
   const results = await mapLimit(assets, PING_CONCURRENCY, async (asset) => {
-    const result = await pingHost(asset.staticIpAddress || asset.assetTag);
+    const result = await relayAwarePing(asset.staticIpAddress || asset.assetTag);
     return { id: asset.id, assetTag: asset.assetTag, alive: result.alive, responseTimeMs: result.responseTimeMs };
   });
 

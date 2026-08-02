@@ -172,17 +172,36 @@ export async function runSystemStatusCheck(): Promise<void> {
   }
 }
 
+// Wall-clock tick — actual check cadence is gated by SystemStatusSettings.checkIntervalMinutes
+// (default 60, admin-configurable per organization via PUT /system/status/settings), same
+// dueAt-against-lastRunAt pattern networkMonitor.ts uses for NetworkMonitorSettings.intervalMinutes.
+const TICK_MS = 60 * 1000;
+
+async function tick(): Promise<void> {
+  const settings = await prisma.systemStatusSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1 },
+  });
+
+  const dueAt = settings.lastRunAt ? settings.lastRunAt.getTime() + settings.checkIntervalMinutes * 60 * 1000 : 0;
+  if (Date.now() < dueAt) return;
+
+  await runSystemStatusCheck();
+  await prisma.systemStatusSettings.update({ where: { id: 1 }, data: { lastRunAt: new Date() } });
+}
+
 let intervalHandle: NodeJS.Timeout | null = null;
 
-export function startSystemStatusScheduler(intervalMinutes = 5) {
+export function startSystemStatusScheduler() {
   if (intervalHandle) return;
   const run = () => {
-    runForEachOrganization(runSystemStatusCheck).catch((err) => {
+    runForEachOrganization(tick).catch((err) => {
       // eslint-disable-next-line no-console
       console.error("System status check failed:", err);
     });
   };
   run();
-  intervalHandle = setInterval(run, intervalMinutes * 60 * 1000);
+  intervalHandle = setInterval(run, TICK_MS);
   intervalHandle.unref();
 }
