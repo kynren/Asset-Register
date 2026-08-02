@@ -22,6 +22,39 @@ interface DataTableProps<T> {
   clientPageSize?: number;
   /** Adds a checkbox column and select-all header checkbox for bulk actions (see BulkActionsBar). */
   selection?: SelectionProps<T>;
+  /**
+   * Explicitly show/hide the search box. Defaults to shown unless the table is server-paginated
+   * (page/totalPages/onPageChange supplied) with no controlled search props — in that case DataTable
+   * only has the current page's rows, so a self-managed filter would silently miss matches on other
+   * pages. Set true there once the page wires `search`/`onSearchChange` into its own server query.
+   */
+  searchable?: boolean;
+  /** Controlled search text — pass this + onSearchChange when the parent owns filtering (typically
+   * server-side, alongside page/totalPages). Omit both to let DataTable filter `data` itself client-side. */
+  search?: string;
+  onSearchChange?: (value: string) => void;
+  searchPlaceholder?: string;
+}
+
+function getColumnRawValue<T>(row: T, col: ColumnDef<T, any>): unknown {
+  const anyCol = col as any;
+  if (typeof anyCol.accessorFn === "function") return anyCol.accessorFn(row, 0);
+  if (typeof anyCol.accessorKey === "string") {
+    return anyCol.accessorKey.split(".").reduce((acc: any, key: string) => acc?.[key], row);
+  }
+  return undefined;
+}
+
+// Full-row text match across every column with an accessor — skips pure-UI columns (e.g. an
+// "actions" column with only a `cell` renderer) and nested objects, which have no single sensible
+// string form here. Matches the same "search everything visible" expectation FilterBar's search
+// gives on pages that wire it server-side.
+function rowMatchesSearch<T>(row: T, columns: ColumnDef<T, any>[], query: string): boolean {
+  return columns.some((col) => {
+    const val = getColumnRawValue(row, col);
+    if (val === null || val === undefined || typeof val === "object") return false;
+    return String(val).toLowerCase().includes(query);
+  });
 }
 
 export function DataTable<T>({
@@ -35,21 +68,47 @@ export function DataTable<T>({
   onRowClick,
   clientPageSize,
   selection,
+  searchable,
+  search: controlledSearch,
+  onSearchChange,
+  searchPlaceholder = "Search...",
 }: DataTableProps<T>) {
   const [clientPage, setClientPage] = useState(1);
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [internalSearch, setInternalSearch] = useState("");
 
   const isServerPaginated = page !== undefined && totalPages !== undefined;
   const isClientPaginated = !isServerPaginated && Boolean(clientPageSize);
+  const isControlledSearch = onSearchChange !== undefined;
+  // Self-managed filtering only makes sense when DataTable actually holds the full dataset —
+  // for server-paginated tables `data` is just the current page, so silently filtering it would
+  // hide matches that exist on other pages instead of finding them.
+  const showSearch = searchable ?? (isControlledSearch || !isServerPaginated);
+  const searchValue = isControlledSearch ? controlledSearch ?? "" : internalSearch;
 
-  const clientTotalPages = isClientPaginated ? Math.max(1, Math.ceil(data.length / clientPageSize!)) : 1;
+  function handleSearchChange(value: string) {
+    if (isControlledSearch) {
+      onSearchChange!(value);
+    } else {
+      setInternalSearch(value);
+      setClientPage(1);
+    }
+  }
+
+  const searchedData = useMemo(() => {
+    if (isControlledSearch || isServerPaginated || !internalSearch.trim()) return data;
+    const q = internalSearch.trim().toLowerCase();
+    return data.filter((row) => rowMatchesSearch(row, columns, q));
+  }, [data, columns, internalSearch, isControlledSearch, isServerPaginated]);
+
+  const clientTotalPages = isClientPaginated ? Math.max(1, Math.ceil(searchedData.length / clientPageSize!)) : 1;
   const effectiveClientPage = Math.min(clientPage, clientTotalPages);
 
   const pagedData = useMemo(() => {
-    if (!isClientPaginated) return data;
+    if (!isClientPaginated) return searchedData;
     const start = (effectiveClientPage - 1) * clientPageSize!;
-    return data.slice(start, start + clientPageSize!);
-  }, [data, isClientPaginated, effectiveClientPage, clientPageSize]);
+    return searchedData.slice(start, start + clientPageSize!);
+  }, [searchedData, isClientPaginated, effectiveClientPage, clientPageSize]);
 
   const table = useReactTable({
     data: pagedData,
@@ -66,6 +125,20 @@ export function DataTable<T>({
 
   return (
     <div>
+      {showSearch && (
+        <div style={{ position: "relative", marginBottom: 10, maxWidth: 280 }}>
+          <span style={{ position: "absolute", left: 10, top: 9, color: "var(--color-text-muted)" }}>
+            <Icon name="search" size={14} />
+          </span>
+          <input
+            className="input"
+            style={{ paddingLeft: 30 }}
+            placeholder={searchPlaceholder}
+            value={searchValue}
+            onChange={(e) => handleSearchChange(e.target.value)}
+          />
+        </div>
+      )}
       <div style={{ overflowX: "auto" }}>
         <table className="data-table">
           <thead>
@@ -109,10 +182,12 @@ export function DataTable<T>({
           </thead>
           <tbody>
             {isLoading && <SkeletonTableRows columns={columns.length + (selection ? 1 : 0)} />}
-            {!isLoading && data.length === 0 && (
+            {!isLoading && pagedData.length === 0 && (
               <tr>
                 <td colSpan={columns.length + (selection ? 1 : 0)}>
-                  <div className="empty-state">{emptyMessage}</div>
+                  <div className="empty-state">
+                    {data.length > 0 ? "No records match your search." : emptyMessage}
+                  </div>
                 </td>
               </tr>
             )}

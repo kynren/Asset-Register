@@ -93,6 +93,7 @@ model User {
   documentsCreated              Document[]
   networkMonitorSettingsUpdates NetworkMonitorSettings[]
   backupSettingsUpdates         BackupSettings[]
+  toastSettingUpdates           ToastSetting[]
 }
 
 model RefreshSession {
@@ -1736,6 +1737,23 @@ model BackupSettings {
 enum BackupDestinationType {
   EMAIL
   S3
+}
+
+// Per-notification-type customization of the in-app toast popped when a matching Notification
+// (see notifyUsers() in lib/notify.ts) arrives while the recipient is active in the app. Keyed by
+// Notification.type (a stable free-form string, e.g. "asset_assigned") rather than EmailEventType,
+// since notification types cover several events (ticket comments, lighting automations) that have
+// no corresponding email template. Missing rows fall back to NOTIFICATION_TYPES catalog defaults
+// on the client — a row only needs to exist once an admin actually customizes that type.
+model ToastSetting {
+  id          Int      @id @default(autoincrement())
+  type        String   @unique
+  isEnabled   Boolean  @default(true)
+  variant     String   @default("info")
+  title       String?
+  updatedById Int?
+  updatedBy   User?    @relation(fields: [updatedById], references: [id])
+  updatedAt   DateTime @updatedAt
 }
 
 // A place a completed backup gets pushed to. S3 fields cover any S3-compatible provider (AWS S3,

@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { axiosClient } from "../api/axiosClient";
 import { Icon } from "../components/Icon";
+import { useToast } from "../components/toast/ToastProvider";
+import { findNotificationTypeInfo } from "../lib/notificationTypes";
 
 interface NotificationItem {
   id: number;
@@ -14,16 +16,57 @@ interface NotificationItem {
   createdAt: string;
 }
 
+interface ToastSettingItem {
+  type: string;
+  isEnabled: boolean | null;
+  variant: "success" | "error" | "warning" | "info" | null;
+  title: string | null;
+}
+
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  const { showToast } = useToast();
 
   const { data } = useQuery({
     queryKey: ["notifications"],
     queryFn: async () => (await axiosClient.get("/notifications")).data as { notifications: NotificationItem[]; unreadCount: number },
     refetchInterval: 30_000,
   });
+
+  // Settings change rarely, so a long staleTime avoids re-fetching them on every 30s
+  // notification poll — they're only actually read from at the moment a new notification lands.
+  const { data: toastSettings } = useQuery({
+    queryKey: ["toast-settings"],
+    queryFn: async () => (await axiosClient.get("/toast-settings")).data as ToastSettingItem[],
+    staleTime: 5 * 60_000,
+  });
+
+  // Pops a toast for each notification that appeared since the last poll — but not on first
+  // load, which would otherwise toast-storm every unread notification on every page refresh.
+  const seenIdsRef = useRef<Set<number> | null>(null);
+  useEffect(() => {
+    if (!data) return;
+    const currentIds = new Set(data.notifications.map((n) => n.id));
+    if (seenIdsRef.current === null) {
+      seenIdsRef.current = currentIds;
+      return;
+    }
+    const newOnes = data.notifications.filter((n) => !seenIdsRef.current!.has(n.id));
+    for (const n of newOnes) {
+      const setting = toastSettings?.find((s) => s.type === n.type);
+      if (setting?.isEnabled === false) continue;
+      const meta = findNotificationTypeInfo(n.type);
+      showToast({
+        variant: setting?.variant ?? meta?.defaultVariant ?? "info",
+        title: setting?.title ?? meta?.label,
+        message: n.message,
+      });
+    }
+    seenIdsRef.current = currentIds;
+  }, [data, toastSettings, showToast]);
 
   const markAllMutation = useMutation({
     mutationFn: () => axiosClient.post("/notifications/read-all"),

@@ -232,6 +232,9 @@ export function AutomationsTab() {
             data={runsPage?.runs ?? []}
             isLoading={runsLoading}
             emptyMessage="No automations have fired yet."
+            // Only one server page of runs is loaded at a time (Prev/Next below manage logPage
+            // directly) — DataTable's client-side search would silently search just this page.
+            searchable={false}
           />
           {runsPage && runsPage.total > runsPage.pageSize && (
             <div className="row gap-2" style={{ justifyContent: "flex-end", alignItems: "center", marginTop: 8 }}>

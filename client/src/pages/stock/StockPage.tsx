@@ -46,6 +46,7 @@ export function StockPage() {
 
   const createMutation = useMutation({
     mutationFn: (values: StockItemFormValues) => axiosClient.post("/stock", values),
+    meta: { successMessage: "Stock item created" },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["stock"] }); setShowForm(false); },
   });
 
@@ -179,12 +180,14 @@ function StockLevelsModal({ item, onClose }: { item: StockItem; onClose: () => v
 
   const txMutation = useMutation({
     mutationFn: () => axiosClient.post(`/stock/${item.id}/transactions`, { type, quantity, locationId: Number(locationId), reason: reason || undefined }),
+    meta: { successMessage: "Stock transaction recorded" },
     onSuccess: () => { invalidateAll(); setQuantity(1); setReason(""); },
   });
 
   const transferMutation = useMutation({
     mutationFn: () =>
       axiosClient.post(`/stock/${item.id}/transfer`, { fromLocationId: Number(fromLocationId), toLocationId: Number(toLocationId), quantity, reason: reason || undefined }),
+    meta: { successMessage: "Stock transferred" },
     onSuccess: () => { invalidateAll(); setQuantity(1); setReason(""); },
   });
 

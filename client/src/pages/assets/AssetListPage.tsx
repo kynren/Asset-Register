@@ -101,16 +101,19 @@ export function AssetListPage() {
 
   const createMutation = useMutation({
     mutationFn: (values: AssetFormValues) => axiosClient.post("/assets", toPayload(values)),
+    meta: { successMessage: "Asset created" },
     onSuccess: () => { invalidateAll(); setShowForm(false); },
   });
 
   const updateMutation = useMutation({
     mutationFn: (values: AssetFormValues) => axiosClient.patch(`/assets/${editing!.id}`, toPayload(values)),
+    meta: { successMessage: "Asset updated" },
     onSuccess: () => { invalidateAll(); setEditing(null); },
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => axiosClient.delete(`/assets/${deleting!.id}`),
+    meta: { successMessage: "Asset deleted" },
     onSuccess: () => { invalidateAll(); setDeleting(null); },
   });
 

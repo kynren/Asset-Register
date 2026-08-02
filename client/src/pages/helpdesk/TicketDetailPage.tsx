@@ -42,11 +42,13 @@ export function TicketDetailPage() {
 
   const statusMutation = useMutation({
     mutationFn: (status: string) => axiosClient.patch(`/tickets/${id}/status`, { status }),
+    meta: { successMessage: "Ticket status updated" },
     onSuccess: invalidate,
   });
 
   const commentMutation = useMutation({
     mutationFn: (body: { body: string; isInternal: boolean }) => axiosClient.post(`/tickets/${id}/comments`, body),
+    meta: { successMessage: "Comment added" },
     onSuccess: () => {
       invalidate();
       setComment("");
