@@ -34,6 +34,7 @@ export function TicketListPage() {
 
   const createMutation = useMutation({
     mutationFn: (values: TicketFormValues) => axiosClient.post("/tickets", values),
+    meta: { successMessage: "Ticket created" },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
       setShowForm(false);

@@ -44,6 +44,7 @@ import searchRoutes from "./modules/search/search.routes";
 import mcpRoutes from "./mcp/mcp.routes";
 import mcpKeysRoutes from "./mcp/mcpKeys.routes";
 import backupsRoutes from "./modules/backups/backups.routes";
+import toastSettingsRoutes from "./modules/toastSettings/toastSettings.routes";
 
 export function createApp() {
   const app = express();
@@ -95,6 +96,7 @@ export function createApp() {
   app.use("/api/asset-form-templates", assetFormTemplatesRoutes);
   app.use("/api/email-templates", emailTemplatesRoutes);
   app.use("/api/backups", backupsRoutes);
+  app.use("/api/toast-settings", toastSettingsRoutes);
   app.use("/api/docs", docsRoutes);
   app.use("/api/search", searchRoutes);
   app.use("/api/mcp", mcpRoutes);

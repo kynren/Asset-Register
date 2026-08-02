@@ -7,6 +7,7 @@ import { AuditLogTab } from "./AuditLogTab";
 import { EmailTemplatesTab } from "./EmailTemplatesTab";
 import { SystemStatusTab } from "./SystemStatusTab";
 import { BackupsTab } from "./BackupsTab";
+import { ToastSettingsTab } from "./ToastSettingsTab";
 import { useAuth } from "../../auth/AuthContext";
 
 const TABS = [
@@ -14,6 +15,7 @@ const TABS = [
   { key: "roles", label: "Roles & Permissions" },
   { key: "catalog", label: "Categories & Locations" },
   { key: "email-templates", label: "Email Templates" },
+  { key: "toasts", label: "Toast Designer" },
   { key: "backups", label: "Backups", module: "backups" as const },
   { key: "settings", label: "System Settings" },
   { key: "status", label: "System Status" },
@@ -48,6 +50,7 @@ export function AdminPage() {
       {tab === "roles" && <RolesTab />}
       {tab === "catalog" && <CategoriesLocationsTab />}
       {tab === "email-templates" && <EmailTemplatesTab />}
+      {tab === "toasts" && <ToastSettingsTab />}
       {tab === "backups" && <BackupsTab />}
       {tab === "settings" && <SystemSettingsTab />}
       {tab === "status" && <SystemStatusTab />}

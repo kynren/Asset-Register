@@ -47,6 +47,7 @@ export function UsersTab() {
 
   const deactivateMutation = useMutation({
     mutationFn: () => axiosClient.delete(`/users/${deactivating!.id}`),
+    meta: { successMessage: "User deactivated" },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["users"] }); setDeactivating(null); },
   });
 
