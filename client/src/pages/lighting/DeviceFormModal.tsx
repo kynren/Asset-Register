@@ -4,7 +4,9 @@ import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { QuickAddSelect } from "../../components/QuickAddSelect";
 
-export type LightingProtocol = "SHELLY" | "TASMOTA" | "GENERIC_HTTP";
+export type LightingProtocol = "SHELLY" | "TASMOTA" | "GENERIC_HTTP" | "ZIGBEE";
+
+const CREATABLE_PROTOCOLS: LightingProtocol[] = ["SHELLY", "TASMOTA", "GENERIC_HTTP"];
 
 export interface DeviceFormValues {
   name: string;
@@ -34,12 +36,14 @@ const PROTOCOL_LABELS: Record<LightingProtocol, string> = {
   SHELLY: "Shelly",
   TASMOTA: "Tasmota",
   GENERIC_HTTP: "Generic HTTP (any web-controllable device)",
+  ZIGBEE: "ZigBee",
 };
 
 const PROTOCOL_HELP: Record<LightingProtocol, string> = {
   SHELLY: "Connects directly to the device's local Shelly API over Wi-Fi — no cloud account needed. Generation (Gen1/Gen2/3) and whether it's a switch or a dimmable light are detected automatically once saved. If this device has more than one output (e.g. a Shelly 2PM or Pro 4PM), one entry is created per output automatically.",
   TASMOTA: "Connects directly to the device's local Tasmota HTTP API over Wi-Fi — no cloud account needed. Whether it's a plain switch or a dimmable light is detected automatically once saved. Devices with a Tasmota web admin password set are not supported.",
   GENERIC_HTTP: "For any other web-controllable light or IoT device — Home Assistant automations, ESPHome, IFTTT/webhook proxies, or a self-built relay. Supply the exact URLs the app should call to turn it on/off, and optionally a URL to read its current state.",
+  ZIGBEE: "Paired from the ZigBee tab — not configurable from this form.",
 };
 
 export function DeviceFormModal({
@@ -77,7 +81,7 @@ export function DeviceFormModal({
         <div className="field">
           <label>Device Type *</label>
           <select className="input" value={values.protocol} onChange={(e) => update("protocol", e.target.value as LightingProtocol)} disabled={editing}>
-            {(Object.keys(PROTOCOL_LABELS) as LightingProtocol[]).map((p) => (
+            {(editing && values.protocol === "ZIGBEE" ? [...CREATABLE_PROTOCOLS, "ZIGBEE" as const] : CREATABLE_PROTOCOLS).map((p) => (
               <option key={p} value={p}>{PROTOCOL_LABELS[p]}</option>
             ))}
           </select>

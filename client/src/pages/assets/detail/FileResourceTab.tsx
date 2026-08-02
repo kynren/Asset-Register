@@ -6,6 +6,7 @@ import { Icon } from "../../../components/Icon";
 import { FieldConfig } from "./SubResourceTab";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { SkeletonText } from "../../../components/Skeleton";
+import { PermissionGate } from "../../../auth/PermissionGate";
 
 interface FileResourceTabProps {
   assetId: number;
@@ -84,9 +85,11 @@ export function FileResourceTab({ assetId, resource, title, subtitle, addLabel, 
             <label>File{fileOptional ? "" : " *"}</label>
             <input ref={fileInputRef} className="ad-input" type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </div>
-          <button className="ad-btn ad-btn-primary" disabled={!canSubmit || createMutation.isPending} onClick={handleSubmit}>
-            <Icon name="plus" size={12} /> {createMutation.isPending ? "Uploading..." : addLabel}
-          </button>
+          <PermissionGate module="assets" action="edit">
+            <button className="ad-btn ad-btn-primary" disabled={!canSubmit || createMutation.isPending} onClick={handleSubmit}>
+              <Icon name="plus" size={12} /> {createMutation.isPending ? "Uploading..." : addLabel}
+            </button>
+          </PermissionGate>
         </div>
 
         {isLoading ? (
@@ -112,9 +115,11 @@ export function FileResourceTab({ assetId, resource, title, subtitle, addLabel, 
                       <Icon name="download" size={12} /> Open
                     </a>
                   )}
-                  <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(item)} disabled={deleteMutation.isPending}>
-                    <Icon name="trash" size={12} />
-                  </button>
+                  <PermissionGate module="assets" action="edit">
+                    <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(item)} disabled={deleteMutation.isPending}>
+                      <Icon name="trash" size={12} />
+                    </button>
+                  </PermissionGate>
                 </div>
               </div>
             ))}

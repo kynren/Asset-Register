@@ -266,10 +266,6 @@ function InnerTopologyGraph() {
     setSelectedNodeId(null);
   }
 
-  function refreshLayout() {
-    setNodes((nds) => layoutGraph(nds, edges));
-  }
-
   const selectedNode = selectedNodeId ? allNodes.find((n) => n.id === selectedNodeId) ?? null : null;
 
   return (

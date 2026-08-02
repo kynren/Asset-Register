@@ -70,13 +70,15 @@ export function ResourceSchedulingTab() {
           <div className="ad-field"><label>Start</label><input className="ad-input" type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} /></div>
           <div className="ad-field"><label>End</label><input className="ad-input" type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} /></div>
           <div className="ad-field"><label>Notes</label><input className="ad-input" placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
-          <button
-            className="ad-btn ad-btn-primary"
-            disabled={!resourceName || !startAt || !endAt || createMutation.isPending}
-            onClick={() => createMutation.mutate()}
-          >
-            <Icon name="clock" size={12} /> Schedule
-          </button>
+          <PermissionGate module="operations" action="create">
+            <button
+              className="ad-btn ad-btn-primary"
+              disabled={!resourceName || !startAt || !endAt || createMutation.isPending}
+              onClick={() => createMutation.mutate()}
+            >
+              <Icon name="clock" size={12} /> Schedule
+            </button>
+          </PermissionGate>
         </div>
       </div>
 

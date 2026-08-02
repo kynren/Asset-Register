@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { AssetDetail } from "./types";
+import { PermissionGate } from "../../../auth/PermissionGate";
 
 const PROTOCOLS = ["RDP", "SSH", "VNC", "TeamViewer", "AnyDesk", "Other"];
 
@@ -58,9 +59,11 @@ export function RemoteManagementTab({ asset, onUpdated }: { asset: AssetDetail; 
         </div>
 
         <div className="row gap-2" style={{ marginTop: 14 }}>
-          <button className="ad-btn ad-btn-primary" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-            {saveMutation.isPending ? "Saving..." : "Save Changes"}
-          </button>
+          <PermissionGate module="assets" action="edit">
+            <button className="ad-btn ad-btn-primary" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+              {saveMutation.isPending ? "Saving..." : "Save Changes"}
+            </button>
+          </PermissionGate>
           {enabled && url && (
             <a className="ad-btn" href={url} target="_blank" rel="noreferrer">
               <Icon name="terminal" size={12} /> Connect

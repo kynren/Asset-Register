@@ -6,6 +6,7 @@ import { Icon } from "../../components/Icon";
 import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/FormModal";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 interface FormTemplateRef {
   id: number;
@@ -85,15 +86,21 @@ export function AssetCategoriesTable() {
       id: "actions",
       cell: ({ row }) => (
         <div className="row gap-1">
-          <button className="btn btn-secondary btn-sm" onClick={() => setEditing(row.original)}>
-            <Icon name="edit" size={12} /> Edit
-          </button>
-          <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
-            <Icon name="paperclip" size={12} />
-          </button>
-          <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
-            <Icon name="trash" size={13} />
-          </button>
+          <PermissionGate module="admin" action="edit">
+            <button className="btn btn-secondary btn-sm" onClick={() => setEditing(row.original)}>
+              <Icon name="edit" size={12} /> Edit
+            </button>
+          </PermissionGate>
+          <PermissionGate module="admin" action="create">
+            <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
+              <Icon name="paperclip" size={12} />
+            </button>
+          </PermissionGate>
+          <PermissionGate module="admin" action="delete">
+            <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
+              <Icon name="trash" size={13} />
+            </button>
+          </PermissionGate>
         </div>
       ),
     },
@@ -103,9 +110,11 @@ export function AssetCategoriesTable() {
     <div className="card">
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 14 }}>
         <h3 className="mt-0 mb-0">Asset Categories</h3>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
-          <Icon name="plus" size={13} /> Add Category
-        </button>
+        <PermissionGate module="admin" action="create">
+          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
+            <Icon name="plus" size={13} /> Add Category
+          </button>
+        </PermissionGate>
       </div>
       <DataTable columns={columns} data={categories ?? []} isLoading={isLoading} clientPageSize={8} emptyMessage="No asset categories yet." />
 

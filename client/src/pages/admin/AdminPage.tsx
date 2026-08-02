@@ -7,7 +7,6 @@ import { CategoriesLocationsTab } from "./CategoriesLocationsTab";
 import { AuditLogTab } from "./AuditLogTab";
 import { EmailTemplatesTab } from "./EmailTemplatesTab";
 import { ToastSettingsTab } from "./ToastSettingsTab";
-import { useAuth } from "../../auth/AuthContext";
 
 const TABS = [
   { key: "users", label: "Users" },
@@ -24,8 +23,6 @@ type TabKey = (typeof TABS)[number]["key"];
 
 export function AdminPage() {
   const [tab, setTab] = useState<TabKey>("users");
-  const { hasPermission } = useAuth();
-  const visibleTabs = TABS.filter((t) => !("module" in t) || hasPermission(t.module, "view"));
 
   return (
     <div className="stack gap-3">
@@ -38,7 +35,7 @@ export function AdminPage() {
         </div>
 
         <div className="row gap-2 flex-wrap">
-          {visibleTabs.map((t) => (
+          {TABS.map((t) => (
             <button key={t.key} className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab(t.key)}>
               {t.label}
             </button>

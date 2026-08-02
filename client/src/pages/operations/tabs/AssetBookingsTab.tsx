@@ -80,13 +80,15 @@ export function AssetBookingsTab() {
           <div className="ad-field"><label>Start</label><input className="ad-input" type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} /></div>
           <div className="ad-field"><label>End</label><input className="ad-input" type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} /></div>
           <div className="ad-field"><label>Purpose</label><input className="ad-input" placeholder="Optional" value={purpose} onChange={(e) => setPurpose(e.target.value)} /></div>
-          <button
-            className="ad-btn ad-btn-primary"
-            disabled={!assetId || !startAt || !endAt || createMutation.isPending}
-            onClick={() => createMutation.mutate()}
-          >
-            <Icon name="calendar" size={12} /> Book Asset
-          </button>
+          <PermissionGate module="operations" action="create">
+            <button
+              className="ad-btn ad-btn-primary"
+              disabled={!assetId || !startAt || !endAt || createMutation.isPending}
+              onClick={() => createMutation.mutate()}
+            >
+              <Icon name="calendar" size={12} /> Book Asset
+            </button>
+          </PermissionGate>
         </div>
       </div>
 

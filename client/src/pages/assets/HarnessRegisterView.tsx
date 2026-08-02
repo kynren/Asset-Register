@@ -4,6 +4,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { Asset } from "./AssetListPage";
 import { SkeletonTableRows } from "../../components/Skeleton";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 interface CustomFieldValue {
   value: string | null;
@@ -98,9 +99,11 @@ export function HarnessRegisterView({ categoryId, onEdit }: { categoryId: number
                 <td><TestCycleCell testDate={f.test_3_test_date} expiryDate={f.test_3_expiry_date} /></td>
                 <td style={{ maxWidth: 200, fontSize: 11 }}>{f.purchased_from ?? "—"}</td>
                 <td onClick={(e) => e.stopPropagation()}>
-                  <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={() => onEdit(asset)}>
-                    <Icon name="edit" size={12} />
-                  </button>
+                  <PermissionGate module="harness" action="edit">
+                    <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={() => onEdit(asset)}>
+                      <Icon name="edit" size={12} />
+                    </button>
+                  </PermissionGate>
                 </td>
               </tr>
             );

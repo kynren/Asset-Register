@@ -5,6 +5,7 @@ import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { AssetDetail, AssetPhoto } from "./types";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { PermissionGate } from "../../../auth/PermissionGate";
 
 interface Checkout {
   id: number;
@@ -154,9 +155,11 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
               if (featuredInputRef.current) featuredInputRef.current.value = "";
             }}
           />
-          <button className="ad-upload-btn" onClick={() => featuredInputRef.current?.click()} disabled={featuredMutation.isPending}>
-            {featuredMutation.isPending ? "Uploading..." : "Upload Image"}
-          </button>
+          <PermissionGate module="assets" action="edit">
+            <button className="ad-upload-btn" onClick={() => featuredInputRef.current?.click()} disabled={featuredMutation.isPending}>
+              {featuredMutation.isPending ? "Uploading..." : "Upload Image"}
+            </button>
+          </PermissionGate>
 
           <div className="ad-panel-title" style={{ marginTop: 18 }}>
             Asset Photo Gallery
@@ -171,16 +174,20 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
                 if (galleryInputRef.current) galleryInputRef.current.value = "";
               }}
             />
-            <button className="ad-btn ad-btn-primary" onClick={() => galleryInputRef.current?.click()} disabled={galleryUploadMutation.isPending}>
-              <Icon name="plus" size={12} /> Add Photo
-            </button>
+            <PermissionGate module="assets" action="edit">
+              <button className="ad-btn ad-btn-primary" onClick={() => galleryInputRef.current?.click()} disabled={galleryUploadMutation.isPending}>
+                <Icon name="plus" size={12} /> Add Photo
+              </button>
+            </PermissionGate>
           </div>
           {photos && photos.length > 0 ? (
             <div className="ad-gallery-grid">
               {photos.map((p) => (
                 <div key={p.id} className="ad-gallery-item">
                   <img src={p.url} alt="" />
-                  <button onClick={() => setDeletingPhoto(p)} title="Remove photo"><Icon name="close" size={12} /></button>
+                  <PermissionGate module="assets" action="edit">
+                    <button onClick={() => setDeletingPhoto(p)} title="Remove photo"><Icon name="close" size={12} /></button>
+                  </PermissionGate>
                 </div>
               ))}
             </div>
@@ -200,15 +207,17 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
                 <div className="ad-row-value">{asset.assignedTo ? `${asset.assignedTo.firstName} ${asset.assignedTo.lastName}` : "Unassigned"}</div>
               </div>
             </div>
-            {asset.assignedTo ? (
-              <button className="ad-btn ad-btn-danger" onClick={() => checkinMutation.mutate()} disabled={checkinMutation.isPending}>
-                {checkinMutation.isPending ? "Checking in..." : "Check In"}
-              </button>
-            ) : (
-              <button className="ad-btn ad-btn-primary" onClick={() => setShowCheckoutForm((v) => !v)}>
-                Check Out
-              </button>
-            )}
+            <PermissionGate module="assets" action="edit">
+              {asset.assignedTo ? (
+                <button className="ad-btn ad-btn-danger" onClick={() => checkinMutation.mutate()} disabled={checkinMutation.isPending}>
+                  {checkinMutation.isPending ? "Checking in..." : "Check In"}
+                </button>
+              ) : (
+                <button className="ad-btn ad-btn-primary" onClick={() => setShowCheckoutForm((v) => !v)}>
+                  Check Out
+                </button>
+              )}
+            </PermissionGate>
           </div>
 
           {showCheckoutForm && !asset.assignedTo && (
@@ -239,15 +248,17 @@ export function AssetProfileTab({ asset, onUpdated }: { asset: AssetDetail; onUp
                 <div className="ad-row-value">{asset.gridPowered ? "Main AC Powered (Grid)" : "Battery / Backup Powered"}</div>
               </div>
             </div>
-            <label className="ad-toggle">
-              <input
-                type="checkbox"
-                checked={asset.gridPowered}
-                disabled={powerMutation.isPending}
-                onChange={(e) => powerMutation.mutate(e.target.checked)}
-              />
-              <span className="ad-toggle-slider" />
-            </label>
+            <PermissionGate module="assets" action="edit">
+              <label className="ad-toggle">
+                <input
+                  type="checkbox"
+                  checked={asset.gridPowered}
+                  disabled={powerMutation.isPending}
+                  onChange={(e) => powerMutation.mutate(e.target.checked)}
+                />
+                <span className="ad-toggle-slider" />
+              </label>
+            </PermissionGate>
           </div>
 
           {!asset.gridPowered && (

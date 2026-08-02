@@ -8,6 +8,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { FormModal } from "../../components/FormModal";
 import { QrCodeModal } from "../../components/QrCodeModal";
 import { Skeleton, SkeletonText } from "../../components/Skeleton";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 interface UserDetail {
   id: number;
@@ -155,24 +156,28 @@ export function UserDetailPage() {
               {roles?.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>Save Changes</button>
+          <PermissionGate module="admin" action="edit">
+            <button className="btn btn-primary btn-sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>Save Changes</button>
+          </PermissionGate>
 
-          <div className="row gap-2" style={{ marginTop: 18, borderTop: "1px solid var(--color-border)", paddingTop: 14, flexWrap: "wrap" }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => resetPasswordMutation.mutate()} disabled={resetPasswordMutation.isPending}>
-              Set Temporary Password
-            </button>
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => magicLinkMutation.mutate()}
-              disabled={magicLinkMutation.isPending || !user.isActive}
-              title={!user.isActive ? "Reactivate this account first" : undefined}
-            >
-              {magicLinkSent ? "Link Sent" : "Send Magic Login Link"}
-            </button>
-            <button className={`btn btn-sm ${user.isActive ? "btn-danger" : "btn-secondary"}`} onClick={() => toggleActiveMutation.mutate()}>
-              {user.isActive ? "Deactivate Account" : "Reactivate Account"}
-            </button>
-          </div>
+          <PermissionGate module="admin" action="edit">
+            <div className="row gap-2" style={{ marginTop: 18, borderTop: "1px solid var(--color-border)", paddingTop: 14, flexWrap: "wrap" }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => resetPasswordMutation.mutate()} disabled={resetPasswordMutation.isPending}>
+                Set Temporary Password
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => magicLinkMutation.mutate()}
+                disabled={magicLinkMutation.isPending || !user.isActive}
+                title={!user.isActive ? "Reactivate this account first" : undefined}
+              >
+                {magicLinkSent ? "Link Sent" : "Send Magic Login Link"}
+              </button>
+              <button className={`btn btn-sm ${user.isActive ? "btn-danger" : "btn-secondary"}`} onClick={() => toggleActiveMutation.mutate()}>
+                {user.isActive ? "Deactivate Account" : "Reactivate Account"}
+              </button>
+            </div>
+          </PermissionGate>
           {magicLinkMutation.isError && (
             <div className="alert alert-danger" style={{ marginTop: 10 }}>
               {(magicLinkMutation.error as any)?.response?.data?.error ?? "Could not send the login link."}

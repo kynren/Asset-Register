@@ -4,6 +4,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { useToast, type ToastVariant } from "../../components/toast/ToastProvider";
 import { NOTIFICATION_TYPES } from "../../lib/notificationTypes";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 interface ToastSettingItem {
   id: number | null;
@@ -108,9 +109,11 @@ function ToastSettingRow({
         >
           <Icon name="eye" size={12} /> Preview
         </button>
-        <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-end" }} disabled={!dirty || saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-          {saveMutation.isPending ? "Saving..." : "Save"}
-        </button>
+        <PermissionGate module="admin" action="edit">
+          <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-end" }} disabled={!dirty || saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+            {saveMutation.isPending ? "Saving..." : "Save"}
+          </button>
+        </PermissionGate>
       </div>
     </div>
   );

@@ -91,6 +91,7 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
   const { data: clientInfo } = useClientInfo();
 
   const isSystemAdmin = user?.roleName === "System Admin";
+  const canExportBriefing = user?.roleName === "Super Admin" || user?.roleName === "System Admin";
   const { data: organizations } = useQuery({
     queryKey: ["app-settings-organizations-switcher"],
     queryFn: async () => (await axiosClient.get<OrganizationRow[]>("/app-settings/organizations")).data,
@@ -224,10 +225,12 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
           <span className="topbar-pill-label">{theme === "dark" ? "DAY MODE" : "NIGHT MODE"}</span>
         </button>
 
-        <button className="topbar-pill topbar-pill-primary" onClick={handleExportBriefing} disabled={exporting} title="Export Briefing">
-          <Icon name="fileText" size={14} />
-          <span className="topbar-pill-label">{exporting ? "Exporting..." : "Export Briefing"}</span>
-        </button>
+        {canExportBriefing && (
+          <button className="topbar-pill topbar-pill-primary" onClick={handleExportBriefing} disabled={exporting} title="Export Briefing">
+            <Icon name="fileText" size={14} />
+            <span className="topbar-pill-label">{exporting ? "Exporting..." : "Export Briefing"}</span>
+          </button>
+        )}
 
         <button className="topbar-icon-btn" onClick={() => navigate("/assistant")} title="Virtual Assistant console">
           <Icon name="terminal" size={16} />

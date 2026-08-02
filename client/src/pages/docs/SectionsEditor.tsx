@@ -41,7 +41,8 @@ export function SectionsEditor({ fields, sections, onChange }: SectionsEditorPro
           );
         }
 
-        // kind === "list"
+        if (field.kind !== "list") return null;
+
         const rows: Record<string, string>[] = sections[field.key] ?? [];
         const updateRow = (index: number, itemKey: string, value: string) => {
           const next = rows.map((r, i) => (i === index ? { ...r, [itemKey]: value } : r));

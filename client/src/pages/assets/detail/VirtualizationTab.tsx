@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { AssetDetail } from "./types";
+import { PermissionGate } from "../../../auth/PermissionGate";
 
 export function VirtualizationTab({ asset, onUpdated }: { asset: AssetDetail; onUpdated: () => void }) {
   const [isVirtual, setIsVirtual] = useState(asset.isVirtual);
@@ -57,9 +58,11 @@ export function VirtualizationTab({ asset, onUpdated }: { asset: AssetDetail; on
           </>
         )}
 
-        <button className="ad-btn ad-btn-primary" style={{ marginTop: 14 }} disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-          {saveMutation.isPending ? "Saving..." : "Save Changes"}
-        </button>
+        <PermissionGate module="assets" action="edit">
+          <button className="ad-btn ad-btn-primary" style={{ marginTop: 14 }} disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+            {saveMutation.isPending ? "Saving..." : "Save Changes"}
+          </button>
+        </PermissionGate>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { AssetDetail } from "./detail/types";
 import { AssetFormModal, AssetFormValues } from "./AssetFormModal";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 function fieldMap(asset: AssetDetail): Record<string, string | null> {
   return Object.fromEntries((asset.customFieldValues ?? []).map((v) => [v.field.fieldKey, v.value]));
@@ -98,9 +99,11 @@ export function HarnessDetailPage({ asset, onUpdated }: { asset: AssetDetail; on
 
       <div style={{ padding: 22 }}>
         <div className="row gap-2" style={{ marginBottom: 16, justifyContent: "flex-end" }}>
-          <button className="ad-btn" onClick={() => setEditing(true)}>
-            <Icon name="edit" size={13} /> Edit Harness
-          </button>
+          <PermissionGate module="harness" action="edit">
+            <button className="ad-btn" onClick={() => setEditing(true)}>
+              <Icon name="edit" size={13} /> Edit Harness
+            </button>
+          </PermissionGate>
           <button className="ad-btn ad-btn-primary" onClick={downloadReport}>
             <Icon name="download" size={13} /> Download Certification Report
           </button>

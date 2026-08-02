@@ -6,6 +6,7 @@ import { Icon } from "../../components/Icon";
 import { AddNodeModal, NodeFormValues } from "./AddNodeModal";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useClientInfo } from "../../hooks/useClientInfo";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 interface GraphNodeOption {
   id: number;
@@ -152,7 +153,9 @@ export function PingConsoleTab() {
       <div className="ad-panel">
         <div className="ad-panel-title">
           <span className="row gap-2"><Icon name="activity" size={14} /> Single-Device ICMP Pinger</span>
-          <button className="ad-btn" onClick={() => setShowAddDevice(true)}><Icon name="plus" size={12} /> Add Device</button>
+          <PermissionGate module="network" action="create">
+            <button className="ad-btn" onClick={() => setShowAddDevice(true)}><Icon name="plus" size={12} /> Add Device</button>
+          </PermissionGate>
         </div>
 
         <div className="ad-field" style={{ marginBottom: 12 }}>

@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { AssetDetail } from "./types";
+import { PermissionGate } from "../../../auth/PermissionGate";
 
 // Manually-recorded network configuration (what the network *should* be set to) — distinct from
 // the "Network identity reported by the Kynren agent" block below, which is what the agent
@@ -45,9 +46,11 @@ export function NetworkSettingsCard({ asset, onUpdated }: { asset: AssetDetail; 
           <span style={{ fontSize: 12, fontWeight: 600 }}>Network Configuration</span>
         </div>
         {!editing && (
-          <button className="ad-btn" onClick={() => setEditing(true)}>
-            <Icon name="edit" size={12} /> {hasAnyValue ? "Edit" : "Set Network Config"}
-          </button>
+          <PermissionGate module="assets" action="edit">
+            <button className="ad-btn" onClick={() => setEditing(true)}>
+              <Icon name="edit" size={12} /> {hasAnyValue ? "Edit" : "Set Network Config"}
+            </button>
+          </PermissionGate>
         )}
       </div>
 

@@ -7,6 +7,7 @@ import { Skeleton } from "../../components/Skeleton";
 import { useToast } from "../../components/toast/ToastProvider";
 import { PublishOrScheduleModal } from "../appSettings/PublishOrScheduleModal";
 import { ScheduledChangeRow } from "../appSettings/scheduledChangeTypes";
+import { PermissionGate, usePermission } from "../../auth/PermissionGate";
 
 interface RolePermission {
   module: string;
@@ -65,6 +66,7 @@ export function RolesTab({
   const [showPublishModal, setShowPublishModal] = useState(false);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const canEditAdmin = usePermission("admin", "edit");
 
   const { data: roles, isLoading } = useQuery({ queryKey: ["roles"], queryFn: async () => (await axiosClient.get("/roles")).data as Role[] });
   const selectedRole = roles?.find((r) => r.id === selectedRoleId) ?? roles?.[0];
@@ -115,7 +117,7 @@ export function RolesTab({
   const isSystemAdminRole = selectedRole?.name === "System Admin";
 
   function toggle(module: ModuleName, action: PermAction) {
-    if (isSystemAdminRole) return;
+    if (isSystemAdminRole || !canEditAdmin) return;
     const full = buildFullMatrix(activePermissions);
     const updated = full.map((p) => (p.module === module ? { ...p, [action]: !p[action] } : p));
     setDraft(updated);
@@ -137,7 +139,9 @@ export function RolesTab({
       <div className="card" style={{ padding: 10 }}>
         <div className="row" style={{ justifyContent: "space-between", padding: "4px 6px 10px" }}>
           <strong style={{ fontSize: 13 }}>Roles</strong>
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowCreate(true)}>+ New</button>
+          <PermissionGate module="admin" action="create">
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowCreate(true)}>+ New</button>
+          </PermissionGate>
         </div>
         {roles.map((r) => (
           <div
@@ -168,9 +172,11 @@ export function RolesTab({
             {isSystemAdminRole ? (
               <span className="muted" style={{ fontSize: 12 }}>Always full access — cannot be edited.</span>
             ) : (
-              <button className="btn btn-primary btn-sm" disabled={!draft || savingSchedule} onClick={handleSaveClick}>
-                {savingSchedule ? "Saving..." : editingScheduledChange ? "Update Scheduled Change" : "Save Permissions"}
-              </button>
+              <PermissionGate module="admin" action="edit">
+                <button className="btn btn-primary btn-sm" disabled={!draft || savingSchedule} onClick={handleSaveClick}>
+                  {savingSchedule ? "Saving..." : editingScheduledChange ? "Update Scheduled Change" : "Save Permissions"}
+                </button>
+              </PermissionGate>
             )}
           </div>
 
@@ -204,7 +210,7 @@ export function RolesTab({
                           <input
                             type="checkbox"
                             checked={isSystemAdminRole ? true : perm[a]}
-                            disabled={isSystemAdminRole}
+                            disabled={isSystemAdminRole || !canEditAdmin}
                             onChange={() => toggle(module, a)}
                           />
                         </td>
