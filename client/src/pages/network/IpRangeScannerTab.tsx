@@ -199,6 +199,16 @@ export function IpRangeScannerTab() {
   const pending = scan?.status === "PENDING";
   const busy = scanning || pending;
 
+  // Typing a new Start IP auto-fills End IP as that /24's broadcast address (x.x.x.254) — same
+  // math as the netmask picker, just triggered by the start field itself so the common case
+  // (scan my own /24) needs no extra click. Still fully overridable via the End IP field or the
+  // netmask dropdown for a non-/24 range.
+  function handleStartIpChange(value: string) {
+    setStartIp(value);
+    const range = applyNetmaskToRange(value, 24);
+    if (range) setEndIp(range.end);
+  }
+
   function pickNetmask(value: string) {
     setNetmaskPick("");
     if (!value) return;
@@ -269,7 +279,7 @@ export function IpRangeScannerTab() {
         <div className="nt-toolbar-row">
           <span className="ips-field-inline">
             <span className="ips-field-label">IP Range:</span>
-            <input className="ips-input" value={startIp} onChange={(e) => setStartIp(e.target.value)} disabled={busy} />
+            <input className="ips-input" value={startIp} onChange={(e) => handleStartIpChange(e.target.value)} disabled={busy} />
           </span>
           <span className="ips-to">to</span>
           <input className="ips-input" value={endIp} onChange={(e) => setEndIp(e.target.value)} disabled={busy} />
