@@ -61,7 +61,7 @@ export function AssetTelemetryCell({ assetId }: { assetId: number }) {
 
   return (
     <span className="row gap-1" style={{ fontSize: 12, alignItems: "center" }}>
-      <span className={`tag-dot ${alive ? "online" : "offline"}`} />
+      <span className={`tag-dot status-flash ${alive ? "online" : "offline"}`} />
       {alive ? "Online" : "Offline"}
       {alive && latency !== null && <span style={{ color: latencyColor(latency) }}>{latency} ms</span>}
       {samples.length > 1 && (

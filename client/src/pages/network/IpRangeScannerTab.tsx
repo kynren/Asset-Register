@@ -223,7 +223,7 @@ export function IpRangeScannerTab() {
   }
 
   const resultColumns: ColumnDef<ScanResult, any>[] = [
-    { header: "", id: "status-dot", enableSorting: false, cell: ({ row }) => <span className={`ips-dot ${statusTone(row.original)}`} title={statusTone(row.original) === "dead" ? "No response" : statusTone(row.original) === "info" ? "Alive — identified" : "Alive"} /> },
+    { header: "", id: "status-dot", enableSorting: false, cell: ({ row }) => <span className={`ips-dot status-flash ${statusTone(row.original)}`} title={statusTone(row.original) === "dead" ? "No response" : statusTone(row.original) === "info" ? "Alive — identified" : "Alive"} /> },
     { header: "IP Address", accessorKey: "ipAddress", cell: ({ row }) => <span className="ips-ip-cell">{row.original.ipAddress}</span> },
     { header: "Ping", accessorFn: (r) => (r.responseTimeMs ?? null), cell: ({ row }) => (row.original.responseTimeMs != null ? `${row.original.responseTimeMs} ms` : "[n/a]") },
     { header: "Hostname", accessorFn: (r) => r.hostname ?? "" , cell: ({ row }) => row.original.hostname || <span className="muted">[n/a]</span> },

@@ -303,7 +303,7 @@ export function DashboardTab() {
                 {selectedRoomDevices.length === 0 ? (
                   <p className="muted" style={{ fontSize: 12 }}>No devices in this location yet.</p>
                 ) : (
-                  <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
+                  <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 4 }}>
                     {selectedRoomDevices.map((d) => (
                       <LightingDeviceTile
                         key={d.id}

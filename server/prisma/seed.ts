@@ -9,7 +9,7 @@ async function main() {
   console.log("Seeding roles and permissions...");
   await seedRoles(prisma);
 
-  const superAdminRole = await prisma.role.findUniqueOrThrow({ where: { name: "Super Admin" } });
+  const systemAdminRole = await prisma.role.findUniqueOrThrow({ where: { name: "System Admin" } });
 
   const adminEmail = "subscriptions@kynren.com";
   const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
@@ -23,7 +23,7 @@ async function main() {
         email: adminEmail,
         firstName: "Kynren",
         lastName: "Admin",
-        roleId: superAdminRole.id,
+        roleId: systemAdminRole.id,
         passwordHash,
         mustChangePassword: true,
       },

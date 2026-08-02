@@ -42,9 +42,9 @@ const MODULE_INFO: Record<ModuleName, { label: string; description: string }> = 
   lighting: { label: "Lighting", description: "Devices, Rooms dashboard, Scenes, Automations, ZigBee scaffold." },
   "virtual-assistant": { label: "Virtual Assistant", description: "In-app assistant chat and quick actions." },
   docs: { label: "Docs & SOPs", description: "Manuals, SOPs, runbooks, and other documents — collections, full-text search, attachments." },
-  admin: { label: "Admin & Setup", description: "Users, Roles & Permissions, Categories & Locations, Asset Form Templates, System Settings, Audit Log." },
+  admin: { label: "Admin & Setup", description: "Users, Roles & Permissions, Categories & Locations, Asset Form Templates, Email Templates, Audit Log." },
   password: { label: "Password Management", description: "Each user's personal password vault." },
-  backups: { label: "Database Backups", description: "Backup schedule, destinations (email/S3), and run history." },
+  "app-settings": { label: "App Settings", description: "Organizations (create new orgs), Backups, System Settings, System Status — platform-level, System Admin only." },
 };
 
 export function RolesTab() {
@@ -72,7 +72,10 @@ export function RolesTab() {
     return MODULES.map((m) => perms.find((p) => p.module === m) ?? { module: m, canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false });
   }
 
+  const isSystemAdminRole = selectedRole?.name === "System Admin";
+
   function toggle(module: ModuleName, action: PermAction) {
+    if (isSystemAdminRole) return;
     const full = buildFullMatrix(activePermissions);
     const updated = full.map((p) => (p.module === module ? { ...p, [action]: !p[action] } : p));
     setDraft(updated);
@@ -122,9 +125,13 @@ export function RolesTab() {
               <h3 className="mt-0 mb-0">{selectedRole.name}</h3>
               <p className="muted" style={{ margin: "2px 0 0" }}>{selectedRole.description}</p>
             </div>
-            <button className="btn btn-primary btn-sm" disabled={!draft || saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-              {saveMutation.isPending ? "Saving..." : "Save Permissions"}
-            </button>
+            {isSystemAdminRole ? (
+              <span className="muted" style={{ fontSize: 12 }}>Always full access — cannot be edited.</span>
+            ) : (
+              <button className="btn btn-primary btn-sm" disabled={!draft || saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+                {saveMutation.isPending ? "Saving..." : "Save Permissions"}
+              </button>
+            )}
           </div>
 
           <div style={{ overflowX: "auto" }}>
@@ -147,7 +154,12 @@ export function RolesTab() {
                       </td>
                       {ACTIONS.map((a) => (
                         <td key={a} style={{ textAlign: "center" }}>
-                          <input type="checkbox" checked={perm[a]} onChange={() => toggle(module, a)} />
+                          <input
+                            type="checkbox"
+                            checked={isSystemAdminRole ? true : perm[a]}
+                            disabled={isSystemAdminRole}
+                            onChange={() => toggle(module, a)}
+                          />
                         </td>
                       ))}
                     </tr>

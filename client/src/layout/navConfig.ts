@@ -26,5 +26,6 @@ export const systemConsoleNav: NavItem[] = [
 export const settingsNav: NavItem[] = [
   { label: "Profile", path: "/profile", icon: "profile" },
   { label: "Admin & Setup", path: "/admin", icon: "admin", module: "admin" },
+  { label: "App Settings", path: "/app-settings", icon: "settings", module: "app-settings" },
   { label: "Password Management", path: "/password", icon: "password", module: "password" },
 ];

@@ -7,7 +7,8 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
 import { DeviceFormModal, DeviceFormValues } from "./DeviceFormModal";
 import { DiscoverPanel } from "./DiscoverPanel";
-import { LightingDevice, LightingDeviceCard } from "./LightingDeviceCard";
+import { LightingDevice } from "./LightingDeviceCard";
+import { LightingDeviceTile } from "./LightingDeviceTile";
 
 // How often the page pulls a genuinely fresh reading from every saved device — same
 // pattern as the NVR live-latency sparkline: a real network round trip on a timer, not
@@ -105,11 +106,12 @@ export function DevicesTab() {
       )}
       {!isLoading && devices?.length === 0 && <div className="empty-state card">No lighting devices added yet.</div>}
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 4 }}>
         {devices?.map((device) => (
-          <LightingDeviceCard
+          <LightingDeviceTile
             key={device.id}
             device={device}
+            detailed
             onToggle={(on) => powerMutation.mutate({ id: device.id, on })}
             onBrightnessCommit={(value) => brightnessMutation.mutate({ id: device.id, value })}
             onEdit={() => setEditingDevice(device)}

@@ -243,7 +243,7 @@ export function MonitoringTab() {
       header: "",
       id: "status-dot",
       enableSorting: false,
-      cell: ({ row }) => <span className={`ips-dot ${row.original.status === "ONLINE" ? "alive" : "dead"}`} title={row.original.status} />,
+      cell: ({ row }) => <span className={`ips-dot status-flash ${row.original.status === "ONLINE" ? "alive" : "dead"}`} title={row.original.status} />,
     },
     { header: "Device", accessorFn: (d) => d.hostname ?? d.ipAddress, cell: ({ row }) => (
       <div>

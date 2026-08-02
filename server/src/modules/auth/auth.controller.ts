@@ -4,7 +4,6 @@ import { Request, Response } from "express";
 import { env } from "../../config/env";
 import { prisma, runWithTenant } from "../../config/prisma";
 import { registerToken, resolveAccountSchema, resolveTokenSchema } from "../../config/controlPlane";
-import { provisionOrganization } from "../../lib/tenantProvisioning";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { sendEventEmail } from "../../lib/emailNotify";
@@ -132,32 +131,6 @@ export async function changePassword(req: Request, res: Response) {
 
   await logAudit({ userId: user.id, action: "auth.change_password", entityType: "User", entityId: user.id });
   res.json({ ok: true });
-}
-
-// ───────────────────────── Organization signup ─────────────────────────
-// Public — creates a brand-new tenant (its own Postgres schema, seeded role matrix, and first
-// Super Admin user), registers it with the control plane, then logs the new admin straight in.
-
-export async function signupOrganization(req: Request, res: Response) {
-  const { organizationName, firstName, lastName, email, password } = req.body;
-
-  const existingSchema = await resolveAccountSchema(email);
-  if (existingSchema) throw new ApiError(409, "An account with this email already exists.");
-
-  const { schemaName } = await provisionOrganization({ organizationName, firstName, lastName, email, password });
-
-  await runWithTenant(schemaName, async () => {
-    const user = await prisma.user.findUniqueOrThrow({ where: { email: email.toLowerCase() }, include: { role: true } });
-
-    const accessToken = issueAccessToken(user);
-    const refreshToken = await createRefreshSession(user.id, req.headers["user-agent"] as string | undefined, (await resolveClientIp(req.ip)) ?? undefined);
-    res.cookie(env.REFRESH_COOKIE_NAME, refreshToken, REFRESH_COOKIE_OPTIONS);
-
-    await logAudit({ userId: user.id, action: "auth.signup_organization", entityType: "User", entityId: user.id, ipAddress: req.ip });
-
-    const permissions = await getPermissionMap(user.roleId);
-    res.status(201).json({ accessToken, user: sanitizeUser(user), permissions });
-  });
 }
 
 // ───────────────────────── Forgot / reset password ─────────────────────────

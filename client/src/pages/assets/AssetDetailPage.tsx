@@ -152,7 +152,7 @@ export function AssetDetailPage() {
             </div>
             <div className="ad-meta-row">
               <span>
-                <span className={`ad-status-dot ${isOnline ? "online" : "offline"}`} />
+                <span className={`ad-status-dot status-flash ${isOnline ? "online" : "offline"}`} />
                 IP Node: <strong>{asset.device?.ipAddresses?.[0] ?? "Not linked"}</strong>
               </span>
               <span>Category: <strong>{asset.category?.name ?? "Uncategorized"}</strong></span>

@@ -213,13 +213,13 @@
     @apply inline-block w-2.5 h-2.5 rounded-full flex-shrink-0;
   }
   .ips-dot.dead {
-    background: var(--color-danger);
+    background: var(--color-success);
   }
   .ips-dot.alive {
-    background: var(--color-primary);
+    background: var(--color-danger);
   }
   .ips-dot.info {
-    background: var(--color-success);
+    background: var(--color-danger);
   }
 
   .ips-statusbar {

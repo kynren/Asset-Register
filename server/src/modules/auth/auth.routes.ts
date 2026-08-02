@@ -2,11 +2,10 @@ import { Router } from "express";
 import { verifyJwt } from "../../middleware/auth";
 import { validateBody } from "../../middleware/validate";
 import * as controller from "./auth.controller";
-import { changePasswordSchema, forgotPasswordSchema, loginSchema, magicLoginSchema, mfaVerifySchema, resetPasswordSchema, signupOrganizationSchema } from "./auth.schema";
+import { changePasswordSchema, forgotPasswordSchema, loginSchema, magicLoginSchema, mfaVerifySchema, resetPasswordSchema } from "./auth.schema";
 
 const router = Router();
 
-router.post("/signup-organization", validateBody(signupOrganizationSchema), controller.signupOrganization);
 router.post("/login", validateBody(loginSchema), controller.login);
 router.post("/refresh", controller.refresh);
 router.post("/logout", verifyJwt, controller.logout);
