@@ -1,0 +1,182 @@
+// The "control plane": a handful of tables that live permanently in the `public` Postgres schema
+// and are never themselves tenant-scoped — they're what let a request figure out WHICH tenant
+// schema to use in the first place, before any tenant-scoped Prisma call can be made. Deliberately
+// implemented with the plain `pg` driver rather than Prisma: Prisma's client is bound to one schema
+// per instance, which is exactly the problem this module exists to solve, so using it here would be
+// circular. All queries explicitly qualify `public.<table>` so they're unaffected by whatever
+// search_path a connection happens to have.
+import { Pool } from "pg";
+import { env } from "./env";
+
+export const controlPlanePool = new Pool({ connectionString: env.DATABASE_URL });
+
+export interface OrganizationRow {
+  id: number;
+  name: string;
+  schemaName: string;
+  createdAt: Date;
+}
+
+let bootstrapped = false;
+
+// Idempotent — safe to call on every server boot (same convention as backfillHarnessPermission).
+export async function bootstrapControlPlane(): Promise<void> {
+  if (bootstrapped) return;
+  await controlPlanePool.query(`
+    CREATE TABLE IF NOT EXISTS public.organizations (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      schema_name TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await controlPlanePool.query(`
+    CREATE TABLE IF NOT EXISTS public.account_index (
+      email TEXT PRIMARY KEY,
+      schema_name TEXT NOT NULL,
+      organization_id INTEGER NOT NULL REFERENCES public.organizations(id)
+    );
+  `);
+  // Generic index for any hash/opaque-token-based lookup that must resolve a tenant before the
+  // real (tenant-scoped) table can be queried: refresh-session tokens, password-reset tokens,
+  // magic-login tokens, and raw device/relay/MCP API keys. `kind` is metadata only (not used to
+  // disambiguate lookups) since every value indexed here is already a cryptographically random
+  // token/hash, so cross-kind collisions are not a real possibility.
+  await controlPlanePool.query(`
+    CREATE TABLE IF NOT EXISTS public.token_index (
+      token TEXT PRIMARY KEY,
+      schema_name TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+
+  // Register the pre-existing `public` schema itself as Organization #1 — the app ran
+  // single-tenant in `public` before multi-tenancy existed, so its data becomes the first
+  // organization in place rather than being physically migrated anywhere.
+  const existingDefault = await controlPlanePool.query<{ id: number }>(
+    `SELECT id FROM public.organizations WHERE schema_name = 'public'`
+  );
+  let defaultOrgId: number;
+  if (existingDefault.rows.length === 0) {
+    let companyName = "Default Organization";
+    try {
+      const setting = await controlPlanePool.query<{ value: string }>(
+        `SELECT value FROM public."SystemSetting" WHERE key = 'companyName'`
+      );
+      if (setting.rows[0]?.value) companyName = setting.rows[0].value;
+    } catch {
+      // SystemSetting may not exist yet on a brand-new database — fine, keep the fallback name.
+    }
+    const inserted = await controlPlanePool.query<{ id: number }>(
+      `INSERT INTO public.organizations (name, schema_name) VALUES ($1, 'public') RETURNING id`,
+      [companyName]
+    );
+    defaultOrgId = inserted.rows[0].id;
+  } else {
+    defaultOrgId = existingDefault.rows[0].id;
+  }
+
+  // Backfill account_index from any users that already exist in `public` (the pre-multi-tenancy
+  // installation) so they can still log in — ON CONFLICT DO NOTHING makes this safe to re-run.
+  try {
+    await controlPlanePool.query(
+      `INSERT INTO public.account_index (email, schema_name, organization_id)
+       SELECT email, 'public', $1 FROM public."User"
+       ON CONFLICT (email) DO NOTHING`,
+      [defaultOrgId]
+    );
+  } catch {
+    // Same as above — a brand-new database has no User table yet.
+  }
+
+  // Same idea for standing infrastructure credentials that pre-date multi-tenancy: the device
+  // agent, the network relay (same key type), and any MCP API keys already issued. Unlike a
+  // refresh/reset/magic-login token, these are long-lived and not tied to a browser session — if
+  // left unindexed, the existing device agent + relay + any Claude/MCP integration on a
+  // pre-existing install would start failing auth the moment this ships.
+  try {
+    await controlPlanePool.query(
+      `INSERT INTO public.token_index (token, schema_name, kind)
+       SELECT key, 'public', 'agent' FROM public."AgentApiKey"
+       ON CONFLICT (token) DO NOTHING`
+    );
+  } catch {
+    // Brand-new database — table doesn't exist yet.
+  }
+  try {
+    await controlPlanePool.query(
+      `INSERT INTO public.token_index (token, schema_name, kind)
+       SELECT key, 'public', 'mcp' FROM public."McpApiKey"
+       ON CONFLICT (token) DO NOTHING`
+    );
+  } catch {
+    // Brand-new database — table doesn't exist yet.
+  }
+
+  bootstrapped = true;
+}
+
+export async function listOrganizations(): Promise<OrganizationRow[]> {
+  const result = await controlPlanePool.query<{ id: number; name: string; schema_name: string; created_at: Date }>(
+    `SELECT id, name, schema_name, created_at FROM public.organizations ORDER BY id ASC`
+  );
+  return result.rows.map((r) => ({ id: r.id, name: r.name, schemaName: r.schema_name, createdAt: r.created_at }));
+}
+
+export async function createOrganization(name: string, schemaName: string): Promise<OrganizationRow> {
+  const result = await controlPlanePool.query<{ id: number; name: string; schema_name: string; created_at: Date }>(
+    `INSERT INTO public.organizations (name, schema_name) VALUES ($1, $2) RETURNING id, name, schema_name, created_at`,
+    [name, schemaName]
+  );
+  const r = result.rows[0];
+  return { id: r.id, name: r.name, schemaName: r.schema_name, createdAt: r.created_at };
+}
+
+export async function resolveAccountSchema(email: string): Promise<string | null> {
+  const result = await controlPlanePool.query<{ schema_name: string }>(
+    `SELECT schema_name FROM public.account_index WHERE email = $1`,
+    [email.toLowerCase()]
+  );
+  return result.rows[0]?.schema_name ?? null;
+}
+
+export async function registerAccount(email: string, schemaName: string, organizationId: number): Promise<void> {
+  await controlPlanePool.query(
+    `INSERT INTO public.account_index (email, schema_name, organization_id) VALUES ($1, $2, $3)
+     ON CONFLICT (email) DO UPDATE SET schema_name = EXCLUDED.schema_name, organization_id = EXCLUDED.organization_id`,
+    [email.toLowerCase(), schemaName, organizationId]
+  );
+}
+
+export async function registerToken(token: string, schemaName: string, kind: string): Promise<void> {
+  await controlPlanePool.query(
+    `INSERT INTO public.token_index (token, schema_name, kind) VALUES ($1, $2, $3)
+     ON CONFLICT (token) DO UPDATE SET schema_name = EXCLUDED.schema_name, kind = EXCLUDED.kind`,
+    [token, schemaName, kind]
+  );
+}
+
+export async function resolveTokenSchema(token: string): Promise<string | null> {
+  const result = await controlPlanePool.query<{ schema_name: string }>(
+    `SELECT schema_name FROM public.token_index WHERE token = $1`,
+    [token]
+  );
+  return result.rows[0]?.schema_name ?? null;
+}
+
+// Runs `fn` once per organization, each under its own tenant context, for background schedulers
+// that must act on every tenant's data (not just the default org). One organization's failure is
+// logged and skipped rather than aborting the rest — a bug or outage in one tenant's data
+// shouldn't stop backups/alerts/monitoring from running for everyone else.
+export async function runForEachOrganization<T>(fn: () => Promise<T>): Promise<void> {
+  const { runWithTenant } = await import("./prisma");
+  const orgs = await listOrganizations();
+  for (const org of orgs) {
+    try {
+      await runWithTenant(org.schemaName, fn);
+    } catch (err) {
+      console.error(`[runForEachOrganization] organization ${org.id} (${org.schemaName}) failed:`, err);
+    }
+  }
+}

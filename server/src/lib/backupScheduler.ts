@@ -6,6 +6,7 @@
  * plain not-equal comparison would silently exclude a schedule that has never fired yet.
  */
 import { prisma } from "../config/prisma";
+import { runForEachOrganization } from "../config/controlPlane";
 import { runBackupNow } from "./backupRunner";
 
 async function tick(): Promise<void> {
@@ -33,7 +34,7 @@ let intervalHandle: NodeJS.Timeout | null = null;
 export function startBackupScheduler() {
   if (intervalHandle) return;
   const run = () => {
-    tick().catch((err) => {
+    runForEachOrganization(tick).catch((err) => {
       // eslint-disable-next-line no-console
       console.error("Backup scheduler tick failed:", err);
     });

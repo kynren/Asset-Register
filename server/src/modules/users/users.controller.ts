@@ -1,7 +1,8 @@
 import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import { env } from "../../config/env";
-import { prisma } from "../../config/prisma";
+import { currentSchemaName, prisma } from "../../config/prisma";
+import { registerToken } from "../../config/controlPlane";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { sendEventEmail } from "../../lib/emailNotify";
@@ -126,6 +127,7 @@ export async function sendMagicLink(req: Request, res: Response) {
   const tokenHash = hashToken(rawToken);
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
   await prisma.magicLoginToken.create({ data: { userId: user.id, tokenHash, expiresAt, createdById: req.user!.id } });
+  await registerToken(tokenHash, currentSchemaName(), "magic");
 
   const magicUrl = `${env.CLIENT_ORIGIN}/magic-login/${rawToken}`;
   await sendEventEmail({

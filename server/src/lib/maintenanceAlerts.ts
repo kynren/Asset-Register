@@ -1,5 +1,6 @@
 import { env } from "../config/env";
 import { prisma } from "../config/prisma";
+import { runForEachOrganization } from "../config/controlPlane";
 import { sendEventEmail } from "./emailNotify";
 
 async function getAlertWindowDays(): Promise<number> {
@@ -105,7 +106,7 @@ let intervalHandle: NodeJS.Timeout | null = null;
 export function startMaintenanceAlertScheduler(intervalHours = 6) {
   if (intervalHandle) return;
   const run = () => {
-    runMaintenanceAlertCheck().catch((err) => {
+    runForEachOrganization(runMaintenanceAlertCheck).catch((err) => {
       // eslint-disable-next-line no-console
       console.error("Maintenance alert check failed:", err);
     });

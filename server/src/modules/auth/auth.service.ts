@@ -3,7 +3,8 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { generateSecret as generateOtpSecret, generateURI as generateOtpUri, verify as verifyOtp } from "otplib";
 import { env } from "../../config/env";
-import { prisma } from "../../config/prisma";
+import { currentSchemaName, prisma } from "../../config/prisma";
+import { registerToken } from "../../config/controlPlane";
 import { ApiError } from "../../middleware/errorHandler";
 
 export function generateOpaqueToken(): string {
@@ -129,7 +130,7 @@ export async function verifyCredentials(email: string, password: string) {
 
 export function issueAccessToken(user: { id: number; roleId: number; role: { name: string } }) {
   return jwt.sign(
-    { id: user.id, roleId: user.roleId, roleName: user.role.name },
+    { id: user.id, roleId: user.roleId, roleName: user.role.name, schemaName: currentSchemaName() },
     env.JWT_SECRET,
     { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions
   );
@@ -140,6 +141,9 @@ export async function createRefreshSession(userId: number, userAgent?: string, i
   const tokenHash = hashToken(rawToken);
   const expiresAt = new Date(Date.now() + REFRESH_SESSION_TTL_MS);
   await prisma.refreshSession.create({ data: { userId, tokenHash, userAgent, ipAddress, expiresAt } });
+  // The refresh cookie is opaque (not a JWT), so /auth/refresh has no way to know which tenant
+  // schema to look in until it can resolve this hash via the control plane first.
+  await registerToken(tokenHash, currentSchemaName(), "refresh");
   return rawToken;
 }
 

@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
 import { prisma } from "../config/prisma";
+import { runForEachOrganization } from "../config/controlPlane";
 import { verifyEmailTransport } from "./email";
 import { SystemComponentStatus } from "@prisma/client";
 
@@ -149,7 +150,7 @@ let intervalHandle: NodeJS.Timeout | null = null;
 export function startSystemStatusScheduler(intervalMinutes = 5) {
   if (intervalHandle) return;
   const run = () => {
-    runSystemStatusCheck().catch((err) => {
+    runForEachOrganization(runSystemStatusCheck).catch((err) => {
       // eslint-disable-next-line no-console
       console.error("System status check failed:", err);
     });

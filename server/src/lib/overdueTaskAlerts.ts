@@ -1,5 +1,6 @@
 import { env } from "../config/env";
 import { prisma } from "../config/prisma";
+import { runForEachOrganization } from "../config/controlPlane";
 import { notifyUsers } from "./notify";
 
 // Same de-dup strategy as maintenanceAlerts.ts: don't re-notify about the exact same overdue
@@ -101,7 +102,7 @@ let intervalHandle: NodeJS.Timeout | null = null;
 export function startOverdueTaskScheduler(intervalHours = 6) {
   if (intervalHandle) return;
   const run = () => {
-    runOverdueTaskCheck().catch((err) => {
+    runForEachOrganization(runOverdueTaskCheck).catch((err) => {
       // eslint-disable-next-line no-console
       console.error("Overdue task check failed:", err);
     });

@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { Readable } from "stream";
 import { prisma } from "../config/prisma";
+import { runForEachOrganization } from "../config/controlPlane";
 
 export const RECORDING_ROOT = path.join(__dirname, "..", "..", "uploads", "recordings");
 fs.mkdirSync(RECORDING_ROOT, { recursive: true });
@@ -127,7 +128,7 @@ let intervalHandle: NodeJS.Timeout | null = null;
 export function startRetentionScheduler(intervalHours = 24) {
   if (intervalHandle) return;
   const run = () => {
-    runRetentionSweep().catch((err) => {
+    runForEachOrganization(runRetentionSweep).catch((err) => {
       // eslint-disable-next-line no-console
       console.error("Camera recording retention sweep failed:", err);
     });

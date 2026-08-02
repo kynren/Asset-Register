@@ -6,6 +6,7 @@
  * would otherwise re-fire an automation on every tick during its matching minute.
  */
 import { prisma } from "../config/prisma";
+import { runForEachOrganization } from "../config/controlPlane";
 import { detectIotDevice, getIotStatus, IotDeviceLike, needsDetection, setIotBrightness, setIotPower } from "./iotDeviceApi";
 import { notifyUsers, getUserIdsWithPermission } from "./notify";
 
@@ -193,7 +194,7 @@ let intervalHandle: NodeJS.Timeout | null = null;
 export function startLightingAutomationScheduler() {
   if (intervalHandle) return;
   const run = () => {
-    runAutomationTick().catch((err) => {
+    runForEachOrganization(runAutomationTick).catch((err) => {
       // eslint-disable-next-line no-console
       console.error("Lighting automation tick failed:", err);
     });

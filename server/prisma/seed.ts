@@ -1,128 +1,13 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
-import { MODULES } from "../src/constants/modules";
 import { generateApiKey, generateTempPassword } from "../src/lib/passwords";
+import { seedRoles } from "../src/lib/seedRoles";
 
 const prisma = new PrismaClient();
 
-type PermSet = Partial<Record<(typeof MODULES)[number], { canView?: boolean; canCreate?: boolean; canEdit?: boolean; canDelete?: boolean; canExport?: boolean }>>;
-
-const ALL_TRUE = { canView: true, canCreate: true, canEdit: true, canDelete: true, canExport: true };
-const VIEW_ONLY = { canView: true, canCreate: false, canEdit: false, canDelete: false, canExport: false };
-
-const ROLE_DEFS: { name: string; description: string; isSystem: boolean; perms: PermSet }[] = [
-  {
-    name: "Super Admin",
-    description: "Full access to every module, including system administration.",
-    isSystem: true,
-    perms: Object.fromEntries(MODULES.map((m) => [m, ALL_TRUE])) as PermSet,
-  },
-  {
-    name: "Admin",
-    description: "Full operational access; cannot be prevented by permissions from managing the system.",
-    isSystem: true,
-    perms: Object.fromEntries(MODULES.map((m) => [m, ALL_TRUE])) as PermSet,
-  },
-  {
-    name: "IT Technician",
-    description: "Manages assets, devices, network map, NVRs and operations tools.",
-    isSystem: true,
-    perms: {
-      dashboard: VIEW_ONLY,
-      assets: ALL_TRUE,
-      network: ALL_TRUE,
-      stock: VIEW_ONLY,
-      helpdesk: { canView: true, canCreate: true, canEdit: true, canDelete: false, canExport: true },
-      operations: ALL_TRUE,
-      nvr: ALL_TRUE,
-      "access-control": ALL_TRUE,
-      lighting: ALL_TRUE,
-      "virtual-assistant": VIEW_ONLY,
-      docs: ALL_TRUE,
-      admin: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      password: ALL_TRUE,
-    },
-  },
-  {
-    name: "Helpdesk Agent",
-    description: "Manages tickets end-to-end; view-only on assets.",
-    isSystem: true,
-    perms: {
-      dashboard: VIEW_ONLY,
-      assets: VIEW_ONLY,
-      network: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      stock: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      helpdesk: ALL_TRUE,
-      operations: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      nvr: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      "access-control": { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      lighting: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      "virtual-assistant": VIEW_ONLY,
-      docs: { canView: true, canCreate: true, canEdit: true, canDelete: false, canExport: false },
-      admin: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      password: ALL_TRUE,
-    },
-  },
-  {
-    name: "Stock Manager",
-    description: "Manages stock register and analytics; view-only on assets and dashboard.",
-    isSystem: true,
-    perms: {
-      dashboard: VIEW_ONLY,
-      assets: VIEW_ONLY,
-      network: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      stock: ALL_TRUE,
-      helpdesk: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      operations: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      nvr: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      "access-control": { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      lighting: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      "virtual-assistant": VIEW_ONLY,
-      docs: { canView: true, canCreate: true, canEdit: true, canDelete: false, canExport: false },
-      admin: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      password: ALL_TRUE,
-    },
-  },
-  {
-    name: "Viewer",
-    description: "Read-only access across the operational modules.",
-    isSystem: true,
-    perms: {
-      dashboard: VIEW_ONLY,
-      assets: VIEW_ONLY,
-      network: VIEW_ONLY,
-      stock: VIEW_ONLY,
-      helpdesk: VIEW_ONLY,
-      operations: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      nvr: VIEW_ONLY,
-      "access-control": VIEW_ONLY,
-      lighting: VIEW_ONLY,
-      "virtual-assistant": VIEW_ONLY,
-      docs: VIEW_ONLY,
-      admin: { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false },
-      password: ALL_TRUE,
-    },
-  },
-];
-
 async function main() {
   console.log("Seeding roles and permissions...");
-  for (const def of ROLE_DEFS) {
-    const role = await prisma.role.upsert({
-      where: { name: def.name },
-      update: { description: def.description, isSystem: def.isSystem },
-      create: { name: def.name, description: def.description, isSystem: def.isSystem },
-    });
-
-    for (const module of MODULES) {
-      const p = def.perms[module] ?? { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false };
-      await prisma.rolePermission.upsert({
-        where: { roleId_module: { roleId: role.id, module } },
-        update: p,
-        create: { roleId: role.id, module, ...p },
-      });
-    }
-  }
+  await seedRoles(prisma);
 
   const superAdminRole = await prisma.role.findUniqueOrThrow({ where: { name: "Super Admin" } });
 
