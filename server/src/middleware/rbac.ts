@@ -17,9 +17,17 @@ export async function hasPermission(roleId: number, module: ModuleName, action: 
   return Boolean(permission?.[actionColumn[action]]);
 }
 
+const SYSTEM_ADMIN_ROLE_NAME = "System Admin";
+
 export function requirePermission(module: ModuleName, action: ActionName) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: "Not authenticated" });
+
+    // System Admin always has full access, in every organization's schema — including ones it's
+    // just "viewing" (see appSettings.controller.ts switchOrganization), where its roleId doesn't
+    // correspond to anything meaningful in that org's own Role table. Checked by name straight off
+    // the JWT payload so this never needs a query.
+    if (req.user.roleName === SYSTEM_ADMIN_ROLE_NAME) return next();
 
     if (!(await hasPermission(req.user.roleId, module, action))) {
       return res.status(403).json({ error: `Not permitted to ${action} ${module}` });
@@ -40,6 +48,7 @@ export function requirePermission(module: ModuleName, action: ActionName) {
 export function requireAssetOrHarnessPermission(action: ActionName) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: "Not authenticated" });
+    if (req.user.roleName === SYSTEM_ADMIN_ROLE_NAME) return next();
 
     let categoryId: number | undefined;
     if (req.params.id) {

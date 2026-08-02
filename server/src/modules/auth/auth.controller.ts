@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import QRCode from "qrcode";
 import { Request, Response } from "express";
 import { env } from "../../config/env";
-import { prisma, runWithTenant } from "../../config/prisma";
+import { DEFAULT_SCHEMA, currentSchemaName, prisma, runWithTenant } from "../../config/prisma";
 import { registerToken, resolveAccountSchema, resolveTokenSchema } from "../../config/controlPlane";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
@@ -12,9 +12,10 @@ import {
   createRefreshSession,
   generateMfaSecret,
   generateOpaqueToken,
+  getEffectivePermissionMap,
   getMfaOtpAuthUrl,
-  getPermissionMap,
   getSecuritySettings,
+  getViewingOrganization,
   hashToken,
   isPasswordReused,
   issueAccessToken,
@@ -27,6 +28,15 @@ import {
   verifyCredentials,
   verifyMfaToken,
 } from "./auth.service";
+
+// System Admin's own identity only ever lives in `public` — while it's "viewing" another
+// organization (schemaName in the JWT points at that org, not home), every self-referential
+// lookup below (profile, password, MFA, sessions) has to bypass the ambient tenant and go
+// straight to `public`, or it'd either 404 or — worse — resolve to an unrelated real person who
+// happens to share the same numeric id in that org's own User table.
+function homeSchemaFor(req: Request): string {
+  return req.user?.roleName === "System Admin" ? DEFAULT_SCHEMA : currentSchemaName();
+}
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -61,8 +71,9 @@ export async function login(req: Request, res: Response) {
 
     await logAudit({ userId: user.id, action: "auth.login", entityType: "User", entityId: user.id, ipAddress: req.ip });
 
-    const permissions = await getPermissionMap(user.roleId);
-    res.json({ accessToken, user: sanitizeUser(user), permissions });
+    const permissions = await getEffectivePermissionMap(user.roleId, user.role.name);
+    const organization = await getViewingOrganization(schemaName);
+    res.json({ accessToken, user: sanitizeUser(user), permissions, organization });
   });
 }
 
@@ -84,8 +95,9 @@ export async function refresh(req: Request, res: Response) {
     if (!user || !user.isActive) throw new ApiError(401, "Invalid refresh token");
 
     const accessToken = issueAccessToken(user);
-    const permissions = await getPermissionMap(user.roleId);
-    res.json({ accessToken, user: sanitizeUser(user), permissions });
+    const permissions = await getEffectivePermissionMap(user.roleId, user.role.name);
+    const organization = await getViewingOrganization(schemaName);
+    res.json({ accessToken, user: sanitizeUser(user), permissions, organization });
   });
 }
 
@@ -100,37 +112,42 @@ export async function logout(req: Request, res: Response) {
 }
 
 export async function me(req: Request, res: Response) {
-  const user = await prisma.user.findUnique({ where: { id: req.user!.id }, include: { role: true } });
-  if (!user) throw new ApiError(404, "User not found");
-  const permissions = await getPermissionMap(user.roleId);
-  res.json({ user: sanitizeUser(user), permissions });
+  const organization = await getViewingOrganization(currentSchemaName());
+  await runWithTenant(homeSchemaFor(req), async () => {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id }, include: { role: true } });
+    if (!user) throw new ApiError(404, "User not found");
+    const permissions = await getEffectivePermissionMap(user.roleId, user.role.name);
+    res.json({ user: sanitizeUser(user), permissions, organization });
+  });
 }
 
 export async function changePassword(req: Request, res: Response) {
   const { currentPassword, newPassword } = req.body;
-  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
-  if (!user) throw new ApiError(404, "User not found");
+  await runWithTenant(homeSchemaFor(req), async () => {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user) throw new ApiError(404, "User not found");
 
-  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
-  if (!valid) throw new ApiError(400, "Current password is incorrect");
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) throw new ApiError(400, "Current password is incorrect");
 
-  const settings = await getSecuritySettings();
-  const complexityError = validatePasswordComplexity(newPassword, settings.passwordMinLength, settings.passwordRequireComplexity);
-  if (complexityError) throw new ApiError(400, complexityError);
+    const settings = await getSecuritySettings();
+    const complexityError = validatePasswordComplexity(newPassword, settings.passwordMinLength, settings.passwordRequireComplexity);
+    if (complexityError) throw new ApiError(400, complexityError);
 
-  if (await isPasswordReused(user.id, newPassword, settings.passwordHistoryCount)) {
-    throw new ApiError(400, `New password must not match your last ${settings.passwordHistoryCount} password(s).`);
-  }
+    if (await isPasswordReused(user.id, newPassword, settings.passwordHistoryCount)) {
+      throw new ApiError(400, `New password must not match your last ${settings.passwordHistoryCount} password(s).`);
+    }
 
-  const passwordHash = await bcrypt.hash(newPassword, 12);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date() },
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date() },
+    });
+    await recordPasswordHistory(user.id, passwordHash, settings.passwordHistoryCount);
+
+    await logAudit({ userId: user.id, action: "auth.change_password", entityType: "User", entityId: user.id });
+    res.json({ ok: true });
   });
-  await recordPasswordHistory(user.id, passwordHash, settings.passwordHistoryCount);
-
-  await logAudit({ userId: user.id, action: "auth.change_password", entityType: "User", entityId: user.id });
-  res.json({ ok: true });
 }
 
 // ───────────────────────── Forgot / reset password ─────────────────────────
@@ -235,41 +252,48 @@ export async function magicLogin(req: Request, res: Response) {
 
     await logAudit({ userId: user.id, action: "auth.magic_login", entityType: "User", entityId: user.id, ipAddress: req.ip });
 
-    const permissions = await getPermissionMap(user.roleId);
-    res.json({ accessToken, user: sanitizeUser(user), permissions });
+    const permissions = await getEffectivePermissionMap(user.roleId, user.role.name);
+    const organization = await getViewingOrganization(schemaName);
+    res.json({ accessToken, user: sanitizeUser(user), permissions, organization });
   });
 }
 
 // ───────────────────────── MFA ─────────────────────────
 
 export async function mfaEnrollStart(req: Request, res: Response) {
-  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
-  if (!user) throw new ApiError(404, "User not found");
+  await runWithTenant(homeSchemaFor(req), async () => {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user) throw new ApiError(404, "User not found");
 
-  const secret = generateMfaSecret();
-  await prisma.user.update({ where: { id: user.id }, data: { mfaSecret: secret, mfaEnabled: false } });
+    const secret = generateMfaSecret();
+    await prisma.user.update({ where: { id: user.id }, data: { mfaSecret: secret, mfaEnabled: false } });
 
-  const otpAuthUrl = getMfaOtpAuthUrl(user.email, secret);
-  const qrDataUrl = await QRCode.toDataURL(otpAuthUrl);
-  res.json({ secret, qrDataUrl });
+    const otpAuthUrl = getMfaOtpAuthUrl(user.email, secret);
+    const qrDataUrl = await QRCode.toDataURL(otpAuthUrl);
+    res.json({ secret, qrDataUrl });
+  });
 }
 
 export async function mfaEnrollVerify(req: Request, res: Response) {
   const { token } = req.body;
-  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
-  if (!user?.mfaSecret) throw new ApiError(400, "MFA enrollment has not been started");
+  await runWithTenant(homeSchemaFor(req), async () => {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user?.mfaSecret) throw new ApiError(400, "MFA enrollment has not been started");
 
-  if (!(await verifyMfaToken(user.mfaSecret, token))) throw new ApiError(400, "Invalid authentication code");
+    if (!(await verifyMfaToken(user.mfaSecret, token))) throw new ApiError(400, "Invalid authentication code");
 
-  await prisma.user.update({ where: { id: user.id }, data: { mfaEnabled: true } });
-  await logAudit({ userId: user.id, action: "auth.mfa_enabled", entityType: "User", entityId: user.id });
-  res.json({ ok: true });
+    await prisma.user.update({ where: { id: user.id }, data: { mfaEnabled: true } });
+    await logAudit({ userId: user.id, action: "auth.mfa_enabled", entityType: "User", entityId: user.id });
+    res.json({ ok: true });
+  });
 }
 
 export async function mfaDisable(req: Request, res: Response) {
-  await prisma.user.update({ where: { id: req.user!.id }, data: { mfaEnabled: false, mfaSecret: null } });
-  await logAudit({ userId: req.user!.id, action: "auth.mfa_disabled", entityType: "User", entityId: req.user!.id });
-  res.json({ ok: true });
+  await runWithTenant(homeSchemaFor(req), async () => {
+    await prisma.user.update({ where: { id: req.user!.id }, data: { mfaEnabled: false, mfaSecret: null } });
+    await logAudit({ userId: req.user!.id, action: "auth.mfa_disabled", entityType: "User", entityId: req.user!.id });
+    res.json({ ok: true });
+  });
 }
 
 // ───────────────────────── Sessions ─────────────────────────
@@ -278,38 +302,44 @@ export async function listSessions(req: Request, res: Response) {
   const currentToken = req.cookies?.[env.REFRESH_COOKIE_NAME];
   const currentHash = currentToken ? hashToken(currentToken) : null;
 
-  const sessions = await prisma.refreshSession.findMany({
-    where: { userId: req.user!.id, revokedAt: null, expiresAt: { gt: new Date() } },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, tokenHash: true, userAgent: true, ipAddress: true, createdAt: true, expiresAt: true },
-  });
+  await runWithTenant(homeSchemaFor(req), async () => {
+    const sessions = await prisma.refreshSession.findMany({
+      where: { userId: req.user!.id, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, tokenHash: true, userAgent: true, ipAddress: true, createdAt: true, expiresAt: true },
+    });
 
-  res.json(
-    sessions.map((s) => ({
-      id: s.id,
-      userAgent: s.userAgent,
-      ipAddress: s.ipAddress,
-      createdAt: s.createdAt,
-      expiresAt: s.expiresAt,
-      isCurrent: s.tokenHash === currentHash,
-    }))
-  );
+    res.json(
+      sessions.map((s) => ({
+        id: s.id,
+        userAgent: s.userAgent,
+        ipAddress: s.ipAddress,
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt,
+        isCurrent: s.tokenHash === currentHash,
+      }))
+    );
+  });
 }
 
 export async function revokeSession(req: Request, res: Response) {
   const id = Number(req.params.id);
-  const session = await prisma.refreshSession.findUnique({ where: { id } });
-  if (!session || session.userId !== req.user!.id) throw new ApiError(404, "Session not found");
+  await runWithTenant(homeSchemaFor(req), async () => {
+    const session = await prisma.refreshSession.findUnique({ where: { id } });
+    if (!session || session.userId !== req.user!.id) throw new ApiError(404, "Session not found");
 
-  await prisma.refreshSession.update({ where: { id }, data: { revokedAt: new Date() } });
-  await logAudit({ userId: req.user!.id, action: "auth.session_revoked", entityType: "RefreshSession", entityId: id });
-  res.json({ ok: true });
+    await prisma.refreshSession.update({ where: { id }, data: { revokedAt: new Date() } });
+    await logAudit({ userId: req.user!.id, action: "auth.session_revoked", entityType: "RefreshSession", entityId: id });
+    res.json({ ok: true });
+  });
 }
 
 export async function revokeOtherSessions(req: Request, res: Response) {
   const currentToken = req.cookies?.[env.REFRESH_COOKIE_NAME];
   const currentHash = currentToken ? hashToken(currentToken) : "";
-  await revokeAllOtherSessions(req.user!.id, currentHash);
-  await logAudit({ userId: req.user!.id, action: "auth.other_sessions_revoked", entityType: "User", entityId: req.user!.id });
-  res.json({ ok: true });
+  await runWithTenant(homeSchemaFor(req), async () => {
+    await revokeAllOtherSessions(req.user!.id, currentHash);
+    await logAudit({ userId: req.user!.id, action: "auth.other_sessions_revoked", entityType: "User", entityId: req.user!.id });
+    res.json({ ok: true });
+  });
 }

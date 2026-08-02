@@ -124,6 +124,60 @@ export async function listOrganizations(): Promise<OrganizationRow[]> {
   return result.rows.map((r) => ({ id: r.id, name: r.name, schemaName: r.schema_name, createdAt: r.created_at }));
 }
 
+export async function getOrganizationById(id: number): Promise<OrganizationRow | null> {
+  const result = await controlPlanePool.query<{ id: number; name: string; schema_name: string; created_at: Date }>(
+    `SELECT id, name, schema_name, created_at FROM public.organizations WHERE id = $1`,
+    [id]
+  );
+  const r = result.rows[0];
+  return r ? { id: r.id, name: r.name, schemaName: r.schema_name, createdAt: r.created_at } : null;
+}
+
+export async function updateOrganizationName(id: number, name: string): Promise<void> {
+  await controlPlanePool.query(`UPDATE public.organizations SET name = $2 WHERE id = $1`, [id, name]);
+}
+
+// Physically renames the Postgres schema itself — not just the control plane's own label for it.
+// Every table this schema owns keeps its data untouched; only the schema's name changes. The
+// `public` schema (the original pre-multi-tenancy installation) is deliberately never renameable
+// via this path — too much else in Postgres and this app assumes "public" exists verbatim.
+export async function renameOrganizationSchema(id: number, newSchemaName: string): Promise<void> {
+  // Interpolated directly into raw SQL below (Postgres identifiers can't be parameterized) — this
+  // is the only thing standing between a schema name and a SQL-injection vector, so it's enforced
+  // here too, not just at whatever Zod schema happens to gate the calling route.
+  if (!/^[a-z][a-z0-9_]{2,50}$/.test(newSchemaName)) {
+    throw new Error("Schema name must be lowercase letters, numbers, and underscores, starting with a letter.");
+  }
+
+  const org = await getOrganizationById(id);
+  if (!org) throw new Error("Organization not found");
+  if (org.schemaName === "public") throw new Error("The default organization's schema cannot be renamed.");
+  if (org.schemaName === newSchemaName) return;
+
+  const existing = await controlPlanePool.query(`SELECT 1 FROM public.organizations WHERE schema_name = $1`, [newSchemaName]);
+  if (existing.rows.length > 0) throw new Error("That schema name is already in use.");
+
+  const client = await controlPlanePool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`ALTER SCHEMA "${org.schemaName}" RENAME TO "${newSchemaName}"`);
+    await client.query(`UPDATE public.organizations SET schema_name = $2 WHERE id = $1`, [id, newSchemaName]);
+    await client.query(`UPDATE public.account_index SET schema_name = $2 WHERE schema_name = $1`, [org.schemaName, newSchemaName]);
+    await client.query(`UPDATE public.token_index SET schema_name = $2 WHERE schema_name = $1`, [org.schemaName, newSchemaName]);
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  // The cached PrismaClient for the old name has a connection string baked in with
+  // `?schema=<old name>` — it's now pointing at a schema that no longer exists under that name.
+  const { evictSchemaClient } = await import("./prisma");
+  await evictSchemaClient(org.schemaName);
+}
+
 export async function createOrganization(name: string, schemaName: string): Promise<OrganizationRow> {
   const result = await controlPlanePool.query<{ id: number; name: string; schema_name: string; created_at: Date }>(
     `INSERT INTO public.organizations (name, schema_name) VALUES ($1, $2) RETURNING id, name, schema_name, created_at`,
