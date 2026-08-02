@@ -21,6 +21,8 @@ const TONE_MAP: Record<string, string> = {
   PUBLISHED: "badge-success",
   CANCELLED: "badge-neutral",
   FAILED: "badge-danger",
+  ACTION: "badge-primary",
+  INFORMATION: "badge-neutral",
 };
 
 export function StatusBadge({ status }: { status: string }) {

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { UsersTab } from "./UsersTab";
 import { RolesTab } from "./RolesTab";
+import { TeamsTab } from "./TeamsTab";
+import { EmailIngestSettingsTab } from "./EmailIngestSettingsTab";
 import { CategoriesLocationsTab } from "./CategoriesLocationsTab";
 import { AuditLogTab } from "./AuditLogTab";
 import { EmailTemplatesTab } from "./EmailTemplatesTab";
@@ -10,7 +12,9 @@ import { useAuth } from "../../auth/AuthContext";
 const TABS = [
   { key: "users", label: "Users" },
   { key: "roles", label: "Roles & Permissions" },
+  { key: "teams", label: "Teams" },
   { key: "catalog", label: "Categories & Locations" },
+  { key: "email-ingest", label: "Email Ingestion" },
   { key: "email-templates", label: "Email Templates" },
   { key: "toasts", label: "Toast Designer" },
   { key: "audit", label: "Audit Log" },
@@ -44,7 +48,9 @@ export function AdminPage() {
 
       {tab === "users" && <UsersTab />}
       {tab === "roles" && <RolesTab />}
+      {tab === "teams" && <TeamsTab />}
       {tab === "catalog" && <CategoriesLocationsTab />}
+      {tab === "email-ingest" && <EmailIngestSettingsTab />}
       {tab === "email-templates" && <EmailTemplatesTab />}
       {tab === "toasts" && <ToastSettingsTab />}
       {tab === "audit" && <AuditLogTab />}

@@ -12,9 +12,11 @@ import { TicketFormModal, TicketFormValues } from "./TicketFormModal";
 import dayjs from "dayjs";
 
 const STATUS_OPTIONS = ["", "OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
+const TYPE_OPTIONS = ["", "ACTION", "INFORMATION"];
 
 export function TicketListPage() {
   const [status, setStatus] = useState("");
+  const [type, setType] = useState("");
   const [assignedToMe, setAssignedToMe] = useState(false);
   const [overdue, setOverdue] = useState(false);
   const [search, setSearch] = useState("");
@@ -24,11 +26,11 @@ export function TicketListPage() {
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["tickets", { status, assignedToMe, overdue, search, page }],
+    queryKey: ["tickets", { status, type, assignedToMe, overdue, search, page }],
     queryFn: async () =>
       (
         await axiosClient.get("/tickets", {
-          params: { status: status || undefined, assignedToMe: assignedToMe || undefined, overdue: overdue || undefined, search: search || undefined, page, pageSize: 15 },
+          params: { status: status || undefined, type: type || undefined, assignedToMe: assignedToMe || undefined, overdue: overdue || undefined, search: search || undefined, page, pageSize: 15 },
         })
       ).data,
   });
@@ -45,11 +47,16 @@ export function TicketListPage() {
   const columns: ColumnDef<any, any>[] = [
     { header: "Ticket #", accessorKey: "ticketNumber" },
     { header: "Title", accessorKey: "title" },
+    { header: "Type", accessorKey: "type", cell: (info) => <StatusBadge status={info.getValue()} /> },
     { header: "Category", accessorFn: (row) => row.category?.name ?? "—" },
+    { header: "Location", accessorFn: (row) => row.location?.name ?? "—" },
     { header: "Status", accessorKey: "status", cell: (info) => <StatusBadge status={info.getValue()} /> },
     { header: "Priority", accessorKey: "priority", cell: (info) => <StatusBadge status={info.getValue()} /> },
     { header: "Requester", accessorFn: (row) => `${row.requester.firstName} ${row.requester.lastName}` },
-    { header: "Assignee", accessorFn: (row) => (row.assignee ? `${row.assignee.firstName} ${row.assignee.lastName}` : "Unassigned") },
+    {
+      header: "Assignee",
+      accessorFn: (row) => (row.assignedTeam ? row.assignedTeam.name : row.assignee ? `${row.assignee.firstName} ${row.assignee.lastName}` : "Unassigned"),
+    },
     {
       header: "Due",
       cell: ({ row }) => {
@@ -81,6 +88,9 @@ export function TicketListPage() {
       <FilterBar>
         <select className="select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
           {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s ? s.replace("_", " ") : "All statuses"}</option>)}
+        </select>
+        <select className="select" value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}>
+          {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t ? (t === "ACTION" ? "Action" : "Information") : "All types"}</option>)}
         </select>
         <label className="row gap-1" style={{ fontSize: 13, cursor: "pointer" }}>
           <input type="checkbox" checked={assignedToMe} onChange={(e) => { setAssignedToMe(e.target.checked); setPage(1); }} />

@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
-import { axiosClient } from "../../api/axiosClient";
+import { useEffect, useRef, useState } from "react";
+import { useAssetHeartbeatStream } from "../../hooks/useAssetHeartbeatStream";
 
-const POLL_MS = 10000;
 const MAX_SAMPLES = 10;
 
 function latencyColor(ms: number | null): string {
@@ -11,42 +10,26 @@ function latencyColor(ms: number | null): string {
   return "var(--color-danger)";
 }
 
-// Actively looks the asset up on the network by its own asset tag and pings it (see the
-// pingAsset backend handler) rather than relying on a passive agent-reported last-seen time —
-// this is the only telemetry source for assets that have no linked Device record.
+// Reads from the shared live status feed (see hooks/useAssetHeartbeatStream.ts) rather than
+// polling /ping itself — the server-side sweep already pings every asset by its own asset tag (or
+// static IP when set) on a shared cycle and pushes changes to every subscribed client instantly.
 export function AssetTelemetryCell({ assetId }: { assetId: number }) {
-  const [alive, setAlive] = useState<boolean | null>(null);
-  const [latency, setLatency] = useState<number | null>(null);
+  const entry = useAssetHeartbeatStream(assetId);
   const [samples, setSamples] = useState<number[]>([]);
+  const prevAssetId = useRef(assetId);
+
+  if (prevAssetId.current !== assetId) {
+    prevAssetId.current = assetId;
+    setSamples([]);
+  }
 
   useEffect(() => {
-    let cancelled = false;
-    setAlive(null);
-    setLatency(null);
-    setSamples([]);
-
-    async function poll() {
-      try {
-        const res = await axiosClient.get(`/assets/${assetId}/ping`);
-        if (cancelled) return;
-        const ms: number | null = res.data.alive ? res.data.responseTimeMs : null;
-        setAlive(Boolean(res.data.alive));
-        setLatency(ms);
-        if (ms !== null) setSamples((prev) => [...prev.slice(-(MAX_SAMPLES - 1)), ms]);
-      } catch {
-        if (!cancelled) setAlive(false);
-      }
+    if (entry?.alive && entry.responseTimeMs !== null) {
+      setSamples((prev) => [...prev.slice(-(MAX_SAMPLES - 1)), entry.responseTimeMs as number]);
     }
+  }, [entry]);
 
-    poll();
-    const id = window.setInterval(poll, POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [assetId]);
-
-  if (alive === null) {
+  if (entry === undefined) {
     return (
       <span title="Pinging..." style={{ display: "inline-flex", alignItems: "center", width: 10, height: 10, position: "relative" }}>
         <span className="animate-ping" style={{ position: "absolute", inset: 0, borderRadius: "9999px", background: "var(--color-primary)", opacity: 0.6 }} />
@@ -54,6 +37,9 @@ export function AssetTelemetryCell({ assetId }: { assetId: number }) {
       </span>
     );
   }
+
+  const alive = entry.alive;
+  const latency = alive ? entry.responseTimeMs : null;
 
   const sparkPoints = samples
     .map((v, i) => `${(i / Math.max(1, samples.length - 1)) * 40},${14 - Math.min(14, (v / 200) * 14)}`)

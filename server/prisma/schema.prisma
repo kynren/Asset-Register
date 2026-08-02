@@ -81,8 +81,8 @@ model User {
 
   refreshSessions               RefreshSession[]
   passwordResetTokens           PasswordResetToken[]
-  magicLoginTokens               MagicLoginToken[]        @relation("MagicLoginTokenUser")
-  magicLoginTokensCreated        MagicLoginToken[]        @relation("MagicLoginTokenCreatedBy")
+  magicLoginTokens              MagicLoginToken[]        @relation("MagicLoginTokenUser")
+  magicLoginTokensCreated       MagicLoginToken[]        @relation("MagicLoginTokenCreatedBy")
   passwordHistory               PasswordHistory[]
   checkoutsReceived             AssetCheckout[]          @relation("CheckoutRecipient")
   checkoutsIssued               AssetCheckout[]          @relation("CheckoutIssuer")
@@ -96,6 +96,8 @@ model User {
   toastSettingUpdates           ToastSetting[]
   scheduledChangesCreated       ScheduledChange[]        @relation("ScheduledChangeCreatedBy")
   scheduledChangesCancelled     ScheduledChange[]        @relation("ScheduledChangeCancelledBy")
+  teamMemberships               TeamMember[]
+  emailIngestFallbackFor        EmailIngestSettings[]
 }
 
 model RefreshSession {
@@ -125,15 +127,15 @@ model PasswordResetToken {
 // a password, same session-issuing path as a normal login. createdById records which admin sent
 // it, since (unlike self-service forgot-password) this is one account acting on another's behalf.
 model MagicLoginToken {
-  id            Int       @id @default(autoincrement())
-  userId        Int
-  user          User      @relation("MagicLoginTokenUser", fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash     String    @unique
-  expiresAt     DateTime
-  usedAt        DateTime?
-  createdById   Int
-  createdBy     User      @relation("MagicLoginTokenCreatedBy", fields: [createdById], references: [id])
-  createdAt     DateTime  @default(now())
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation("MagicLoginTokenUser", fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById Int
+  createdBy   User      @relation("MagicLoginTokenCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
 }
 
 model PasswordHistory {
@@ -247,17 +249,18 @@ model AssetCustomFieldValue {
 }
 
 model Location {
-  id          Int          @id @default(autoincrement())
-  name        String       @unique
-  address     String?
-  assets      Asset[]
-  stockItems  StockItem[]
-  stockLevels StockLevel[]
-  nvrs        Nvr[]
-  cameras     Camera[]
+  id                   Int                   @id @default(autoincrement())
+  name                 String                @unique
+  address              String?
+  assets               Asset[]
+  stockItems           StockItem[]
+  stockLevels          StockLevel[]
+  nvrs                 Nvr[]
+  cameras              Camera[]
   accessControlDevices AccessControlDevice[]
   lightingDevices      LightingDevice[]
   zigbeeDevices        ZigbeeDevice[]
+  tickets              Ticket[]
 }
 
 enum AssetStatus {
@@ -653,29 +656,29 @@ enum DeviceLiveStatus {
 // hardware inventory) and NetworkScanResult (one row per host per scan) — this is the "latest
 // known status" table the Monitoring tab reads from.
 model MonitoredNetworkDevice {
-  id               Int              @id @default(autoincrement())
-  key              String           @unique
-  ipAddress        String
-  macAddress       String?
-  hostname         String?
-  vendor           String?
-  deviceType       String?
+  id                Int              @id @default(autoincrement())
+  key               String           @unique
+  ipAddress         String
+  macAddress        String?
+  hostname          String?
+  vendor            String?
+  deviceType        String?
   // Cross-referenced from Device by MAC/IP match, same as NetworkScanResult.loggedInUser above.
-  loggedInUser     String?
-  status           DeviceLiveStatus @default(ONLINE)
-  firstSeenAt      DateTime         @default(now())
-  lastSeenAt       DateTime         @default(now())
-  lastChangedAt    DateTime         @default(now())
-  snmpEnabled      Boolean          @default(false)
+  loggedInUser      String?
+  status            DeviceLiveStatus @default(ONLINE)
+  firstSeenAt       DateTime         @default(now())
+  lastSeenAt        DateTime         @default(now())
+  lastChangedAt     DateTime         @default(now())
+  snmpEnabled       Boolean          @default(false)
   // AES-256-GCM encrypted at rest via server/src/lib/crypto.ts encryptSecret(), same as NVR
   // credentials — never stored or returned in plaintext.
-  snmpCommunity    String?
-  snmpPort         Int              @default(161)
-  snmpSysDescr     String?
-  snmpSysName      String?
-  snmpUpTimeTicks  BigInt?
+  snmpCommunity     String?
+  snmpPort          Int              @default(161)
+  snmpSysDescr      String?
+  snmpSysName       String?
+  snmpUpTimeTicks   BigInt?
   // Array of { index, name, adminStatus, operStatus, speedMbps, inOctets, outOctets }.
-  snmpInterfaces   Json?
+  snmpInterfaces    Json?
   // Array of { mac, port } — bridge/forwarding-table entries (dot1dTpFdbTable), i.e. which MAC
   // addresses this switch has actually seen on which of its own ports. Populated by the network
   // relay agent's SNMP walk (agent/kynren_network_relay.py); the direct (non-relay) SNMP poll in
@@ -691,8 +694,8 @@ model MonitoredNetworkDevice {
   // Array of { port, status } — PoE delivery state per port (pethPsePortTable), where status is
   // one of "delivering" | "searching" | "disabled" | "fault" | "unknown".
   snmpPoeStatus     Json?
-  snmpLastPolledAt DateTime?
-  snmpLastError    String?
+  snmpLastPolledAt  DateTime?
+  snmpLastError     String?
 
   statusEvents NetworkDeviceStatusEvent[]
 }
@@ -837,10 +840,52 @@ enum TicketPriority {
   URGENT
 }
 
+enum TicketType {
+  ACTION
+  INFORMATION
+}
+
 model TicketCategory {
-  id      Int      @id @default(autoincrement())
-  name    String   @unique
-  tickets Ticket[]
+  id                 Int                   @id @default(autoincrement())
+  name               String                @unique
+  tickets            Ticket[]
+  emailIngestDefault EmailIngestSettings[]
+}
+
+model Team {
+  id        Int          @id @default(autoincrement())
+  name      String       @unique
+  members   TeamMember[]
+  tickets   Ticket[]
+  createdAt DateTime     @default(now())
+}
+
+model TeamMember {
+  id     Int  @id @default(autoincrement())
+  teamId Int
+  team   Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+}
+
+model EmailIngestSettings {
+  id                    Int             @id @default(1)
+  isEnabled             Boolean         @default(false)
+  imapHost              String?
+  imapPort              Int?            @default(993)
+  imapUser              String?
+  imapPasswordEncrypted String?
+  mailbox               String          @default("INBOX")
+  fallbackRequesterId   Int?
+  fallbackRequester     User?           @relation(fields: [fallbackRequesterId], references: [id])
+  defaultCategoryId     Int?
+  defaultCategory       TicketCategory? @relation(fields: [defaultCategoryId], references: [id])
+  lastUid               Int?
+  lastPolledAt          DateTime?
+  lastError             String?
+  updatedAt             DateTime        @updatedAt
 }
 
 model Ticket {
@@ -848,16 +893,21 @@ model Ticket {
   ticketNumber        String             @unique
   title               String
   description         String
+  type                TicketType         @default(ACTION)
   status              TicketStatus       @default(OPEN)
   priority            TicketPriority     @default(MEDIUM)
   categoryId          Int?
   category            TicketCategory?    @relation(fields: [categoryId], references: [id])
   assetId             Int?
   asset               Asset?             @relation(fields: [assetId], references: [id])
+  locationId          Int?
+  location            Location?          @relation(fields: [locationId], references: [id])
   requesterId         Int
   requester           User               @relation("TicketRequester", fields: [requesterId], references: [id])
   assigneeId          Int?
   assignee            User?              @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  assignedTeamId      Int?
+  assignedTeam        Team?              @relation(fields: [assignedTeamId], references: [id])
   dueAt               DateTime?
   satisfactionRating  Int?
   satisfactionComment String?
@@ -870,26 +920,29 @@ model Ticket {
 }
 
 model TicketComment {
-  id         Int      @id @default(autoincrement())
-  ticketId   Int
-  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  authorId   Int
-  author     User     @relation(fields: [authorId], references: [id])
-  body       String
-  isInternal Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id          Int                @id @default(autoincrement())
+  ticketId    Int
+  ticket      Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId    Int
+  author      User               @relation(fields: [authorId], references: [id])
+  body        String
+  isInternal  Boolean            @default(false)
+  attachments TicketAttachment[]
+  createdAt   DateTime           @default(now())
 }
 
 model TicketAttachment {
-  id           Int      @id @default(autoincrement())
+  id           Int            @id @default(autoincrement())
   ticketId     Int
-  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticket       Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  commentId    Int?
+  comment      TicketComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
   filename     String
   storedPath   String
   sizeBytes    Int
   uploadedById Int
-  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
-  createdAt    DateTime @default(now())
+  uploadedBy   User           @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime       @default(now())
 }
 
 model TicketWatcher {
@@ -1003,40 +1056,40 @@ enum AccessCredentialStatus {
 }
 
 model AccessControlDevice {
-  id                Int              @id @default(autoincrement())
+  id                Int                @id @default(autoincrement())
   name              String
   ipAddress         String?
   port              Int?
   username          String?
   encryptedPassword String?
   locationId        Int?
-  location          Location?        @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  location          Location?          @relation(fields: [locationId], references: [id], onDelete: SetNull)
   model             String?
   notes             String?
-  status            CameraStatus     @default(UNKNOWN)
+  status            CameraStatus       @default(UNKNOWN)
   lastCheckedAt     DateTime?
   lastEventSyncAt   DateTime?
   doors             Door[]
   credentials       AccessCredential[]
   events            AccessEvent[]
-  createdAt         DateTime         @default(now())
+  createdAt         DateTime           @default(now())
 }
 
 model Door {
-  id             Int                          @id @default(autoincrement())
-  deviceId       Int
-  device         AccessControlDevice          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  doorNumber     Int
-  name           String
-  lockState      DoorLockState                @default(UNKNOWN)
-  doorState      DoorState                    @default(UNKNOWN)
-  lastCheckedAt  DateTime?
-  events         AccessEvent[]
+  id               Int                         @id @default(autoincrement())
+  deviceId         Int
+  device           AccessControlDevice         @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  doorNumber       Int
+  name             String
+  lockState        DoorLockState               @default(UNKNOWN)
+  doorState        DoorState                   @default(UNKNOWN)
+  lastCheckedAt    DateTime?
+  events           AccessEvent[]
   credentialRights AccessCredentialDoorRight[]
-  groupDoors     AccessGroupDoor[]
+  groupDoors       AccessGroupDoor[]
   // Cameras an operator wants to see pop up when this door opens — see the "Read Card"/status
   // routes in accessControl.routes.ts for how these get surfaced.
-  cameras        Camera[]
+  cameras          Camera[]
 
   @@unique([deviceId, doorNumber])
 }
@@ -1047,20 +1100,20 @@ model Door {
 // access on two controllers gets two AccessCredential rows, each with its own device-assigned
 // employeeNo.
 model AccessCredential {
-  id          Int                          @id @default(autoincrement())
-  deviceId    Int
-  device      AccessControlDevice          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  personId    Int
-  person      Person                       @relation(fields: [personId], references: [id], onDelete: Cascade)
-  employeeNo  String
-  cardNumber  String?
-  hasPin      Boolean                      @default(false)
-  status      AccessCredentialStatus       @default(ACTIVE)
-  validFrom   DateTime?
-  validTo     DateTime?
-  doorRights  AccessCredentialDoorRight[]
-  createdAt   DateTime                     @default(now())
-  updatedAt   DateTime                     @updatedAt
+  id         Int                         @id @default(autoincrement())
+  deviceId   Int
+  device     AccessControlDevice         @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  personId   Int
+  person     Person                      @relation(fields: [personId], references: [id], onDelete: Cascade)
+  employeeNo String
+  cardNumber String?
+  hasPin     Boolean                     @default(false)
+  status     AccessCredentialStatus      @default(ACTIVE)
+  validFrom  DateTime?
+  validTo    DateTime?
+  doorRights AccessCredentialDoorRight[]
+  createdAt  DateTime                    @default(now())
+  updatedAt  DateTime                    @updatedAt
 
   @@unique([deviceId, employeeNo])
 }
@@ -1072,12 +1125,12 @@ model AccessCredential {
 // AccessCredential with no rows here was provisioned without a RightPlan at all, which leaves
 // the controller's own default access behavior in effect for that person.
 model AccessCredentialDoorRight {
-  id             Int               @id @default(autoincrement())
+  id             Int              @id @default(autoincrement())
   credentialId   Int
-  credential     AccessCredential  @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  credential     AccessCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
   doorId         Int
-  door           Door              @relation(fields: [doorId], references: [id], onDelete: Cascade)
-  planTemplateNo String            @default("1")
+  door           Door             @relation(fields: [doorId], references: [id], onDelete: Cascade)
+  planTemplateNo String           @default("1")
 
   @@unique([credentialId, doorId])
 }
@@ -1204,35 +1257,35 @@ enum LightingProtocol {
 // concepts (null until first successful contact auto-detects them); `onUrl`/`offUrl`/`statusUrl`/
 // `statusOnPath` are GENERIC_HTTP-only, user-supplied at add time (see lighting.schema.ts).
 model LightingDevice {
-  id             Int                 @id @default(autoincrement())
-  name           String
-  protocol       LightingProtocol    @default(SHELLY)
-  ipAddress      String?
-  port           Int?
-  gen            Int?
-  kind           LightingDeviceKind?
-  channel        Int                 @default(0)
-  onUrl          String?
-  offUrl         String?
-  statusUrl      String?
-  statusOnPath   String?
+  id                   Int                        @id @default(autoincrement())
+  name                 String
+  protocol             LightingProtocol           @default(SHELLY)
+  ipAddress            String?
+  port                 Int?
+  gen                  Int?
+  kind                 LightingDeviceKind?
+  channel              Int                        @default(0)
+  onUrl                String?
+  offUrl               String?
+  statusUrl            String?
+  statusOnPath         String?
   // ZIGBEE-protocol devices only — set once paired via the coordinator (see ZigbeeCoordinator).
   zigbeeIeeeAddress    String?
   zigbeeNetworkAddress Int?
-  icon           String?
-  sortOrder      Int                 @default(0)
-  groupId        Int?
-  group          LightingGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  locationId     Int?
-  location       Location?           @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  status         CameraStatus        @default(UNKNOWN)
-  isOn           Boolean             @default(false)
-  brightness     Int?
-  powerW         Float?
-  lastCheckedAt  DateTime?
-  createdAt      DateTime            @default(now())
-  sceneActions   LightingSceneAction[]
-  automationActions LightingAutomationAction[]
+  icon                 String?
+  sortOrder            Int                        @default(0)
+  groupId              Int?
+  group                LightingGroup?             @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  locationId           Int?
+  location             Location?                  @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  status               CameraStatus               @default(UNKNOWN)
+  isOn                 Boolean                    @default(false)
+  brightness           Int?
+  powerW               Float?
+  lastCheckedAt        DateTime?
+  createdAt            DateTime                   @default(now())
+  sceneActions         LightingSceneAction[]
+  automationActions    LightingAutomationAction[]
 }
 
 // A user-defined grouping of lighting devices, shown as a card on the Lighting Dashboard —
@@ -1251,12 +1304,12 @@ model LightingGroup {
 // devices, applied all at once via "Activate" — e.g. "Movie Night" dims the lounge and switches
 // off the hallway in one click.
 model LightingScene {
-  id          Int                    @id @default(autoincrement())
+  id          Int                   @id @default(autoincrement())
   name        String
   icon        String?
   actions     LightingSceneAction[]
   automations LightingAutomation[]
-  createdAt   DateTime               @default(now())
+  createdAt   DateTime              @default(now())
 }
 
 model LightingSceneAction {
@@ -1280,9 +1333,9 @@ enum LightingAutomationActionType {
 // Automations tab projects daysOfWeek/timeOfDay onto a month grid rather than storing one-off
 // calendar events, since every automation here repeats weekly by design.
 model LightingAutomation {
-  id             Int                           @id @default(autoincrement())
+  id             Int                          @id @default(autoincrement())
   name           String
-  isEnabled      Boolean                       @default(true)
+  isEnabled      Boolean                      @default(true)
   daysOfWeek     Int[]
   timeOfDay      String
   actionType     LightingAutomationActionType
@@ -1290,7 +1343,7 @@ model LightingAutomation {
   // matches how Scenes already let one activation touch a whole set of devices.
   actions        LightingAutomationAction[]
   targetSceneId  Int?
-  targetScene    LightingScene?                @relation(fields: [targetSceneId], references: [id], onDelete: Cascade)
+  targetScene    LightingScene?               @relation(fields: [targetSceneId], references: [id], onDelete: Cascade)
   // Optional paired "off" trigger for DEVICE automations — at this time, every device in
   // `actions` is turned off, so one automation can cover "on at 18:00, off at 23:00" instead of
   // needing two separate automations. Not applicable to SCENE automations (a scene has no
@@ -1302,8 +1355,8 @@ model LightingAutomation {
   // Separate dedup key for the offTimeOfDay trigger, since the on- and off-legs of the same
   // automation fire independently and both may legitimately run on the same day.
   lastRunDateOff String?
-  createdAt      DateTime                      @default(now())
-  updatedAt      DateTime                      @updatedAt
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
   runs           LightingAutomationRun[]
 }
 
@@ -1313,16 +1366,16 @@ model LightingAutomation {
 // with onDelete: SetNull (and the name snapshotted separately) so this history survives deleting
 // the automation itself.
 model LightingAutomationRun {
-  id             Int                @id @default(autoincrement())
+  id             Int                          @id @default(autoincrement())
   automationId   Int?
-  automation     LightingAutomation? @relation(fields: [automationId], references: [id], onDelete: SetNull)
+  automation     LightingAutomation?          @relation(fields: [automationId], references: [id], onDelete: SetNull)
   automationName String
   trigger        LightingAutomationRunTrigger
   status         LightingAutomationRunStatus
-  deviceCount    Int                @default(0)
-  failedCount    Int                @default(0)
+  deviceCount    Int                          @default(0)
+  failedCount    Int                          @default(0)
   message        String?
-  ranAt          DateTime           @default(now())
+  ranAt          DateTime                     @default(now())
 
   @@index([ranAt])
   @@index([automationId])
@@ -1340,13 +1393,13 @@ enum LightingAutomationRunStatus {
 }
 
 model LightingAutomationAction {
-  id            Int                @id @default(autoincrement())
-  automationId  Int
-  automation    LightingAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
-  deviceId      Int
-  device        LightingDevice     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  turnOn        Boolean
-  brightness    Int?
+  id           Int                @id @default(autoincrement())
+  automationId Int
+  automation   LightingAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  deviceId     Int
+  device       LightingDevice     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  turnOn       Boolean
+  brightness   Int?
 
   @@unique([automationId, deviceId])
 }
@@ -1429,30 +1482,30 @@ model LightingScan {
 }
 
 model LightingScanResult {
-  id           Int                 @id @default(autoincrement())
+  id           Int              @id @default(autoincrement())
   scanId       Int
-  scan         LightingScan        @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  scan         LightingScan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
   ipAddress    String
-  protocol     LightingProtocol    @default(SHELLY)
+  protocol     LightingProtocol @default(SHELLY)
   name         String?
   model        String?
   gen          Int?
-  alreadyAdded Boolean             @default(false)
-  discoveredAt DateTime            @default(now())
+  alreadyAdded Boolean          @default(false)
+  discoveredAt DateTime         @default(now())
 }
 
 model AccessEvent {
-  id         Int                  @id @default(autoincrement())
+  id         Int                 @id @default(autoincrement())
   deviceId   Int
-  device     AccessControlDevice  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  device     AccessControlDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   doorId     Int?
-  door       Door?                @relation(fields: [doorId], references: [id], onDelete: SetNull)
+  door       Door?               @relation(fields: [doorId], references: [id], onDelete: SetNull)
   employeeNo String?
   cardNumber String?
   eventType  String
   message    String?
   occurredAt DateTime
-  createdAt  DateTime             @default(now())
+  createdAt  DateTime            @default(now())
 }
 
 // ───────────────────────── Cross-cutting ─────────────────────────
@@ -1516,11 +1569,12 @@ model SystemSetting {
 }
 
 model AgentApiKey {
-  id        Int      @id @default(autoincrement())
-  key       String   @unique
-  label     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id         Int       @id @default(autoincrement())
+  key        String    @unique
+  label      String?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
 }
 
 // Bearer key for external MCP clients (Claude Desktop, Claude Code, etc.) connecting to this
@@ -1692,11 +1746,11 @@ enum SystemComponentStatus {
 // lib/systemStatusMonitor.ts for the actual checks). Static-ish reference data upserted by the
 // scheduler on first run; the interesting history lives in SystemComponentDailyStatus below.
 model SystemComponent {
-  id            Int                           @id @default(autoincrement())
-  key           String                        @unique
+  id            Int                          @id @default(autoincrement())
+  key           String                       @unique
   name          String
-  sortOrder     Int                           @default(0)
-  createdAt     DateTime                      @default(now())
+  sortOrder     Int                          @default(0)
+  createdAt     DateTime                     @default(now())
   dailyStatuses SystemComponentDailyStatus[]
 }
 
@@ -1707,15 +1761,15 @@ model SystemComponent {
 // whole day red, matching how public status pages summarize a day); checksOk/checksTotal back the
 // displayed uptime percentage.
 model SystemComponentDailyStatus {
-  id          Int                    @id @default(autoincrement())
+  id          Int                   @id @default(autoincrement())
   componentId Int
-  component   SystemComponent        @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  component   SystemComponent       @relation(fields: [componentId], references: [id], onDelete: Cascade)
   date        DateTime
-  status      SystemComponentStatus  @default(OPERATIONAL)
-  checksOk    Int                    @default(0)
-  checksTotal Int                    @default(0)
+  status      SystemComponentStatus @default(OPERATIONAL)
+  checksOk    Int                   @default(0)
+  checksTotal Int                   @default(0)
   lastMessage String?
-  updatedAt   DateTime               @updatedAt
+  updatedAt   DateTime              @updatedAt
 
   @@unique([componentId, date])
   @@index([date])
@@ -1726,14 +1780,14 @@ model SystemComponentDailyStatus {
 // reusing the day-of-week + time-of-day + lastRunDate dedup convention from
 // LightingAutomation/lightingAutomationScheduler rather than inventing a cron parser.
 model BackupSettings {
-  id           Int      @id @default(1)
-  isEnabled    Boolean  @default(false)
-  daysOfWeek   Int[]    @default([])
-  timeOfDay    String   @default("02:00")
-  lastRunDate  String?
-  updatedById  Int?
-  updatedBy    User?    @relation(fields: [updatedById], references: [id])
-  updatedAt    DateTime @updatedAt
+  id          Int      @id @default(1)
+  isEnabled   Boolean  @default(false)
+  daysOfWeek  Int[]    @default([])
+  timeOfDay   String   @default("02:00")
+  lastRunDate String?
+  updatedById Int?
+  updatedBy   User?    @relation(fields: [updatedById], references: [id])
+  updatedAt   DateTime @updatedAt
 }
 
 enum BackupDestinationType {
@@ -1807,12 +1861,12 @@ model ToastSetting {
 // self-hosted apps pushing backups to remote object storage. s3SecretAccessKey is encrypted at
 // rest with the same AES-256-GCM helper used for NVR/device credentials.
 model BackupDestination {
-  id                Int       @id @default(autoincrement())
-  type              BackupDestinationType
-  name              String
-  isEnabled         Boolean   @default(true)
+  id        Int                   @id @default(autoincrement())
+  type      BackupDestinationType
+  name      String
+  isEnabled Boolean               @default(true)
 
-  emailTo           String?
+  emailTo String?
 
   s3Endpoint        String?
   s3Region          String?
@@ -1820,16 +1874,16 @@ model BackupDestination {
   s3AccessKeyId     String?
   s3SecretAccessKey String?
   s3PathPrefix      String?
-  s3ForcePathStyle  Boolean   @default(false)
+  s3ForcePathStyle  Boolean @default(false)
 
-  lastTestAt        DateTime?
-  lastTestOk        Boolean?
-  lastTestMessage   String?
+  lastTestAt      DateTime?
+  lastTestOk      Boolean?
+  lastTestMessage String?
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  deliveries        BackupRunDestination[]
+  deliveries BackupRunDestination[]
 }
 
 enum BackupRunStatus {
@@ -1855,7 +1909,7 @@ model BackupRun {
   startedAt     DateTime         @default(now())
   finishedAt    DateTime?
 
-  deliveries    BackupRunDestination[]
+  deliveries BackupRunDestination[]
 
   @@index([startedAt])
 }
@@ -1864,11 +1918,11 @@ model BackupRun {
 // (name snapshotted separately) so history survives deleting the destination itself, same
 // reasoning as LightingAutomationRun surviving automation deletion.
 model BackupRunDestination {
-  id              Int                @id @default(autoincrement())
+  id              Int                   @id @default(autoincrement())
   runId           Int
-  run             BackupRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run             BackupRun             @relation(fields: [runId], references: [id], onDelete: Cascade)
   destinationId   Int?
-  destination     BackupDestination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+  destination     BackupDestination?    @relation(fields: [destinationId], references: [id], onDelete: SetNull)
   destinationName String
   destinationType BackupDestinationType
   ok              Boolean

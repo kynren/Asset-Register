@@ -17,6 +17,11 @@ export async function verifyAgentKey(req: Request, res: Response, next: NextFunc
     if (!record || !record.isActive) {
       return res.status(401).json({ error: "Invalid agent key" });
     }
+    // Fire-and-forget — this fires on every relay poll (every 3s while the relay agent runs), so
+    // it must never add latency to the request or fail the request if the write itself hiccups.
+    // It's what lets System Status report real "last agent contact" recency (see
+    // systemStatusMonitor.ts's checkAgentConnectivity()).
+    prisma.agentApiKey.update({ where: { id: record.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);
     next();
   });
 }

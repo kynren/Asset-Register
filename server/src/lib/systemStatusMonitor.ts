@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import { prisma } from "../config/prisma";
 import { runForEachOrganization } from "../config/controlPlane";
 import { verifyEmailTransport } from "./email";
+import { isNetworkRelayEnabled } from "../modules/network/scan.service";
 import { SystemComponentStatus } from "@prisma/client";
 
 interface CheckResult {
@@ -80,12 +81,38 @@ async function checkNetworkMonitor(): Promise<CheckResult> {
     : { status: "OPERATIONAL", message: `Last scan completed at ${settings.lastRunAt.toISOString()}.` };
 }
 
+// Reports whether an on-prem agent (the device agent or the network relay/"server" agent — both
+// share the same AgentApiKey, see middleware/agentAuth.ts) has actually called in recently. The
+// relay agent polls every 3s while it's running (kynren_network_relay.py's
+// POLL_INTERVAL_SECONDS), so once it's enabled, silence beyond a generous multiple of that is a
+// real "it stopped" signal rather than just landing between polls.
+async function checkAgentConnectivity(): Promise<CheckResult> {
+  const anyKeyConfigured = (await prisma.agentApiKey.count()) > 0;
+  if (!anyKeyConfigured) return { status: "OPERATIONAL", message: "No agent API key configured — device/relay agents aren't in use." };
+
+  const mostRecent = await prisma.agentApiKey.findFirst({
+    where: { lastUsedAt: { not: null } },
+    orderBy: { lastUsedAt: "desc" },
+  });
+  if (!mostRecent?.lastUsedAt) return { status: "DEGRADED", message: "Agent key(s) configured but no agent has connected yet." };
+
+  const secondsAgo = Math.round((Date.now() - mostRecent.lastUsedAt.getTime()) / 1000);
+  const relayEnabled = await isNetworkRelayEnabled();
+  if (!relayEnabled) return { status: "OPERATIONAL", message: `Last agent contact ${secondsAgo}s ago.` };
+
+  const STALE_AFTER_SECONDS = 30; // relay polls every ~3s — 10x that is a generous buffer
+  return secondsAgo > STALE_AFTER_SECONDS
+    ? { status: "DEGRADED", message: `Relay agent is enabled but hasn't polled in ${secondsAgo}s (expected every ~3s).` }
+    : { status: "OPERATIONAL", message: `Relay agent last polled ${secondsAgo}s ago.` };
+}
+
 const COMPONENTS: ComponentDef[] = [
   { key: "api", name: "API Server", sortOrder: 1, check: checkApi },
   { key: "database", name: "Database", sortOrder: 2, check: checkDatabase },
   { key: "email", name: "Email Notifications", sortOrder: 3, check: checkEmail },
   { key: "nvr-relay", name: "NVR / Camera Relay", sortOrder: 4, check: checkNvrRelay },
   { key: "network-monitor", name: "Network Monitor", sortOrder: 5, check: checkNetworkMonitor },
+  { key: "agent-connectivity", name: "Device / Relay Agent", sortOrder: 6, check: checkAgentConnectivity },
 ];
 
 function startOfUtcDay(d: Date): Date {
