@@ -75,7 +75,7 @@ function startOfUtcDay(d: Date): Date {
 // `currentStatus`/`days[].status` are null wherever no health check has run yet for that day
 // (e.g. every day before this feature was deployed) — the frontend renders those as neutral
 // "no data" bars rather than fabricating a status.
-router.get("/status", requirePermission("admin", "view"), async (_req, res) => {
+router.get("/status", requirePermission("app-settings", "view"), async (_req, res) => {
   const today = startOfUtcDay(new Date());
   const rangeStart = new Date(today);
   rangeStart.setUTCDate(rangeStart.getUTCDate() - (STATUS_HISTORY_DAYS - 1));
@@ -132,7 +132,7 @@ router.get("/status", requirePermission("admin", "view"), async (_req, res) => {
 
 // Lets an admin force an immediate health check instead of waiting for the next 5-minute cycle —
 // useful right after fixing something (e.g. configuring SMTP) to confirm it actually took effect.
-router.post("/status/check-now", requirePermission("admin", "view"), async (_req, res) => {
+router.post("/status/check-now", requirePermission("app-settings", "view"), async (_req, res) => {
   await runSystemStatusCheck();
   res.json({ ok: true });
 });

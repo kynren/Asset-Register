@@ -13,7 +13,7 @@ export const MODULES = [
   "docs",
   "admin",
   "password",
-  "backups",
+  "app-settings",
 ] as const;
 
 export type ModuleName = (typeof MODULES)[number];

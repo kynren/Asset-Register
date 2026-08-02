@@ -19,7 +19,7 @@ export function AssetGridCard({ asset, onOpen }: { asset: any; onOpen: () => voi
         {asset.location && <span className="badge badge-neutral">{asset.location.name}</span>}
         {isOnline !== null && (
           <span className="row gap-1">
-            <span className={`tag-dot ${isOnline ? "online" : "offline"}`} /> {isOnline ? "Online" : "Offline"}
+            <span className={`tag-dot status-flash ${isOnline ? "online" : "offline"}`} /> {isOnline ? "Online" : "Offline"}
           </span>
         )}
       </div>

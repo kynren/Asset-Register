@@ -187,6 +187,109 @@
     }
   }
 
+  /* ---------- Recently Updated / category grid (wrapped, no horizontal scroll) ---------- */
+
+  .docs-recent-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+    gap: 16px;
+    padding: 14px 4px 26px;
+  }
+
+  /* ---------- Category tab bar ---------- */
+
+  .docs-category-bar {
+    @apply relative w-full;
+  }
+
+  .docs-category-bar-measure {
+    @apply absolute flex pointer-events-none;
+    top: -9999px;
+    left: -9999px;
+    gap: 6px;
+    visibility: hidden;
+  }
+
+  .docs-category-bar-track {
+    @apply flex items-center;
+    gap: 6px;
+  }
+
+  .docs-category-tab {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-surface text-text-muted cursor-pointer transition-colors duration-150 ease-in-out;
+    padding: 6px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .docs-category-tab:hover {
+    @apply text-text border-primary;
+  }
+  .docs-category-tab.active {
+    @apply bg-primary text-white border-primary;
+  }
+
+  .docs-category-tab-count {
+    @apply text-[10px] font-bold rounded-full;
+    padding: 1px 6px;
+    background: rgba(127, 127, 127, 0.18);
+  }
+  .docs-category-tab.active .docs-category-tab-count {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .docs-category-more {
+    @apply relative;
+  }
+  .docs-category-more-btn {
+    @apply border-dashed;
+  }
+  .docs-category-more-menu {
+    @apply absolute left-0 flex flex-col rounded-md border border-border bg-surface shadow-lg z-20;
+    top: calc(100% + 6px);
+    min-width: 220px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 6px;
+  }
+  .docs-category-more-item {
+    @apply flex items-center justify-between gap-3 rounded text-left border-none bg-transparent text-text cursor-pointer;
+    padding: 7px 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .docs-category-more-item:hover {
+    @apply bg-bg;
+  }
+  .docs-category-more-item.active {
+    @apply text-primary;
+  }
+
+  /* ---------- Breadcrumb (Collection drill-down) ---------- */
+
+  .docs-breadcrumb-root {
+    @apply text-[15px] font-bold text-primary border-none bg-transparent cursor-pointer p-0;
+  }
+  .docs-breadcrumb-root:hover {
+    @apply underline;
+  }
+
+  /* ---------- Clickable collection references ---------- */
+
+  .book-card-collection-link {
+    @apply cursor-pointer underline decoration-dotted underline-offset-2;
+  }
+  .book-card-collection-link:hover {
+    @apply text-primary;
+  }
+
+  .docs-collection-link {
+    @apply text-primary border-none bg-transparent cursor-pointer p-0 font-semibold;
+    font-size: inherit;
+  }
+  .docs-collection-link:hover {
+    @apply underline;
+  }
+
   /* ---------- View toggle ---------- */
 
   .docs-view-toggle {

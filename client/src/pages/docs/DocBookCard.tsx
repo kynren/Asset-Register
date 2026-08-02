@@ -16,7 +16,13 @@ export interface DocLibraryItem {
   createdBy: { firstName: string; lastName: string } | null;
 }
 
-export function DocBookCard({ doc, onClick }: { doc: DocLibraryItem; onClick: () => void }) {
+interface DocBookCardProps {
+  doc: DocLibraryItem;
+  onClick: () => void;
+  onCollectionClick?: (collection: { id: number; name: string }) => void;
+}
+
+export function DocBookCard({ doc, onClick, onCollectionClick }: DocBookCardProps) {
   const colors = DOC_TYPE_COLORS[doc.docType];
   const overdue = doc.reviewDueDate ? dayjs(doc.reviewDueDate).isBefore(dayjs()) : false;
 
@@ -34,7 +40,23 @@ export function DocBookCard({ doc, onClick }: { doc: DocLibraryItem; onClick: ()
         </div>
 
         <div className="book-card-face book-card-back">
-          <div className="book-card-back-type">{DOC_TYPE_LABELS[doc.docType]}{doc.collection ? ` · ${doc.collection.name}` : ""}</div>
+          <div className="book-card-back-type">
+            {DOC_TYPE_LABELS[doc.docType]}
+            {doc.collection && (
+              <>
+                {" · "}
+                <span
+                  className="book-card-collection-link"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCollectionClick?.(doc.collection!);
+                  }}
+                >
+                  {doc.collection.name}
+                </span>
+              </>
+            )}
+          </div>
           <div className="book-card-back-title">{doc.title}</div>
           {doc.summary && <div className="book-card-back-summary">{doc.summary}</div>}
           {doc.tags.length > 0 && (

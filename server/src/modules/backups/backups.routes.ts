@@ -15,12 +15,12 @@ router.use(verifyJwt);
 
 // ───────────────────────── Schedule ─────────────────────────
 
-router.get("/settings", requirePermission("backups", "view"), async (_req, res) => {
+router.get("/settings", requirePermission("app-settings","view"), async (_req, res) => {
   const settings = await prisma.backupSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
   res.json(settings);
 });
 
-router.put("/settings", requirePermission("backups", "edit"), validateBody(updateBackupSettingsSchema), async (req, res) => {
+router.put("/settings", requirePermission("app-settings","edit"), validateBody(updateBackupSettingsSchema), async (req, res) => {
   const settings = await prisma.backupSettings.upsert({
     where: { id: 1 },
     update: { ...req.body, updatedById: req.user!.id },
@@ -51,11 +51,11 @@ const destinationSelect = {
   updatedAt: true,
 };
 
-router.get("/destinations", requirePermission("backups", "view"), async (_req, res) => {
+router.get("/destinations", requirePermission("app-settings","view"), async (_req, res) => {
   res.json(await prisma.backupDestination.findMany({ select: destinationSelect, orderBy: { createdAt: "asc" } }));
 });
 
-router.post("/destinations", requirePermission("backups", "create"), validateBody(createBackupDestinationSchema), async (req, res) => {
+router.post("/destinations", requirePermission("app-settings","create"), validateBody(createBackupDestinationSchema), async (req, res) => {
   const { s3SecretAccessKey, ...rest } = req.body as typeof req.body & { s3SecretAccessKey?: string };
   const destination = await prisma.backupDestination.create({
     data: { ...rest, ...(s3SecretAccessKey ? { s3SecretAccessKey: encryptSecret(s3SecretAccessKey) } : {}) },
@@ -65,7 +65,7 @@ router.post("/destinations", requirePermission("backups", "create"), validateBod
   res.status(201).json(destination);
 });
 
-router.patch("/destinations/:id", requirePermission("backups", "edit"), validateBody(updateBackupDestinationSchema), async (req, res) => {
+router.patch("/destinations/:id", requirePermission("app-settings","edit"), validateBody(updateBackupDestinationSchema), async (req, res) => {
   const { s3SecretAccessKey, ...rest } = req.body as typeof req.body & { s3SecretAccessKey?: string };
   const destination = await prisma.backupDestination.update({
     where: { id: Number(req.params.id) },
@@ -76,7 +76,7 @@ router.patch("/destinations/:id", requirePermission("backups", "edit"), validate
   res.json(destination);
 });
 
-router.delete("/destinations/:id", requirePermission("backups", "delete"), async (req, res) => {
+router.delete("/destinations/:id", requirePermission("app-settings","delete"), async (req, res) => {
   await prisma.backupDestination.delete({ where: { id: Number(req.params.id) } });
   await logAudit({ userId: req.user!.id, action: "backups.destination_delete", entityType: "BackupDestination", entityId: Number(req.params.id) });
   res.json({ ok: true });
@@ -84,7 +84,7 @@ router.delete("/destinations/:id", requirePermission("backups", "delete"), async
 
 // Writes and then deletes a real object (S3) or sends a real message (email) — see
 // lib/backupService.ts for why a lighter "can we reach the endpoint" check isn't enough here.
-router.post("/destinations/:id/test", requirePermission("backups", "edit"), async (req, res) => {
+router.post("/destinations/:id/test", requirePermission("app-settings","edit"), async (req, res) => {
   const id = Number(req.params.id);
   const destination = await prisma.backupDestination.findUnique({ where: { id } });
   if (!destination) throw new ApiError(404, "Destination not found");
@@ -101,7 +101,7 @@ router.post("/destinations/:id/test", requirePermission("backups", "edit"), asyn
 
 // ───────────────────────── Runs ─────────────────────────
 
-router.get("/runs", requirePermission("backups", "view"), async (req, res) => {
+router.get("/runs", requirePermission("app-settings","view"), async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
   const [runs, total] = await Promise.all([
@@ -119,7 +119,7 @@ router.get("/runs", requirePermission("backups", "view"), async (req, res) => {
 // Fire-and-forget — a real pg_dump + upload can take well beyond a normal request timeout, so
 // this returns immediately and the client polls GET /runs to watch the result land, same pattern
 // as the network monitor's manual "Run Now".
-router.post("/run-now", requirePermission("backups", "create"), async (req, res) => {
+router.post("/run-now", requirePermission("app-settings","create"), async (req, res) => {
   runBackupNow("MANUAL").catch((err) => {
     // eslint-disable-next-line no-console
     console.error("Manual backup run failed:", err);

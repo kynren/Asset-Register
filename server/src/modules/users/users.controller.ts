@@ -10,6 +10,20 @@ import { generateTempPassword } from "../../lib/passwords";
 import { getPagination, paginatedResponse } from "../../lib/pagination";
 import { generateOpaqueToken, hashToken } from "../auth/auth.service";
 
+const SYSTEM_ADMIN_ROLE_NAME = "System Admin";
+
+// Only an existing System Admin can hand the role to someone else — otherwise a Super Admin
+// (who already has full operational access) could self-escalate into the platform-level role
+// that gates App Settings and organization creation. Checked against req.user's JWT-embedded
+// roleName (no query needed) so this is cheap on every create/update call.
+async function assertCanAssignRole(req: Request, roleId: number | undefined): Promise<void> {
+  if (roleId === undefined) return;
+  const role = await prisma.role.findUnique({ where: { id: roleId }, select: { name: true } });
+  if (role?.name === SYSTEM_ADMIN_ROLE_NAME && req.user!.roleName !== SYSTEM_ADMIN_ROLE_NAME) {
+    throw new ApiError(403, "Only a System Admin can grant the System Admin role.");
+  }
+}
+
 const userSelect = {
   id: true,
   email: true,
@@ -73,6 +87,7 @@ export async function devices(req: Request, res: Response) {
 
 export async function create(req: Request, res: Response) {
   const { email, firstName, lastName, roleId, password } = req.body;
+  await assertCanAssignRole(req, roleId);
   const tempPassword = password || generateTempPassword();
   const passwordHash = await bcrypt.hash(tempPassword, 12);
 
@@ -97,6 +112,7 @@ export async function update(req: Request, res: Response) {
   if (id === req.user!.id && req.body.isActive === false) {
     throw new ApiError(400, "You cannot deactivate your own account");
   }
+  await assertCanAssignRole(req, req.body.roleId);
   const { email, ...rest } = req.body;
   // Lowercased to match verifyCredentials()/create()'s lookup convention — otherwise a
   // mixed-case edit here would silently break that user's next login.

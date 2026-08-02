@@ -30,7 +30,7 @@ const brandingUpload = multer({
 const router = Router();
 router.use(verifyJwt);
 
-router.get("/", requirePermission("admin", "view"), async (_req, res) => {
+router.get("/", requirePermission("app-settings", "view"), async (_req, res) => {
   const settings = await prisma.systemSetting.findMany();
   const map: Record<string, string> = {};
   for (const s of settings) map[s.key] = s.value;
@@ -39,7 +39,7 @@ router.get("/", requirePermission("admin", "view"), async (_req, res) => {
 
 const updateSchema = z.object({ values: z.record(z.string()) });
 
-router.put("/", requirePermission("admin", "edit"), validateBody(updateSchema), async (req, res) => {
+router.put("/", requirePermission("app-settings", "edit"), validateBody(updateSchema), async (req, res) => {
   const { values } = req.body as { values: Record<string, string> };
   await prisma.$transaction(
     Object.entries(values).map(([key, value]) =>
@@ -52,7 +52,7 @@ router.put("/", requirePermission("admin", "edit"), validateBody(updateSchema), 
 
 const brandingTypeSchema = z.object({ type: z.enum(["appIcon", "favicon"]) });
 
-router.post("/branding", requirePermission("admin", "edit"), brandingUpload.single("file"), async (req, res) => {
+router.post("/branding", requirePermission("app-settings", "edit"), brandingUpload.single("file"), async (req, res) => {
   const parsed = brandingTypeSchema.safeParse(req.body);
   if (!parsed.success || !req.file) throw new ApiError(400, "Missing file or type");
 
@@ -65,11 +65,11 @@ router.post("/branding", requirePermission("admin", "edit"), brandingUpload.sing
 });
 
 // Agent API keys
-router.get("/agent-keys", requirePermission("admin", "view"), async (_req, res) => {
+router.get("/agent-keys", requirePermission("app-settings", "view"), async (_req, res) => {
   res.json(await prisma.agentApiKey.findMany({ orderBy: { createdAt: "desc" } }));
 });
 
-router.post("/agent-keys", requirePermission("admin", "create"), async (req, res) => {
+router.post("/agent-keys", requirePermission("app-settings", "create"), async (req, res) => {
   const { generateApiKey } = await import("../../lib/passwords");
   const { registerToken } = await import("../../config/controlPlane");
   const { currentSchemaName } = await import("../../config/prisma");
@@ -83,7 +83,7 @@ router.post("/agent-keys", requirePermission("admin", "create"), async (req, res
   res.status(201).json(record);
 });
 
-router.patch("/agent-keys/:id", requirePermission("admin", "edit"), async (req, res) => {
+router.patch("/agent-keys/:id", requirePermission("app-settings", "edit"), async (req, res) => {
   const record = await prisma.agentApiKey.update({
     where: { id: Number(req.params.id) },
     data: { isActive: Boolean(req.body.isActive) },

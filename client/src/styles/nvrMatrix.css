@@ -90,10 +90,10 @@
     @apply w-[7px] h-[7px] rounded-full flex-shrink-0;
   }
   .nvx-group-dot.online {
-    @apply bg-ad-success;
+    @apply bg-ad-danger;
   }
   .nvx-group-dot.offline {
-    @apply bg-ad-danger;
+    @apply bg-ad-success;
   }
   .nvx-group-dot.unknown {
     @apply bg-ad-text-muted;

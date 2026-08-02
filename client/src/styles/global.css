@@ -276,6 +276,28 @@
   table.data-table tbody tr:hover {
     @apply bg-primary-soft;
   }
+  table.data-table th {
+    position: relative;
+  }
+  .col-resize-handle {
+    @apply absolute top-0 right-0 h-full w-1.5 cursor-col-resize select-none touch-none;
+    background: transparent;
+  }
+  .col-resize-handle:hover,
+  .col-resize-handle.resizing {
+    background: var(--color-primary);
+  }
+  .col-filter-input {
+    @apply w-full text-xs border border-border rounded bg-surface text-text;
+    padding: 3px 6px;
+    font-weight: 400;
+  }
+  table.data-table tr.col-filter-row th,
+  table.data-table tr.col-filter-row td {
+    @apply border-b border-border;
+    padding: 4px 6px;
+    cursor: default;
+  }
 
   .badge {
     @apply inline-flex items-center px-2.5 py-[3px] rounded-full text-[11px] font-semibold uppercase tracking-wide;
@@ -473,14 +495,26 @@
     @apply flex items-center gap-2.5 justify-end mt-3.5;
   }
 
+  /* Device reachability convention app-wide: ONLINE flashes red, OFFLINE flashes green — the
+     inverse of the usual traffic-light instinct, chosen deliberately so a device coming online
+     draws the eye the same way an alert would. Shared by every online/offline dot in the app
+     (.tag-dot, .ad-status-dot, .nvx-group-dot, .ips-dot) so they never drift out of sync. */
+  @keyframes kynren-status-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
+  .status-flash {
+    animation: kynren-status-blink 1.1s ease-in-out infinite;
+  }
+
   .tag-dot {
     @apply w-2 h-2 rounded-full inline-block;
   }
   .tag-dot.online {
-    @apply bg-success;
+    @apply bg-danger;
   }
   .tag-dot.offline {
-    @apply bg-danger;
+    @apply bg-success;
   }
 
   .alert {

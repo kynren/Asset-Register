@@ -45,7 +45,10 @@ interface GraphEdge {
   bandwidthMbps: number | null;
 }
 
-const STATUS_COLOR: Record<string, string> = { ONLINE: "#22c55e", DEGRADED: "#f59e0b", OFFLINE: "#3b82f6" };
+// Device reachability convention app-wide: ONLINE is red, OFFLINE is green (see .status-flash /
+// .tag-dot in global.css) — deliberately inverted from the usual instinct so a device coming
+// online draws the eye. DEGRADED sits outside that binary and keeps its own amber.
+const STATUS_COLOR: Record<string, string> = { ONLINE: "#ef4444", DEGRADED: "#f59e0b", OFFLINE: "#22c55e" };
 const ROLE_LABEL: Record<string, string> = {
   CORE_SWITCH: "Core Switch",
   DISTRIBUTION_SWITCH: "Distribution Switch",
@@ -296,7 +299,7 @@ function InnerTopologyGraph() {
         <div className="nt-filter-row">
           {(["ALL", "ONLINE", "DEGRADED", "OFFLINE"] as const).map((key) => (
             <button key={key} className={`nt-filter-pill ${statusFilter === key ? "active" : ""}`} onClick={() => setStatusFilter(key)}>
-              {key !== "ALL" && <span className="nt-filter-dot" style={{ background: STATUS_COLOR[key] }} />}
+              {key !== "ALL" && <span className={`nt-filter-dot ${key === "ONLINE" || key === "OFFLINE" ? "status-flash" : ""}`} style={{ background: STATUS_COLOR[key] }} />}
               {key === "ALL" ? "All Devices" : `${key.charAt(0)}${key.slice(1).toLowerCase()} Only`}
               <span className="nt-filter-count">{statusCounts[key]}</span>
             </button>
@@ -325,9 +328,9 @@ function InnerTopologyGraph() {
               </div>
 
               <div className="nt-legend-section">Node Status Colors</div>
-              <div className="nt-legend-item"><span className="nt-legend-dot" style={{ background: STATUS_COLOR.ONLINE }} /> Online (Normal Latency)</div>
+              <div className="nt-legend-item"><span className="nt-legend-dot status-flash" style={{ background: STATUS_COLOR.ONLINE }} /> Online (Normal Latency)</div>
               <div className="nt-legend-item"><span className="nt-legend-dot" style={{ background: STATUS_COLOR.DEGRADED }} /> Degraded (Moderate Loss/RTT)</div>
-              <div className="nt-legend-item"><span className="nt-legend-dot" style={{ background: STATUS_COLOR.OFFLINE }} /> Offline (No Response)</div>
+              <div className="nt-legend-item"><span className="nt-legend-dot status-flash" style={{ background: STATUS_COLOR.OFFLINE }} /> Offline (No Response)</div>
 
               <div className="nt-legend-section">Node Role Icons</div>
               {Object.entries(ROLE_LABEL).map(([key, label]) => (

@@ -11,16 +11,24 @@ const NO_ACCESS = { canView: false, canCreate: false, canEdit: false, canDelete:
 // organization signed up afterwards) so the two never drift out of sync with each other.
 export const ROLE_DEFS: { name: string; description: string; isSystem: boolean; perms: PermSet }[] = [
   {
-    name: "Super Admin",
-    description: "Full access to every module, including system administration.",
+    name: "System Admin",
+    description: "Platform-level access: creates organizations, and owns App Settings (Backups, System Settings, System Status) — the only role that can grant itself to another user.",
     isSystem: true,
     perms: Object.fromEntries(MODULES.map((m) => [m, ALL_TRUE])) as PermSet,
   },
   {
-    name: "Admin",
-    description: "Full operational access; cannot be prevented by permissions from managing the system.",
+    name: "Super Admin",
+    // App Settings (Organizations, Backups, System Settings, System Status) is deliberately
+    // excluded even from this otherwise-full-access role — it's reserved for System Admin only.
+    description: "Full access to every module except App Settings.",
     isSystem: true,
-    perms: Object.fromEntries(MODULES.map((m) => [m, ALL_TRUE])) as PermSet,
+    perms: { ...Object.fromEntries(MODULES.map((m) => [m, ALL_TRUE])), "app-settings": NO_ACCESS } as PermSet,
+  },
+  {
+    name: "Admin",
+    description: "Full operational access except App Settings, which is reserved for System Admin.",
+    isSystem: true,
+    perms: { ...Object.fromEntries(MODULES.map((m) => [m, ALL_TRUE])), "app-settings": NO_ACCESS } as PermSet,
   },
   {
     name: "IT Technician",

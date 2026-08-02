@@ -24,7 +24,6 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string, mfaToken?: string) => Promise<{ mfaRequired: boolean }>;
   magicLogin: (token: string) => Promise<void>;
-  signupOrganization: (input: { organizationName: string; firstName: string; lastName: string; email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   hasPermission: (module: ModuleName, action: ActionName) => boolean;
@@ -90,13 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPermissions(res.data.permissions);
   }
 
-  async function signupOrganization(input: { organizationName: string; firstName: string; lastName: string; email: string; password: string }) {
-    const res = await axiosClient.post("/auth/signup-organization", input);
-    setAccessToken(res.data.accessToken);
-    setUser(res.data.user);
-    setPermissions(res.data.permissions);
-  }
-
   async function logout() {
     await axiosClient.post("/auth/logout").catch(() => undefined);
     setAccessToken(null);
@@ -117,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const value = useMemo(
-    () => ({ user, permissions, loading, login, magicLogin, signupOrganization, logout, refreshSession, hasPermission }),
+    () => ({ user, permissions, loading, login, magicLogin, logout, refreshSession, hasPermission }),
     [user, permissions, loading]
   );
 

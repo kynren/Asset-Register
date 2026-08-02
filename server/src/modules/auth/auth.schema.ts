@@ -27,11 +27,3 @@ export const magicLoginSchema = z.object({
 export const mfaVerifySchema = z.object({
   token: z.string().min(6).max(6),
 });
-
-export const signupOrganizationSchema = z.object({
-  organizationName: z.string().min(2).max(100),
-  firstName: z.string().min(1).max(60),
-  lastName: z.string().min(1).max(60),
-  email: z.string().email(),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});

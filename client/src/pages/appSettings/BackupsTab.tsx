@@ -183,12 +183,12 @@ export function BackupsTab() {
               <input className="input" type="time" value={draft.timeOfDay} onChange={(e) => setDraft({ ...draft, timeOfDay: e.target.value })} />
             </div>
 
-            <PermissionGate module="backups" action="edit">
+            <PermissionGate module="app-settings" action="edit">
               <div className="row gap-2">
                 <button className="btn btn-primary btn-sm" disabled={saveSettingsMutation.isPending} onClick={() => saveSettingsMutation.mutate(draft)}>
                   {saveSettingsMutation.isPending ? "Saving..." : "Save Schedule"}
                 </button>
-                <PermissionGate module="backups" action="create">
+                <PermissionGate module="app-settings" action="create">
                   <button className="btn btn-secondary btn-sm" disabled={runNowMutation.isPending} onClick={() => runNowMutation.mutate()}>
                     <Icon name="refresh" size={12} /> {runNowMutation.isPending ? "Starting..." : "Run Now"}
                   </button>
@@ -202,7 +202,7 @@ export function BackupsTab() {
       <div className="card">
         <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 8 }}>
           <h3 className="mt-0" style={{ marginBottom: 0 }}>Destinations</h3>
-          <PermissionGate module="backups" action="create">
+          <PermissionGate module="app-settings" action="create">
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddDestination(true)}>
               <Icon name="plus" size={12} /> Add Destination
             </button>
@@ -230,7 +230,7 @@ export function BackupsTab() {
                   {d.lastTestAt && ` · tested ${dayjs(d.lastTestAt).format("DD MMM HH:mm")}`}
                 </p>
               </div>
-              <PermissionGate module="backups" action="edit">
+              <PermissionGate module="app-settings" action="edit">
                 <div className="row gap-1">
                   <button className="btn btn-secondary btn-sm" disabled={testDestinationMutation.isPending} onClick={() => testDestinationMutation.mutate(d.id)}>
                     Test Connection
@@ -238,7 +238,7 @@ export function BackupsTab() {
                   <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={() => setEditingDestination(d)}>
                     <Icon name="edit" size={12} />
                   </button>
-                  <PermissionGate module="backups" action="delete">
+                  <PermissionGate module="app-settings" action="delete">
                     <button className="btn btn-danger btn-sm btn-icon" title="Delete" onClick={() => setDeletingDestination(d)}>
                       <Icon name="trash" size={12} />
                     </button>

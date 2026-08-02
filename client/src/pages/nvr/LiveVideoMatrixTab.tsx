@@ -238,7 +238,7 @@ export function LiveVideoMatrixTab() {
             {(nvrs ?? []).map((n) => (
               <div key={n.id} style={{ marginBottom: 14 }}>
                 <div className="nvx-group-header">
-                  <span className={`nvx-group-dot ${n.status === "ONLINE" ? "online" : n.status === "OFFLINE" ? "offline" : "unknown"}`} />
+                  <span className={`nvx-group-dot ${n.status === "UNKNOWN" ? "unknown" : "status-flash"} ${n.status === "ONLINE" ? "online" : n.status === "OFFLINE" ? "offline" : "unknown"}`} />
                   {n.name}
                 </div>
                 {n.cameras.filter((c) => visibleCameraIds.has(c.id)).map((c) => (

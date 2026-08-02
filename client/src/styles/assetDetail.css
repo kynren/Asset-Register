@@ -48,10 +48,10 @@
     @apply w-[7px] h-[7px] rounded-full inline-block mr-[5px];
   }
   .ad-status-dot.online {
-    @apply bg-ad-success;
+    @apply bg-ad-danger;
   }
   .ad-status-dot.offline {
-    @apply bg-ad-danger;
+    @apply bg-ad-success;
   }
 
   .ad-header-right {

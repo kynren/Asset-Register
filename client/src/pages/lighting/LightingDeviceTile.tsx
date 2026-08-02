@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from "react";
+import dayjs from "dayjs";
 import { Icon } from "../../components/Icon";
+import { StatusBadge } from "../../components/StatusBadge";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { LightingDevice } from "./LightingDeviceCard";
 
 const BULB_ON_COLOR = "#f2b705";
+
+const PROTOCOL_LABELS: Record<LightingDevice["protocol"], string> = {
+  SHELLY: "Shelly",
+  TASMOTA: "Tasmota",
+  GENERIC_HTTP: "Generic HTTP",
+  ZIGBEE: "ZigBee",
+};
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   const angleRad = ((angleDeg - 90) * Math.PI) / 180;
@@ -27,12 +36,19 @@ export function LightingDeviceTile({
   onEdit,
   onDuplicate,
   onDelete,
+  onBrightnessCommit,
+  detailed,
 }: {
   device: LightingDevice;
   onToggle: (on: boolean) => void;
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  /** Only needed when `detailed` is true — the Devices tab's dimmable lights show a slider. */
+  onBrightnessCommit?: (value: number) => void;
+  /** Adds the protocol/IP/status/wattage line and brightness slider that the Devices tab needs,
+   * on top of the same ring-tile visual the Dashboard uses — same design, no lost functionality. */
+  detailed?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -42,6 +58,12 @@ export function LightingDeviceTile({
   const r = size / 2 - 8;
   const ringColor = on ? "var(--color-success)" : "var(--color-border)";
   const dotPos = polarToCartesian(size / 2, size / 2, r, 225);
+  const isLight = device.kind === "LIGHT" && device.protocol !== "GENERIC_HTTP";
+
+  // Local draft value while dragging the slider — only committed (network call) on release, same
+  // pattern LightingDeviceCard used, so sweeping the range doesn't fire dozens of requests.
+  const [liveBrightness, setLiveBrightness] = useState(device.brightness ?? 0);
+  useEffect(() => setLiveBrightness(device.brightness ?? 0), [device.brightness]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -101,6 +123,46 @@ export function LightingDeviceTile({
       </button>
 
       <div style={{ fontSize: 13, color: "var(--color-text)", marginTop: 4 }}>{device.name}</div>
+
+      {detailed && (
+        <div style={{ marginTop: 8, textAlign: "left" }}>
+          <div className="muted" style={{ fontSize: 11, lineHeight: 1.5 }}>
+            {PROTOCOL_LABELS[device.protocol]}
+            {device.ipAddress && ` · ${device.ipAddress}${device.port ? `:${device.port}` : ""}`}
+            {device.protocol === "SHELLY" && ` · ${device.gen ? `Gen ${device.gen}` : "?"}`}
+            {device.location && ` · ${device.location.name}`}
+          </div>
+          <div className="row gap-2" style={{ marginTop: 4, alignItems: "center" }}>
+            <StatusBadge status={device.status} />
+            {device.powerW !== null && <span className="muted" style={{ fontSize: 11 }}>{device.powerW.toFixed(1)} W</span>}
+            {device.lastCheckedAt && (
+              <span className="muted" style={{ fontSize: 10, marginLeft: "auto" }}>
+                checked {dayjs(device.lastCheckedAt).format("HH:mm:ss")}
+              </span>
+            )}
+          </div>
+
+          {isLight && (
+            <div style={{ marginTop: 8 }}>
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <span className="muted" style={{ fontSize: 11 }}>Brightness</span>
+                <span className="muted" style={{ fontSize: 11 }}>{liveBrightness}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={liveBrightness}
+                disabled={offline}
+                onChange={(e) => setLiveBrightness(Number(e.target.value))}
+                onMouseUp={(e) => onBrightnessCommit?.(Number((e.target as HTMLInputElement).value))}
+                onTouchEnd={(e) => onBrightnessCommit?.(Number((e.target as HTMLInputElement).value))}
+                style={{ width: "100%", accentColor: "var(--color-primary)", marginTop: 4 }}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

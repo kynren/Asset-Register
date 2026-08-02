@@ -67,6 +67,10 @@ export async function updatePermissions(req: Request, res: Response) {
   const id = Number(req.params.id);
   const { permissions } = req.body;
 
+  const existing = await prisma.role.findUnique({ where: { id }, select: { name: true } });
+  if (!existing) throw new ApiError(404, "Role not found");
+  if (existing.name === "System Admin") throw new ApiError(400, "System Admin always has full access and cannot be edited.");
+
   await prisma.$transaction(
     permissions.map((p: { module: string; canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean }) =>
       prisma.rolePermission.upsert({

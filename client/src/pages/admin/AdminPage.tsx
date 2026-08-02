@@ -2,11 +2,8 @@ import { useState } from "react";
 import { UsersTab } from "./UsersTab";
 import { RolesTab } from "./RolesTab";
 import { CategoriesLocationsTab } from "./CategoriesLocationsTab";
-import { SystemSettingsTab } from "./SystemSettingsTab";
 import { AuditLogTab } from "./AuditLogTab";
 import { EmailTemplatesTab } from "./EmailTemplatesTab";
-import { SystemStatusTab } from "./SystemStatusTab";
-import { BackupsTab } from "./BackupsTab";
 import { ToastSettingsTab } from "./ToastSettingsTab";
 import { useAuth } from "../../auth/AuthContext";
 
@@ -16,9 +13,6 @@ const TABS = [
   { key: "catalog", label: "Categories & Locations" },
   { key: "email-templates", label: "Email Templates" },
   { key: "toasts", label: "Toast Designer" },
-  { key: "backups", label: "Backups", module: "backups" as const },
-  { key: "settings", label: "System Settings" },
-  { key: "status", label: "System Status" },
   { key: "audit", label: "Audit Log" },
 ] as const;
 
@@ -34,7 +28,7 @@ export function AdminPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Admin & Setup</h1>
-          <p className="page-subtitle">Manage users, roles, categories, and system-wide settings.</p>
+          <p className="page-subtitle">Manage users, roles, categories, email templates, and the audit log.</p>
         </div>
       </div>
 
@@ -51,9 +45,6 @@ export function AdminPage() {
       {tab === "catalog" && <CategoriesLocationsTab />}
       {tab === "email-templates" && <EmailTemplatesTab />}
       {tab === "toasts" && <ToastSettingsTab />}
-      {tab === "backups" && <BackupsTab />}
-      {tab === "settings" && <SystemSettingsTab />}
-      {tab === "status" && <SystemStatusTab />}
       {tab === "audit" && <AuditLogTab />}
     </div>
   );

@@ -89,6 +89,7 @@ const paths: Record<string, string> = {
   bot: "M12 8V4 M10 2h4 M7 8h10a2 2 0 012 2v7a2 2 0 01-2 2H7a2 2 0 01-2-2v-7a2 2 0 012-2z M9 13h.01 M15 13h.01 M9 16h6",
   alertTriangle: "M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01",
   info: "M12 22a10 10 0 100-20 10 10 0 000 20zM12 16v-4M12 8h.01",
+  filter: "M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
 };
 
 export function Icon({ name, size = 18 }: IconProps) {

@@ -8,6 +8,7 @@ import { startNetworkMonitorScheduler } from "./lib/networkMonitor";
 import { startLightingAutomationScheduler } from "./lib/lightingAutomationScheduler";
 import { startSystemStatusScheduler } from "./lib/systemStatusMonitor";
 import { backfillHarnessPermission } from "./lib/backfillHarnessPermission";
+import { backfillSystemAdmin } from "./lib/backfillSystemAdmin";
 import { startBackupScheduler } from "./lib/backupScheduler";
 
 const app = createApp();
@@ -30,6 +31,10 @@ bootstrapControlPlane()
       backfillHarnessPermission().catch((err) => {
         // eslint-disable-next-line no-console
         console.error("Harness permission backfill failed:", err);
+      });
+      backfillSystemAdmin().catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error("System Admin backfill failed:", err);
       });
     });
   })

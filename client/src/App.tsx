@@ -3,7 +3,6 @@ import { AppShell } from "./layout/AppShell";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { PermissionGate } from "./auth/PermissionGate";
 import { LoginPage } from "./pages/auth/LoginPage";
-import { SignupPage } from "./pages/auth/SignupPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { MagicLoginPage } from "./pages/auth/MagicLoginPage";
@@ -28,13 +27,13 @@ import { AssistantPage } from "./pages/assistant/AssistantPage";
 import { ProfilePage } from "./pages/profile/ProfilePage";
 import { AdminPage } from "./pages/admin/AdminPage";
 import { UserDetailPage } from "./pages/admin/UserDetailPage";
+import { AppSettingsPage } from "./pages/appSettings/AppSettingsPage";
 import { PasswordManagementPage } from "./pages/password/PasswordManagementPage";
 
 function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
       <Route path="/magic-login/:token" element={<MagicLoginPage />} />
@@ -75,6 +74,7 @@ function App() {
           <Route path="/password" element={<PermissionGate module="password" redirect><PasswordManagementPage /></PermissionGate>} />
           <Route path="/admin" element={<PermissionGate module="admin" redirect><AdminPage /></PermissionGate>} />
           <Route path="/admin/users/:id" element={<PermissionGate module="admin" redirect><UserDetailPage /></PermissionGate>} />
+          <Route path="/app-settings" element={<PermissionGate module="app-settings" redirect><AppSettingsPage /></PermissionGate>} />
         </Route>
       </Route>
 
