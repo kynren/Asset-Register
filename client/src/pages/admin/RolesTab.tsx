@@ -32,6 +32,7 @@ const ACTION_LABELS: Record<string, string> = { canView: "View", canCreate: "Cre
 const MODULE_INFO: Record<ModuleName, { label: string; description: string }> = {
   dashboard: { label: "Dashboard", description: "KPI widgets, charts, and recent activity feed." },
   assets: { label: "Asset Inventory", description: "Asset CRUD, check-in/check-out, CSV/QR import-export, asset detail (Profile, Reports, Logs, sub-resources)." },
+  harness: { label: "Harness Register", description: "Fall-arrest harness compliance register — separate from general Asset Inventory access." },
   network: { label: "Network Topology Map", description: "Topology graph, ICMP ping console, IP range scanner, agent-reported client devices." },
   stock: { label: "Stock Register & Analytics", description: "Stock items, multi-location stock levels & transfers, analytics — and Suppliers & Purchase Orders." },
   helpdesk: { label: "Helpdesk & Ticketing", description: "Ticket CRUD, comments, status workflow." },
@@ -43,6 +44,7 @@ const MODULE_INFO: Record<ModuleName, { label: string; description: string }> = 
   docs: { label: "Docs & SOPs", description: "Manuals, SOPs, runbooks, and other documents — collections, full-text search, attachments." },
   admin: { label: "Admin & Setup", description: "Users, Roles & Permissions, Categories & Locations, Asset Form Templates, System Settings, Audit Log." },
   password: { label: "Password Management", description: "Each user's personal password vault." },
+  backups: { label: "Database Backups", description: "Backup schedule, destinations (email/S3), and run history." },
 };
 
 export function RolesTab() {

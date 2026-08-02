@@ -13,6 +13,22 @@ import { PermissionGate } from "../../auth/PermissionGate";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
 import { LightingDevice } from "./LightingDeviceCard";
+import { LightingDeviceTile } from "./LightingDeviceTile";
+import { DeviceFormModal } from "./DeviceFormModal";
+
+interface SceneAction {
+  id: number;
+  deviceId: number;
+  turnOn: boolean;
+  brightness: number | null;
+  device: { id: number; name: string };
+}
+interface LightingScene {
+  id: number;
+  name: string;
+  icon: string | null;
+  actions: SceneAction[];
+}
 
 interface LightingGroup {
   id: number;
@@ -44,6 +60,8 @@ export function DashboardTab() {
   const [deletingGroup, setDeletingGroup] = useState<LightingGroup | null>(null);
   const [pickingIconFor, setPickingIconFor] = useState<{ kind: "group" | "device"; id: number; current: string | null } | null>(null);
   const [activeDeviceId, setActiveDeviceId] = useState<number | null>(null);
+  const [editingDevice, setEditingDevice] = useState<LightingDevice | null>(null);
+  const [deletingDevice, setDeletingDevice] = useState<LightingDevice | null>(null);
   const queryClient = useQueryClient();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -60,6 +78,10 @@ export function DashboardTab() {
     queryKey: ["lighting-dashboard-summary"],
     queryFn: async () => (await axiosClient.get("/lighting/dashboard-summary")).data as DashboardSummary,
     refetchInterval: 30_000,
+  });
+  const { data: scenes } = useQuery({
+    queryKey: ["lighting-scenes"],
+    queryFn: async () => (await axiosClient.get("/lighting/scenes")).data as LightingScene[],
   });
 
   function invalidateGroups() {
@@ -98,6 +120,22 @@ export function DashboardTab() {
     mutationFn: ({ id, value }: { id: number; value: number }) => axiosClient.post(`/lighting/devices/${id}/brightness`, { value }),
     onSuccess: invalidateDevices,
   });
+  const updateDeviceMutation = useMutation({
+    mutationFn: (values: any) => axiosClient.patch(`/lighting/devices/${editingDevice!.id}`, values),
+    onSuccess: () => { invalidateDevices(); setEditingDevice(null); },
+  });
+  const duplicateDeviceMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/lighting/devices/${id}/duplicate`),
+    onSuccess: invalidateDevices,
+  });
+  const deleteDeviceMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.delete(`/lighting/devices/${id}`),
+    onSuccess: () => { invalidateDevices(); setDeletingDevice(null); },
+  });
+  const activateSceneMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.post(`/lighting/scenes/${id}/activate`),
+    onSuccess: invalidateDevices,
+  });
 
   const devicesByGroup = useMemo(() => {
     const map = new Map<number | null, LightingDevice[]>();
@@ -123,7 +161,6 @@ export function DashboardTab() {
 
   const selectedRoomDevices = selectedRoom === "ungrouped" ? ungroupedDevices : devices?.filter((d) => d.groupId === selectedRoom) ?? [];
   const selectedRoomLabel = selectedRoom === "ungrouped" ? "Ungrouped" : sortedGroups.find((g) => g.id === selectedRoom)?.name ?? null;
-  const selectedRoomIcon = selectedRoom === "ungrouped" ? "layers" : sortedGroups.find((g) => g.id === selectedRoom)?.icon ?? "home";
   const dimmableLight = selectedRoomDevices.find((d) => d.kind === "LIGHT" && d.protocol !== "GENERIC_HTTP");
 
   function handleDragStart(event: DragStartEvent) {
@@ -181,137 +218,146 @@ export function DashboardTab() {
             <KpiCard label="Automations Active" value={summary?.automationsActiveCount ?? "—"} icon="clock" tone="primary" />
           </div>
 
-          <div className="grid grid-cols-5 gap-3">
-            <div className="card" style={{ gridColumn: "span 2" }}>
-              <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 10 }}>
-                <strong style={{ fontSize: 14 }}>Locations</strong>
+          <div className="card">
+            <div className="row gap-1 flex-wrap" style={{ borderBottom: "1px solid var(--color-border)", paddingBottom: 8, marginBottom: 16, alignItems: "center" }}>
+              {sortedGroups.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setSelectedRoom(g.id)}
+                  style={{
+                    background: "none", border: "none", padding: "6px 14px", cursor: "pointer",
+                    fontSize: 12, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase",
+                    color: selectedRoom === g.id ? "var(--color-text)" : "var(--color-text-muted)",
+                    borderBottom: selectedRoom === g.id ? "2px solid var(--color-primary)" : "2px solid transparent",
+                  }}
+                >
+                  {g.name}
+                </button>
+              ))}
+              {ungroupedDevices.length > 0 && (
+                <button
+                  onClick={() => setSelectedRoom("ungrouped")}
+                  style={{
+                    background: "none", border: "none", padding: "6px 14px", cursor: "pointer",
+                    fontSize: 12, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase",
+                    color: selectedRoom === "ungrouped" ? "var(--color-text)" : "var(--color-text-muted)",
+                    borderBottom: selectedRoom === "ungrouped" ? "2px solid var(--color-primary)" : "2px solid transparent",
+                  }}
+                >
+                  Ungrouped
+                </button>
+              )}
+              <PermissionGate module="lighting" action="create">
+                <button className="btn-icon" style={{ marginLeft: "auto" }} onClick={() => setAddingGroup(true)} title="Add location">
+                  <Icon name="plus" size={14} />
+                </button>
+              </PermissionGate>
+            </div>
+
+            {isLoading && (
+              <div className="grid grid-cols-4 gap-3">
+                <Skeleton height={140} /><Skeleton height={140} /><Skeleton height={140} /><Skeleton height={140} />
               </div>
-              {isLoading && <Skeleton height={200} />}
-              {!isLoading && (
-                <div className="stack gap-1">
-                  {sortedGroups.length === 0 && ungroupedDevices.length === 0 && (
-                    <p className="muted" style={{ fontSize: 12 }}>No locations yet — add one to get started.</p>
-                  )}
-                  {sortedGroups.map((g) => {
-                    const roomDevices = devicesByGroup.get(g.id) ?? [];
-                    const anyOn = roomDevices.some((d) => d.isOn);
+            )}
+
+            {!isLoading && !selectedRoomLabel && (
+              <p className="muted" style={{ fontSize: 12 }}>No locations yet — add one to get started.</p>
+            )}
+
+            {!isLoading && selectedRoomLabel && (
+              <div className="stack gap-3">
+                {dimmableLight && (
+                  <div className="card" style={{ background: "var(--color-bg)", maxWidth: 260 }}>
+                    <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 4 }}>
+                      <strong style={{ fontSize: 13 }}>{dimmableLight.name}</strong>
+                      <label className="form-toggle-switch" style={{ cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={dimmableLight.isOn}
+                          disabled={dimmableLight.status === "OFFLINE"}
+                          onChange={(e) => powerMutation.mutate({ id: dimmableLight.id, on: e.target.checked })}
+                        />
+                        <span className="form-toggle-switch-track" />
+                      </label>
+                    </div>
+                    <RadialGauge value={dimmableLight.brightness ?? 0} tone="warning" size={120} sublabel="Brightness" />
+                    <div className="row gap-2" style={{ justifyContent: "center", marginTop: 8 }}>
+                      <button
+                        className="btn btn-secondary btn-sm btn-icon"
+                        disabled={!dimmableLight.isOn || brightnessMutation.isPending}
+                        onClick={() => brightnessMutation.mutate({ id: dimmableLight.id, value: Math.max(0, (dimmableLight.brightness ?? 0) - 10) })}
+                      >
+                        −
+                      </button>
+                      <button
+                        className="btn btn-secondary btn-sm btn-icon"
+                        disabled={!dimmableLight.isOn || brightnessMutation.isPending}
+                        onClick={() => brightnessMutation.mutate({ id: dimmableLight.id, value: Math.min(100, (dimmableLight.brightness ?? 0) + 10) })}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {selectedRoomDevices.length === 0 ? (
+                  <p className="muted" style={{ fontSize: 12 }}>No devices in this location yet.</p>
+                ) : (
+                  <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
+                    {selectedRoomDevices.map((d) => (
+                      <LightingDeviceTile
+                        key={d.id}
+                        device={d}
+                        onToggle={(on) => powerMutation.mutate({ id: d.id, on })}
+                        onEdit={() => setEditingDevice(d)}
+                        onDuplicate={() => duplicateDeviceMutation.mutate(d.id)}
+                        onDelete={() => setDeletingDevice(d)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(scenes ?? []).length > 0 && (
+              <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid var(--color-border)" }}>
+                <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Quick Scenes</div>
+                <div className="row gap-3 flex-wrap">
+                  {(scenes ?? []).map((s) => {
+                    const active = s.actions.length > 0 && s.actions.every((a) => devices?.find((d) => d.id === a.deviceId)?.isOn === a.turnOn);
                     return (
                       <button
-                        key={g.id}
-                        className="row gap-2"
-                        onClick={() => setSelectedRoom(g.id)}
-                        style={{
-                          alignItems: "center", justifyContent: "space-between", padding: "10px 10px", borderRadius: 8, cursor: "pointer",
-                          border: "1px solid " + (selectedRoom === g.id ? "var(--color-primary)" : "var(--color-border)"),
-                          background: selectedRoom === g.id ? "var(--color-primary-soft)" : "transparent", textAlign: "left",
-                        }}
+                        key={s.id}
+                        onClick={() => activateSceneMutation.mutate(s.id)}
+                        title={`Activate "${s.name}"`}
+                        style={{ position: "relative", width: 64, background: "none", border: "none", cursor: "pointer", textAlign: "center" }}
                       >
-                        <span className="row gap-2" style={{ alignItems: "center" }}>
-                          <Icon name={g.icon ?? "layers"} size={16} />
-                          <span>
-                            <div style={{ fontSize: 13, fontWeight: 600 }}>{g.name}</div>
-                            <div className="muted" style={{ fontSize: 11 }}>{roomDevices.length} device{roomDevices.length === 1 ? "" : "s"}</div>
-                          </span>
+                        <div
+                          style={{
+                            width: 48, height: 48, margin: "0 auto", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
+                            background: "var(--color-primary-soft)", color: "var(--color-primary)",
+                          }}
+                        >
+                          <Icon name="bot" size={22} />
+                        </div>
+                        <span
+                          style={{
+                            position: "absolute", top: -2, right: 6, width: 16, height: 16, borderRadius: "50%",
+                            display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
+                            background: active ? "var(--color-success)" : "var(--color-border)", border: "2px solid var(--color-surface)",
+                          }}
+                        >
+                          <Icon name={active ? "check" : "close"} size={9} />
                         </span>
-                        {anyOn && <span style={{ color: "var(--color-success)" }}><Icon name="check" size={14} /></span>}
+                        <div className="muted" style={{ fontSize: 11, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {s.name}
+                        </div>
                       </button>
                     );
                   })}
-                  {ungroupedDevices.length > 0 && (
-                    <button
-                      className="row gap-2"
-                      onClick={() => setSelectedRoom("ungrouped")}
-                      style={{
-                        alignItems: "center", justifyContent: "space-between", padding: "10px 10px", borderRadius: 8, cursor: "pointer",
-                        border: "1px solid " + (selectedRoom === "ungrouped" ? "var(--color-primary)" : "var(--color-border)"),
-                        background: selectedRoom === "ungrouped" ? "var(--color-primary-soft)" : "transparent", textAlign: "left",
-                      }}
-                    >
-                      <span className="row gap-2" style={{ alignItems: "center" }}>
-                        <Icon name="layers" size={16} />
-                        <span>
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>Ungrouped</div>
-                          <div className="muted" style={{ fontSize: 11 }}>{ungroupedDevices.length} device{ungroupedDevices.length === 1 ? "" : "s"}</div>
-                        </span>
-                      </span>
-                      {ungroupedDevices.some((d) => d.isOn) && <span style={{ color: "var(--color-success)" }}><Icon name="check" size={14} /></span>}
-                    </button>
-                  )}
-                  <PermissionGate module="lighting" action="create">
-                    <button className="btn btn-secondary btn-sm" style={{ marginTop: 4 }} onClick={() => setAddingGroup(true)}>
-                      <Icon name="plus" size={12} /> Add location
-                    </button>
-                  </PermissionGate>
                 </div>
-              )}
-            </div>
-
-            <div className="card" style={{ gridColumn: "span 3" }}>
-              {!selectedRoomLabel ? (
-                <p className="muted" style={{ fontSize: 12 }}>Select a location to control its devices.</p>
-              ) : (
-                <div className="stack gap-3">
-                  <div className="row gap-2" style={{ alignItems: "center" }}>
-                    <Icon name={selectedRoomIcon ?? "home"} size={18} />
-                    <strong style={{ fontSize: 15 }}>{selectedRoomLabel}</strong>
-                    <span className="muted" style={{ fontSize: 12 }}>{selectedRoomDevices.length} device{selectedRoomDevices.length === 1 ? "" : "s"}</span>
-                  </div>
-
-                  {dimmableLight && (
-                    <div className="card" style={{ background: "var(--color-bg)" }}>
-                      <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 4 }}>
-                        <strong style={{ fontSize: 13 }}>{dimmableLight.name}</strong>
-                        <label className="form-toggle-switch" style={{ cursor: "pointer" }}>
-                          <input
-                            type="checkbox"
-                            checked={dimmableLight.isOn}
-                            disabled={dimmableLight.status === "OFFLINE"}
-                            onChange={(e) => powerMutation.mutate({ id: dimmableLight.id, on: e.target.checked })}
-                          />
-                          <span className="form-toggle-switch-track" />
-                        </label>
-                      </div>
-                      <RadialGauge value={dimmableLight.brightness ?? 0} tone="warning" size={140} sublabel="Brightness" />
-                      <div className="row gap-2" style={{ justifyContent: "center", marginTop: 8 }}>
-                        <button
-                          className="btn btn-secondary btn-sm btn-icon"
-                          disabled={!dimmableLight.isOn || brightnessMutation.isPending}
-                          onClick={() => brightnessMutation.mutate({ id: dimmableLight.id, value: Math.max(0, (dimmableLight.brightness ?? 0) - 10) })}
-                        >
-                          −
-                        </button>
-                        <button
-                          className="btn btn-secondary btn-sm btn-icon"
-                          disabled={!dimmableLight.isOn || brightnessMutation.isPending}
-                          onClick={() => brightnessMutation.mutate({ id: dimmableLight.id, value: Math.min(100, (dimmableLight.brightness ?? 0) + 10) })}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="stack gap-1">
-                    {selectedRoomDevices.length === 0 && <p className="muted" style={{ fontSize: 12 }}>No devices in this location yet.</p>}
-                    {selectedRoomDevices.map((d) => (
-                      <div key={d.id} className="row gap-2" style={{ alignItems: "center", padding: "8px 4px", borderBottom: "1px solid var(--color-border)" }}>
-                        <Icon name={d.icon ?? (d.kind === "LIGHT" ? "bulb" : "plug")} size={16} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13 }}>{d.name}</div>
-                          <div className="muted" style={{ fontSize: 11 }}>
-                            {d.status === "OFFLINE" ? "Offline" : d.powerW !== null ? `${d.powerW.toFixed(1)} W` : d.isOn ? "On" : "Off"}
-                          </div>
-                        </div>
-                        <label className="form-toggle-switch" style={{ cursor: "pointer" }}>
-                          <input type="checkbox" checked={d.isOn} disabled={d.status === "OFFLINE"} onChange={(e) => powerMutation.mutate({ id: d.id, on: e.target.checked })} />
-                          <span className="form-toggle-switch-track" />
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-5 gap-3">
@@ -442,6 +488,36 @@ export function DashboardTab() {
           loading={deleteGroupMutation.isPending}
           onCancel={() => setDeletingGroup(null)}
           onConfirm={() => deleteGroupMutation.mutate(deletingGroup.id)}
+        />
+      )}
+
+      {editingDevice && (
+        <DeviceFormModal
+          initial={{
+            name: editingDevice.name,
+            protocol: editingDevice.protocol,
+            ipAddress: editingDevice.ipAddress ?? "",
+            port: editingDevice.port,
+            locationId: editingDevice.location?.id ?? null,
+            onUrl: editingDevice.onUrl ?? "",
+            offUrl: editingDevice.offUrl ?? "",
+            statusUrl: editingDevice.statusUrl ?? "",
+            statusOnPath: editingDevice.statusOnPath ?? "",
+          }}
+          onClose={() => setEditingDevice(null)}
+          onSubmit={(v) => updateDeviceMutation.mutate(v)}
+          submitting={updateDeviceMutation.isPending}
+        />
+      )}
+
+      {deletingDevice && (
+        <ConfirmDialog
+          title="Remove device"
+          message={`Remove "${deletingDevice.name}"? This cannot be undone.`}
+          danger
+          loading={deleteDeviceMutation.isPending}
+          onCancel={() => setDeletingDevice(null)}
+          onConfirm={() => deleteDeviceMutation.mutate(deletingDevice.id)}
         />
       )}
     </div>

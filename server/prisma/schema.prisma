@@ -92,6 +92,7 @@ model User {
   emailTemplatesCreated         EmailTemplate[]
   documentsCreated              Document[]
   networkMonitorSettingsUpdates NetworkMonitorSettings[]
+  backupSettingsUpdates         BackupSettings[]
 }
 
 model RefreshSession {
@@ -1715,4 +1716,100 @@ model SystemComponentDailyStatus {
 
   @@unique([componentId, date])
   @@index([date])
+}
+
+// ───────────────────────── Database Backups ─────────────────────────
+// Singleton schedule (same pattern as NetworkMonitorSettings) — when a pg_dump should run,
+// reusing the day-of-week + time-of-day + lastRunDate dedup convention from
+// LightingAutomation/lightingAutomationScheduler rather than inventing a cron parser.
+model BackupSettings {
+  id           Int      @id @default(1)
+  isEnabled    Boolean  @default(false)
+  daysOfWeek   Int[]    @default([])
+  timeOfDay    String   @default("02:00")
+  lastRunDate  String?
+  updatedById  Int?
+  updatedBy    User?    @relation(fields: [updatedById], references: [id])
+  updatedAt    DateTime @updatedAt
+}
+
+enum BackupDestinationType {
+  EMAIL
+  S3
+}
+
+// A place a completed backup gets pushed to. S3 fields cover any S3-compatible provider (AWS S3,
+// MinIO, Backblaze B2, DigitalOcean Spaces, Cloudflare R2, Wasabi) via a configurable endpoint —
+// there's no single "online drive" API, so S3 is the closest thing to a universal standard for
+// self-hosted apps pushing backups to remote object storage. s3SecretAccessKey is encrypted at
+// rest with the same AES-256-GCM helper used for NVR/device credentials.
+model BackupDestination {
+  id                Int       @id @default(autoincrement())
+  type              BackupDestinationType
+  name              String
+  isEnabled         Boolean   @default(true)
+
+  emailTo           String?
+
+  s3Endpoint        String?
+  s3Region          String?
+  s3Bucket          String?
+  s3AccessKeyId     String?
+  s3SecretAccessKey String?
+  s3PathPrefix      String?
+  s3ForcePathStyle  Boolean   @default(false)
+
+  lastTestAt        DateTime?
+  lastTestOk        Boolean?
+  lastTestMessage   String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  deliveries        BackupRunDestination[]
+}
+
+enum BackupRunStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum BackupRunTrigger {
+  SCHEDULED
+  MANUAL
+}
+
+// One row per pg_dump attempt — the dump file itself is never kept on disk after delivery (it's
+// streamed out to each destination and removed), so this is the only record that a backup ran.
+model BackupRun {
+  id            Int              @id @default(autoincrement())
+  trigger       BackupRunTrigger
+  status        BackupRunStatus  @default(RUNNING)
+  fileSizeBytes Int?
+  message       String?
+  startedAt     DateTime         @default(now())
+  finishedAt    DateTime?
+
+  deliveries    BackupRunDestination[]
+
+  @@index([startedAt])
+}
+
+// Per-destination delivery result for a run — destinationId is nullable with onDelete: SetNull
+// (name snapshotted separately) so history survives deleting the destination itself, same
+// reasoning as LightingAutomationRun surviving automation deletion.
+model BackupRunDestination {
+  id              Int                @id @default(autoincrement())
+  runId           Int
+  run             BackupRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  destinationId   Int?
+  destination     BackupDestination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+  destinationName String
+  destinationType BackupDestinationType
+  ok              Boolean
+  message         String?
+
+  @@index([runId])
 }

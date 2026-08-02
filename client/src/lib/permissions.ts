@@ -1,6 +1,7 @@
 export const MODULES = [
   "dashboard",
   "assets",
+  "harness",
   "network",
   "stock",
   "helpdesk",
@@ -12,6 +13,7 @@ export const MODULES = [
   "docs",
   "admin",
   "password",
+  "backups",
 ] as const;
 
 export type ModuleName = (typeof MODULES)[number];

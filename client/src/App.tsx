@@ -46,8 +46,8 @@ function App() {
           <Route path="/assets" element={<PermissionGate module="assets" redirect><AssetListPage /></PermissionGate>} />
           <Route path="/assets/:id" element={<PermissionGate module="assets" redirect><AssetDetailPage /></PermissionGate>} />
 
-          <Route path="/harness" element={<PermissionGate module="assets" redirect><HarnessInventoryPage /></PermissionGate>} />
-          <Route path="/harness/:id" element={<PermissionGate module="assets" redirect><HarnessDetailRoutePage /></PermissionGate>} />
+          <Route path="/harness" element={<PermissionGate module="harness" redirect><HarnessInventoryPage /></PermissionGate>} />
+          <Route path="/harness/:id" element={<PermissionGate module="harness" redirect><HarnessDetailRoutePage /></PermissionGate>} />
 
           <Route path="/network" element={<PermissionGate module="network" redirect><NetworkMapPage /></PermissionGate>} />
 

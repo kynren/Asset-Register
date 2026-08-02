@@ -186,6 +186,7 @@ export function EmailTemplateBuilderModal({ templateId, onClose }: { templateId:
 
           {selectedBlock && (
             <BlockEditor
+              key={selectedBlock.id}
               block={selectedBlock}
               variables={variables}
               onChange={(patch) => updateBlock(selectedBlock.id, patch)}
@@ -263,13 +264,61 @@ function BlockEditor({
   onUploadImage: () => void;
   uploading: boolean;
 }) {
+  // Tracks whichever text field the admin last focused (heading/text body, button text, or
+  // button URL) so a variable chip click inserts the token at that field's cursor position
+  // rather than requiring the admin to type "{{name}}" from memory.
+  const activeFieldRef = useRef<{ el: HTMLTextAreaElement | HTMLInputElement; setValue: (v: string) => void } | null>(null);
+
+  function insertVariable(token: string) {
+    const active = activeFieldRef.current;
+    if (!active) return;
+    const { el, setValue } = active;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    setValue(el.value.slice(0, start) + token + el.value.slice(end));
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  const variablePalette = (variables.length > 0 && (block.type === "heading" || block.type === "text" || block.type === "button")) && (
+    <div className="field">
+      <label>Insert Variable</label>
+      <div className="row gap-1 flex-wrap">
+        {variables.map((v) => (
+          <button
+            key={v}
+            type="button"
+            className="btn btn-secondary btn-sm"
+            style={{ fontFamily: "monospace", fontSize: 11, padding: "2px 8px" }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => insertVariable(`{{${v}}}`)}
+            title={`Insert {{${v}}} at cursor`}
+          >
+            {`{{${v}}}`}
+          </button>
+        ))}
+      </div>
+      <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>Click into a field below, then click a variable to insert it at the cursor.</p>
+    </div>
+  );
+
   return (
     <div className="ad-panel">
       {(block.type === "heading" || block.type === "text") && (
         <>
+          {variablePalette}
           <div className="field">
             <label>Text</label>
-            <textarea className="input" rows={block.type === "heading" ? 2 : 4} value={block.text} onChange={(e) => onChange({ text: e.target.value } as Partial<EmailBlock>)} />
+            <textarea
+              className="input"
+              rows={block.type === "heading" ? 2 : 4}
+              value={block.text}
+              onChange={(e) => onChange({ text: e.target.value } as Partial<EmailBlock>)}
+              onFocus={(e) => { activeFieldRef.current = { el: e.currentTarget, setValue: (v) => onChange({ text: v } as Partial<EmailBlock>) }; }}
+            />
           </div>
           <div className="field">
             <label>Alignment</label>
@@ -306,13 +355,25 @@ function BlockEditor({
 
       {block.type === "button" && (
         <>
+          {variablePalette}
           <div className="field">
             <label>Button Text</label>
-            <input className="input" value={block.text} onChange={(e) => onChange({ text: e.target.value } as Partial<EmailBlock>)} />
+            <input
+              className="input"
+              value={block.text}
+              onChange={(e) => onChange({ text: e.target.value } as Partial<EmailBlock>)}
+              onFocus={(e) => { activeFieldRef.current = { el: e.currentTarget, setValue: (v) => onChange({ text: v } as Partial<EmailBlock>) }; }}
+            />
           </div>
           <div className="field">
             <label>Link URL</label>
-            <input className="input" value={block.url} onChange={(e) => onChange({ url: e.target.value } as Partial<EmailBlock>)} placeholder="{{assetUrl}}" />
+            <input
+              className="input"
+              value={block.url}
+              onChange={(e) => onChange({ url: e.target.value } as Partial<EmailBlock>)}
+              onFocus={(e) => { activeFieldRef.current = { el: e.currentTarget, setValue: (v) => onChange({ url: v } as Partial<EmailBlock>) }; }}
+              placeholder="{{assetUrl}}"
+            />
           </div>
           <div className="field">
             <label>Color</label>
@@ -329,12 +390,6 @@ function BlockEditor({
       )}
 
       {block.type === "divider" && <p className="muted" style={{ fontSize: 12 }}>A horizontal divider line — nothing to configure.</p>}
-
-      {(block.type === "heading" || block.type === "text" || block.type === "button") && variables.length > 0 && (
-        <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-          Insert a variable by typing it, e.g. <code>{`{{${variables[0]}}}`}</code>
-        </p>
-      )}
     </div>
   );
 }

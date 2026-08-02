@@ -85,6 +85,8 @@ const paths: Record<string, string> = {
   door: "M5 21V3a1 1 0 011-1h9a1 1 0 011 1v18M3 21h18M15 12h.01",
   unlock: "M18 10H6a2 2 0 00-2 2v7a2 2 0 002 2h12a2 2 0 002-2v-7a2 2 0 00-2-2z M12 15a2 2 0 100-4 2 2 0 000 4z M8 10V7a4 4 0 017.75-3.02",
   creditCard: "M2 6a2 2 0 012-2h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6z M2 10h20 M6 15h4",
+  moreVertical: "M12 13a1 1 0 100-2 1 1 0 000 2zM12 6a1 1 0 100-2 1 1 0 000 2zM12 20a1 1 0 100-2 1 1 0 000 2z",
+  bot: "M12 8V4 M10 2h4 M7 8h10a2 2 0 012 2v7a2 2 0 01-2 2H7a2 2 0 01-2-2v-7a2 2 0 012-2z M9 13h.01 M15 13h.01 M9 16h6",
 };
 
 export function Icon({ name, size = 18 }: IconProps) {

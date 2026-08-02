@@ -43,6 +43,7 @@ import docsRoutes from "./modules/docs/docs.routes";
 import searchRoutes from "./modules/search/search.routes";
 import mcpRoutes from "./mcp/mcp.routes";
 import mcpKeysRoutes from "./mcp/mcpKeys.routes";
+import backupsRoutes from "./modules/backups/backups.routes";
 
 export function createApp() {
   const app = express();
@@ -93,6 +94,7 @@ export function createApp() {
   app.use("/api/procurement", procurementRoutes);
   app.use("/api/asset-form-templates", assetFormTemplatesRoutes);
   app.use("/api/email-templates", emailTemplatesRoutes);
+  app.use("/api/backups", backupsRoutes);
   app.use("/api/docs", docsRoutes);
   app.use("/api/search", searchRoutes);
   app.use("/api/mcp", mcpRoutes);

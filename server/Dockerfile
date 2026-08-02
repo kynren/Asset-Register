@@ -18,7 +18,16 @@ FROM node:20-slim AS runtime
 # UTC no matter what TZ is set to, which is exactly the kind of thing that makes a Lighting
 # Automation look like it fires at the wrong hour (or never) for no visible reason.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg iputils-ping net-tools openssl ca-certificates tzdata \
+    ffmpeg iputils-ping net-tools openssl ca-certificates tzdata curl gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# postgresql-client provides pg_dump for the Database Backups feature. Debian bookworm's default
+# "postgresql-client" package is v15, but docker-compose.yml runs postgres:16-alpine — pg_dump
+# against a newer server than the client's major version isn't reliably supported, so this pulls
+# postgresql-client-16 specifically from the official PGDG apt repo to match.
+RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update && apt-get install -y --no-install-recommends postgresql-client-16 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

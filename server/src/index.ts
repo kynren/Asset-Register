@@ -6,6 +6,8 @@ import { startRetentionScheduler } from "./lib/recording";
 import { startNetworkMonitorScheduler } from "./lib/networkMonitor";
 import { startLightingAutomationScheduler } from "./lib/lightingAutomationScheduler";
 import { startSystemStatusScheduler } from "./lib/systemStatusMonitor";
+import { backfillHarnessPermission } from "./lib/backfillHarnessPermission";
+import { startBackupScheduler } from "./lib/backupScheduler";
 
 const app = createApp();
 
@@ -18,4 +20,9 @@ app.listen(env.PORT, () => {
   startNetworkMonitorScheduler();
   startLightingAutomationScheduler();
   startSystemStatusScheduler();
+  startBackupScheduler();
+  backfillHarnessPermission().catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error("Harness permission backfill failed:", err);
+  });
 });
