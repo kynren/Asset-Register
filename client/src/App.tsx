@@ -66,7 +66,7 @@ function App() {
           <Route path="/docs" element={<PermissionGate module="docs" redirect><DocsListPage /></PermissionGate>} />
           <Route path="/docs/:id" element={<PermissionGate module="docs" redirect><DocumentDetailPage /></PermissionGate>} />
 
-          <Route path="/operational-context" element={<PermissionGate module="assets" redirect><OperationalContextPage /></PermissionGate>} />
+          <Route path="/operational-context" element={<PermissionGate module="operational-context" redirect><OperationalContextPage /></PermissionGate>} />
 
           <Route path="/assistant" element={<PermissionGate module="virtual-assistant" redirect><AssistantPage /></PermissionGate>} />
 

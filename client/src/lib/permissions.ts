@@ -2,6 +2,7 @@ export const MODULES = [
   "dashboard",
   "assets",
   "harness",
+  "operational-context",
   "network",
   "stock",
   "helpdesk",

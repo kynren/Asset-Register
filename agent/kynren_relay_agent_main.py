@@ -134,6 +134,12 @@ def _interactive_setup() -> None:
 
 
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] in ("diagnose-vlans", "--diagnose-vlans"):
+        # Handled here rather than passed to pywin32's HandleCommandLine below, which only knows
+        # install/start/stop/restart/remove/debug and would just error out on this verb.
+        relay.diagnose_vlans()
+        return 0
+
     if len(sys.argv) > 1:
         import win32serviceutil
 

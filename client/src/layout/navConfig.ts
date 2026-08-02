@@ -42,7 +42,7 @@ export const systemConsoleNav: NavItem[] = [
   { label: "Helpdesk & Ticketing", path: "/helpdesk", icon: "helpdesk", module: "helpdesk" },
   { label: "Operations Tools", path: "/operations", icon: "operations", module: "operations" },
   { label: "Docs & SOPs", path: "/docs", icon: "book", module: "docs" },
-  { label: "Operational Context", path: "/operational-context", icon: "gauge", module: "assets" },
+  { label: "Operational Context", path: "/operational-context", icon: "gauge", module: "operational-context" },
   { label: "Virtual Assistant", path: "/assistant", icon: "assistant", module: "virtual-assistant" },
   { label: "Password Management", path: "/password", icon: "password", module: "password" },
 ];

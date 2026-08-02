@@ -172,3 +172,54 @@ wrapper needs — nothing else has to be installed on the target machine.
 
 Each run appends to `network_relay.log` in this folder (rotated at ~2MB, 3
 backups kept).
+
+### Multi-VLAN deployments
+
+If the relay runs as a VM and needs to reach devices across **multiple
+VLANs**, a single virtual NIC on a "trunk" port group is usually not enough
+on its own. That vSwitch config delivers 802.1Q-tagged frames from every
+VLAN to the VM's virtual NIC, but Windows itself has to understand those
+tags to actually use them — and by default it doesn't. Without extra guest-OS
+VLAN configuration, Windows can only send/receive on whichever VLAN is
+untagged/native on that port group; every other VLAN's traffic arriving at
+the vNIC is effectively invisible to it. Symptom: the relay can reach devices
+on its "home" VLAN, and can often still ping other VLANs' *gateway* IPs (that
+hop doesn't need forwarding), but can't reach individual devices *behind*
+those gateways.
+
+**Recommended fix: one virtual NIC per VLAN**, instead of one trunked NIC.
+
+1. In your hypervisor, change the relevant port group(s)/vSwitch from
+   "trunk / all VLANs" to a single specific VLAN ID (access mode) — one port
+   group per VLAN the relay needs to reach.
+2. Add one virtual NIC to the relay VM for each VLAN, each attached to its
+   own access-mode port group. The hypervisor strips the VLAN tag before the
+   frame reaches the guest, so Windows just sees N ordinary NICs.
+3. In Windows, give each new NIC a **static IP** in that VLAN's subnet, with
+   the correct subnet mask. Leave the **default gateway blank** on every NIC
+   except your one primary/management NIC — multiple NICs each claiming a
+   default gateway causes Windows to pick one via route metrics, which can
+   silently break reachability on the others. Each VLAN NIC only needs its
+   IP/mask; devices on that same subnet are reached directly (on-link), no
+   gateway required.
+4. Verify each VLAN before trusting a real scan against it:
+   ```
+   KynrenRelayAgent.exe diagnose-vlans
+   ```
+   (or `python kynren_network_relay.py --diagnose-vlans` for a manual/dev
+   setup). This requires no server connection or `.env` — it lists every
+   subnet Windows currently sees and pings each one's configured gateway (if
+   any), so you can confirm a newly-added VLAN NIC is actually wired
+   correctly right after configuring it. A NIC with no gateway shown is
+   expected per step 3 above, not an error.
+5. Once verified, no further agent configuration is needed — subnet
+   discovery (`discover_local_subnets()`, used for the auto-reported
+   candidates in Network Monitor settings) already enumerates every NIC
+   automatically, so the newly-reachable VLANs show up there as soon as the
+   relay restarts.
+
+If a VLAN's gateway still isn't reachable after this, the remaining likely
+causes are upstream of Windows entirely: an ACL/firewall rule between VLANs
+on your router/L3 switch/firewall (check its traffic log for the exact deny
+reason), or the target devices having the wrong default gateway configured
+themselves (their replies never find their way back).

@@ -148,22 +148,30 @@ def discover_local_subnets() -> list[dict]:
     guessing/typing them blind. Interface config is used rather than parsing the routing table
     directly since it's a more stable text format across Windows locales/versions and expresses
     the same "on-link" subnets a route-table read would. Purely informational — see
-    RelayDiscoveredSubnet's schema comment: nothing here ever auto-triggers a scan on its own."""
-    subnets: dict[str, str] = {}  # cidr -> adapter/interface label
+    RelayDiscoveredSubnet's schema comment: nothing here ever auto-triggers a scan on its own.
+
+    On Windows, also captures each adapter's configured default gateway (None if it has none) —
+    used by diagnose_vlans() below. A per-VLAN NIC having no gateway is normal (see README's
+    Multi-VLAN section) so this is never treated as an error here, just extra data."""
+    subnets: dict[str, dict] = {}  # cidr -> {"label": adapter name, "gateway": ip or None}
     try:
         if IS_WINDOWS:
             result = subprocess.run(["ipconfig", "/all"], capture_output=True, text=True, timeout=5)
             current_adapter: str | None = None
             current_ip: str | None = None
+            current_cidr: str | None = None  # set once IP+mask are both known, so a later "Default
+            # Gateway" line (same adapter block) can still be attributed to the right subnet entry
             for line in result.stdout.splitlines():
                 adapter_match = re.match(r"^(\S.*adapter\s.*):\s*$", line)
                 if adapter_match:
                     current_adapter = adapter_match.group(1).strip()
                     current_ip = None
+                    current_cidr = None
                     continue
                 ip_match = re.search(r"IPv4 Address[.\s]*:\s*([\d.]+)", line)
                 if ip_match:
                     current_ip = ip_match.group(1)
+                    current_cidr = None
                     continue
                 mask_match = re.search(r"Subnet Mask[.\s]*:\s*([\d.]+)", line)
                 if mask_match and current_ip:
@@ -173,8 +181,13 @@ def discover_local_subnets() -> list[dict]:
                         current_ip = None
                         continue
                     if not network.is_loopback and not network.is_link_local:
-                        subnets[str(network)] = current_adapter or ""
+                        current_cidr = str(network)
+                        subnets[current_cidr] = {"label": current_adapter or "", "gateway": None}
                     current_ip = None
+                    continue
+                gateway_match = re.search(r"Default Gateway[.\s]*:\s*([\d.]+)", line)
+                if gateway_match and current_cidr:
+                    subnets[current_cidr]["gateway"] = gateway_match.group(1)
         else:
             result = subprocess.run(["ip", "-4", "-o", "addr", "show"], capture_output=True, text=True, timeout=5)
             for line in result.stdout.splitlines():
@@ -186,10 +199,40 @@ def discover_local_subnets() -> list[dict]:
                 except ValueError:
                     continue
                 if not network.is_loopback and not network.is_link_local:
-                    subnets[str(network)] = match.group(3)
+                    subnets[str(network)] = {"label": match.group(3), "gateway": None}
     except Exception:
         return []
-    return [{"cidr": cidr, "label": label} for cidr, label in subnets.items()]
+    return [{"cidr": cidr, "label": info["label"], "gateway": info["gateway"]} for cidr, info in subnets.items()]
+
+
+def diagnose_vlans() -> None:
+    """Standalone, offline self-check for a multi-VLAN/DMZ relay deployment (see README's
+    "Multi-VLAN deployments" section) — confirms each per-VLAN virtual NIC is actually live and
+    routed before trusting real scans against it. Prints straight to stdout (not just the log
+    file) since this is meant to be run interactively right after reconfiguring virtual NICs,
+    often before the agent has ever successfully talked to the server at all — deliberately does
+    not require .env/API credentials, unlike the rest of this script."""
+    print("Checking every locally-configured IPv4 subnet on this machine...\n")
+    subnets = discover_local_subnets()
+    if not subnets:
+        print("No local IPv4 subnets detected at all — is this machine's networking configured?")
+        return
+
+    for s in subnets:
+        cidr, label, gateway = s["cidr"], s["label"] or "(unnamed adapter)", s["gateway"]
+        print(f"- {cidr}  [{label}]")
+        if not gateway:
+            print("    No default gateway configured on this NIC. That's expected for a secondary")
+            print("    per-VLAN NIC (see README) — only your primary/management NIC should have one.")
+            continue
+        ok, latency_ms = ping_host(gateway, timeout_ms=1500)
+        if ok:
+            print(f"    Gateway {gateway} reachable ({latency_ms} ms) — this VLAN looks correctly wired.")
+        else:
+            print(f"    Gateway {gateway} NOT reachable. This VLAN's virtual NIC/port group is likely")
+            print("    still misconfigured (wrong VLAN ID on the port group, or the vSwitch uplink")
+            print("    isn't trunking this VLAN at all). See the README's Multi-VLAN section.")
+    print()
 
 
 def reverse_dns(ip: str, timeout: float = DNS_TIMEOUT_SECONDS) -> str | None:
@@ -887,7 +930,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Kynren Asset Register network relay agent")
     parser.add_argument("--api-base-url", help="Override API_BASE_URL from .env")
     parser.add_argument("--api-key", help="Override AGENT_API_KEY from .env")
+    parser.add_argument(
+        "--diagnose-vlans",
+        action="store_true",
+        help="Check every locally-configured subnet's default-gateway reachability and exit — "
+        "no server connection or .env required. Run this right after configuring a per-VLAN "
+        "virtual NIC to confirm it's wired correctly before relying on real scans.",
+    )
     args = parser.parse_args()
+
+    if args.diagnose_vlans:
+        diagnose_vlans()
+        return 0
 
     logger = setup_logging()
 
