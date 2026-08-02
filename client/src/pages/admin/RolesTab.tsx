@@ -143,7 +143,7 @@ export function RolesTab() {
                 </tr>
               </thead>
               <tbody>
-                {MODULES.map((module) => {
+                {MODULES.filter((module) => module !== "app-settings" || isSystemAdminRole).map((module) => {
                   const perm = matrix.find((p) => p.module === module)!;
                   const info = MODULE_INFO[module];
                   return (

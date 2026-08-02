@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getAccessToken, notifyUnauthorized, setAccessToken } from "./tokenStore";
+import { getViewingOrgId } from "./viewingOrgStore";
 
 export const axiosClient = axios.create({
   baseURL: "/api",
@@ -20,7 +21,7 @@ let refreshPromise: Promise<string | null> | null = null;
 async function tryRefresh(): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = axios
-      .post("/api/auth/refresh", {}, { withCredentials: true })
+      .post("/api/auth/refresh", { viewingOrganizationId: getViewingOrgId() }, { withCredentials: true })
       .then((res) => {
         const token = res.data.accessToken as string;
         setAccessToken(token);

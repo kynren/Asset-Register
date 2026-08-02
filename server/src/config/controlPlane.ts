@@ -7,6 +7,7 @@
 // search_path a connection happens to have.
 import { Pool } from "pg";
 import { env } from "./env";
+import { evictSchemaClient, runWithTenant } from "./prisma";
 
 export const controlPlanePool = new Pool({ connectionString: env.DATABASE_URL });
 
@@ -174,7 +175,6 @@ export async function renameOrganizationSchema(id: number, newSchemaName: string
 
   // The cached PrismaClient for the old name has a connection string baked in with
   // `?schema=<old name>` — it's now pointing at a schema that no longer exists under that name.
-  const { evictSchemaClient } = await import("./prisma");
   await evictSchemaClient(org.schemaName);
 }
 
@@ -224,7 +224,6 @@ export async function resolveTokenSchema(token: string): Promise<string | null> 
 // logged and skipped rather than aborting the rest — a bug or outage in one tenant's data
 // shouldn't stop backups/alerts/monitoring from running for everyone else.
 export async function runForEachOrganization<T>(fn: () => Promise<T>): Promise<void> {
-  const { runWithTenant } = await import("./prisma");
   const orgs = await listOrganizations();
   for (const org of orgs) {
     try {

@@ -3,12 +3,14 @@ import path from "path";
 import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
-import { prisma } from "../../config/prisma";
+import { currentSchemaName, prisma } from "../../config/prisma";
+import { registerToken } from "../../config/controlPlane";
 import { verifyJwt } from "../../middleware/auth";
 import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
+import { generateApiKey } from "../../lib/passwords";
 
 const BRANDING_UPLOAD_ROOT = path.join(__dirname, "..", "..", "..", "uploads", "branding");
 fs.mkdirSync(BRANDING_UPLOAD_ROOT, { recursive: true });
@@ -70,9 +72,6 @@ router.get("/agent-keys", requirePermission("app-settings", "view"), async (_req
 });
 
 router.post("/agent-keys", requirePermission("app-settings", "create"), async (req, res) => {
-  const { generateApiKey } = await import("../../lib/passwords");
-  const { registerToken } = await import("../../config/controlPlane");
-  const { currentSchemaName } = await import("../../config/prisma");
   const key = generateApiKey();
   const label = (req.body?.label as string) || undefined;
   const record = await prisma.agentApiKey.create({ data: { key, label } });

@@ -20,19 +20,21 @@ export function NvrPage() {
 
   return (
     <div className="stack gap-3">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">NVRs & Cameras</h1>
-          <p className="page-subtitle">Live video matrix, playback, discovery, and device configuration — modeled on Hikvision iVMS workflows.</p>
+      <div className="page-header-sticky">
+        <div className="page-header-content">
+          <div>
+            <h1 className="page-title">NVRs & Cameras</h1>
+            <p className="page-subtitle">Live video matrix, playback, discovery, and device configuration — modeled on Hikvision iVMS workflows.</p>
+          </div>
         </div>
-      </div>
 
-      <div className="row gap-2 flex-wrap">
-        {TABS.map((t) => (
-          <button key={t.key} className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab(t.key)}>
-            {t.label}
-          </button>
-        ))}
+        <div className="row gap-2 flex-wrap">
+          {TABS.map((t) => (
+            <button key={t.key} className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab(t.key)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === "matrix" && <LiveVideoMatrixTab />}

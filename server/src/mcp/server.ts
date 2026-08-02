@@ -11,7 +11,12 @@ export function createMcpServer(actingUserId: number): McpServer {
   for (const tool of tools) {
     server.registerTool(
       tool.name,
-      { description: tool.description, inputSchema: tool.inputSchema },
+      // inputSchema is typed as the widened `Record<string, ZodTypeAny>` (see ToolDef in
+      // tools.ts) since `tools` holds many differently-shaped schemas in one array — registerTool
+      // tries to infer a precise arg type from it regardless, and chasing that through a widened
+      // Record blows up into TS2589 (excessively deep type instantiation). Cast it away here since
+      // the handler below already types `args` as `any` and does its own runtime validation.
+      { description: tool.description, inputSchema: tool.inputSchema as any },
       async (args: any) => {
         try {
           const result = await tool.handler(args ?? {}, { actingUserId });

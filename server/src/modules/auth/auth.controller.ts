@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { Request, Response } from "express";
 import { env } from "../../config/env";
 import { DEFAULT_SCHEMA, currentSchemaName, prisma, runWithTenant } from "../../config/prisma";
-import { registerToken, resolveAccountSchema, resolveTokenSchema } from "../../config/controlPlane";
+import { getOrganizationById, registerToken, resolveAccountSchema, resolveTokenSchema } from "../../config/controlPlane";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { sendEventEmail } from "../../lib/emailNotify";
@@ -94,9 +94,22 @@ export async function refresh(req: Request, res: Response) {
     const user = await prisma.user.findUnique({ where: { id: session.userId }, include: { role: true } });
     if (!user || !user.isActive) throw new ApiError(401, "Invalid refresh token");
 
-    const accessToken = issueAccessToken(user);
+    // Only System Admin can ever be "viewing" a schema other than its own home (enforced at
+    // switch-time in appSettings.controller.ts) — so a viewingOrganizationId hint from any other
+    // role is simply ignored, same as a hint naming an organization that doesn't exist. This is
+    // what makes a switch survive the ~15 min access-token lifetime indefinitely (see
+    // client/src/api/viewingOrgStore.ts): every refresh re-applies the same "still viewing X"
+    // choice instead of quietly falling back to home the moment the old token expires.
+    let targetSchemaName = schemaName;
+    const viewingOrganizationId = Number(req.body?.viewingOrganizationId);
+    if (user.role.name === "System Admin" && Number.isFinite(viewingOrganizationId)) {
+      const target = await getOrganizationById(viewingOrganizationId);
+      if (target) targetSchemaName = target.schemaName;
+    }
+
+    const accessToken = issueAccessToken(user, targetSchemaName);
     const permissions = await getEffectivePermissionMap(user.roleId, user.role.name);
-    const organization = await getViewingOrganization(schemaName);
+    const organization = await getViewingOrganization(targetSchemaName);
     res.json({ accessToken, user: sanitizeUser(user), permissions, organization });
   });
 }

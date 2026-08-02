@@ -4,6 +4,13 @@ import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { MODULES } from "../../constants/modules";
 
+const SYSTEM_ADMIN_ROLE_NAME = "System Admin";
+const APP_SETTINGS_MODULE = "app-settings";
+
+function isSystemAdminName(name: string): boolean {
+  return name.trim().toLowerCase() === SYSTEM_ADMIN_ROLE_NAME.toLowerCase();
+}
+
 // Pads a role's `permissions` with an all-false row for any module in MODULES that has
 // no RolePermission row yet — e.g. right after a new module is added to the constant,
 // before every existing role has been re-saved or reseeded. Without this, the API would
@@ -21,12 +28,21 @@ function padPermissions<T extends { permissions: { module: string }[] }>(role: T
   return { ...role, permissions: [...role.permissions, ...missing] };
 }
 
-export async function list(_req: Request, res: Response) {
+// System Admin is a platform-level role (see backfillSystemAdmin.ts / seedRoles.ts) — a non-System-
+// Admin viewer shouldn't even see that it exists, let alone open its (locked, always-full-access)
+// permission matrix. Real enforcement is elsewhere (rbac.ts's by-name bypass, updatePermissions'
+// own guard below); this is just keeping it out of a view that isn't System Admin's business.
+function visibleTo<T extends { name: string }>(roles: T[], req: Request): T[] {
+  if (req.user!.roleName === SYSTEM_ADMIN_ROLE_NAME) return roles;
+  return roles.filter((r) => !isSystemAdminName(r.name));
+}
+
+export async function list(req: Request, res: Response) {
   const roles = await prisma.role.findMany({
     include: { permissions: true, _count: { select: { users: true } } },
     orderBy: { id: "asc" },
   });
-  res.json(roles.map(padPermissions));
+  res.json(visibleTo(roles, req).map(padPermissions));
 }
 
 export async function getOne(req: Request, res: Response) {
@@ -34,12 +50,15 @@ export async function getOne(req: Request, res: Response) {
     where: { id: Number(req.params.id) },
     include: { permissions: true },
   });
-  if (!role) throw new ApiError(404, "Role not found");
+  if (!role || visibleTo([role], req).length === 0) throw new ApiError(404, "Role not found");
   res.json(padPermissions(role));
 }
 
 export async function create(req: Request, res: Response) {
   const { name, description } = req.body;
+  if (typeof name === "string" && isSystemAdminName(name)) {
+    throw new ApiError(400, `"${SYSTEM_ADMIN_ROLE_NAME}" is reserved and cannot be used for another role.`);
+  }
   const role = await prisma.role.create({
     data: {
       name,
@@ -57,6 +76,9 @@ export async function update(req: Request, res: Response) {
   const existing = await prisma.role.findUnique({ where: { id } });
   if (!existing) throw new ApiError(404, "Role not found");
   if (existing.isSystem) throw new ApiError(400, "Cannot rename a system role");
+  if (typeof req.body?.name === "string" && isSystemAdminName(req.body.name)) {
+    throw new ApiError(400, `"${SYSTEM_ADMIN_ROLE_NAME}" is reserved and cannot be used for another role.`);
+  }
 
   const role = await prisma.role.update({ where: { id }, data: req.body });
   await logAudit({ userId: req.user!.id, action: "role.update", entityType: "Role", entityId: id, metadata: req.body });
@@ -69,7 +91,17 @@ export async function updatePermissions(req: Request, res: Response) {
 
   const existing = await prisma.role.findUnique({ where: { id }, select: { name: true } });
   if (!existing) throw new ApiError(404, "Role not found");
-  if (existing.name === "System Admin") throw new ApiError(400, "System Admin always has full access and cannot be edited.");
+  if (isSystemAdminName(existing.name)) throw new ApiError(400, "System Admin always has full access and cannot be edited.");
+
+  // App Settings (organizations, backups, system settings/status — see appSettings module) is
+  // deliberately System Admin-only at the platform level; no other role, however it's edited, is
+  // allowed to be granted any part of it. The UI already hides this module's row for every role
+  // except System Admin (see client RolesTab.tsx), but that's just presentation — this is the
+  // actual enforcement, so a direct API call can't grant it either.
+  const grantsAppSettings = (permissions as { module: string; canView?: boolean; canCreate?: boolean; canEdit?: boolean; canDelete?: boolean; canExport?: boolean }[]).some(
+    (p) => p.module === APP_SETTINGS_MODULE && (p.canView || p.canCreate || p.canEdit || p.canDelete || p.canExport)
+  );
+  if (grantsAppSettings) throw new ApiError(400, "App Settings can only be granted to the System Admin role.");
 
   await prisma.$transaction(
     permissions.map((p: { module: string; canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean }) =>
