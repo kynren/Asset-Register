@@ -16,9 +16,10 @@ interface AuditRow {
 
 export function AuditLogTab() {
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
   const { data, isLoading } = useQuery({
-    queryKey: ["audit-log", page],
-    queryFn: async () => (await axiosClient.get("/audit", { params: { page, pageSize: 20 } })).data,
+    queryKey: ["audit-log", page, search],
+    queryFn: async () => (await axiosClient.get("/audit", { params: { page, pageSize: 20, search: search || undefined } })).data,
   });
 
   const columns: ColumnDef<AuditRow, any>[] = [
@@ -30,7 +31,17 @@ export function AuditLogTab() {
 
   return (
     <div className="card">
-      <DataTable columns={columns} data={data?.items ?? []} isLoading={isLoading} page={data?.page} totalPages={data?.totalPages} onPageChange={setPage} />
+      <DataTable
+        columns={columns}
+        data={data?.items ?? []}
+        isLoading={isLoading}
+        page={data?.page}
+        totalPages={data?.totalPages}
+        onPageChange={setPage}
+        search={search}
+        onSearchChange={(v) => { setSearch(v); setPage(1); }}
+        searchPlaceholder="Search by action, entity, or user..."
+      />
     </div>
   );
 }

@@ -257,6 +257,10 @@ export function BackupsTab() {
           data={runsPage?.runs ?? []}
           isLoading={runsLoading}
           emptyMessage="No backups have run yet."
+          // This table only ever holds one server page of runs (Prev/Next below manage runPage
+          // directly), so DataTable's own client-side search would silently search just the
+          // visible page instead of full history — disabled until real server-side search exists.
+          searchable={false}
         />
         {runsPage && runsPage.total > runsPage.pageSize && (
           <div className="row gap-2" style={{ justifyContent: "flex-end", alignItems: "center", marginTop: 8 }}>

@@ -17,17 +17,18 @@ export function TicketListPage() {
   const [status, setStatus] = useState("");
   const [assignedToMe, setAssignedToMe] = useState(false);
   const [overdue, setOverdue] = useState(false);
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["tickets", { status, assignedToMe, overdue, page }],
+    queryKey: ["tickets", { status, assignedToMe, overdue, search, page }],
     queryFn: async () =>
       (
         await axiosClient.get("/tickets", {
-          params: { status: status || undefined, assignedToMe: assignedToMe || undefined, overdue: overdue || undefined, page, pageSize: 15 },
+          params: { status: status || undefined, assignedToMe: assignedToMe || undefined, overdue: overdue || undefined, search: search || undefined, page, pageSize: 15 },
         })
       ).data,
   });
@@ -101,6 +102,9 @@ export function TicketListPage() {
           onPageChange={setPage}
           onRowClick={(row) => navigate(`/helpdesk/${row.id}`)}
           emptyMessage="No tickets found."
+          search={search}
+          onSearchChange={(v) => { setSearch(v); setPage(1); }}
+          searchPlaceholder="Search by ticket #, title, or person..."
         />
       </div>
 

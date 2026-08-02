@@ -161,7 +161,7 @@ export function LowStockWidget() {
   return (
     <>
       <h3 className="mt-0">Low Stock Items</h3>
-      <DataTable columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={5} emptyMessage="No items are currently low on stock." />
+      <DataTable columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={5} emptyMessage="No items are currently low on stock." searchable={false} />
     </>
   );
 }
@@ -183,7 +183,7 @@ export function OfflineDevicesWidget() {
   return (
     <>
       <h3 className="mt-0">Offline Devices</h3>
-      <DataTable columns={columns} data={offline} isLoading={isLoading} clientPageSize={5} emptyMessage="All known devices have reported in recently." />
+      <DataTable columns={columns} data={offline} isLoading={isLoading} clientPageSize={5} emptyMessage="All known devices have reported in recently." searchable={false} />
     </>
   );
 }
@@ -202,7 +202,7 @@ export function MaintenanceDueWidget() {
   return (
     <>
       <h3 className="mt-0">Maintenance Due</h3>
-      <DataTable columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={5} emptyMessage="No assets are currently due for maintenance." />
+      <DataTable columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={5} emptyMessage="No assets are currently due for maintenance." searchable={false} />
     </>
   );
 }

@@ -27,7 +27,7 @@ async function watcherIds(ticketId: number): Promise<number[]> {
 
 export async function list(req: Request, res: Response) {
   const { page, pageSize, skip, take } = getPagination(req);
-  const { status, priority, categoryId, assignedToMe, mine, overdue } = req.query as Record<string, string | undefined>;
+  const { status, priority, categoryId, assignedToMe, mine, overdue, search } = req.query as Record<string, string | undefined>;
 
   const where: Record<string, unknown> = {};
   if (status) where.status = status;
@@ -38,6 +38,14 @@ export async function list(req: Request, res: Response) {
   if (overdue === "true") {
     where.dueAt = { lt: new Date() };
     where.status = { in: ["OPEN", "IN_PROGRESS"] };
+  }
+  if (search) {
+    where.OR = [
+      { ticketNumber: { contains: search, mode: "insensitive" } },
+      { title: { contains: search, mode: "insensitive" } },
+      { requester: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { lastName: { contains: search, mode: "insensitive" } }] } },
+      { assignee: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { lastName: { contains: search, mode: "insensitive" } }] } },
+    ];
   }
 
   const [items, total] = await Promise.all([
