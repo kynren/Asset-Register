@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
+import { AxiosResponse } from "axios";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 
@@ -30,7 +31,7 @@ export function TestConnectionButton({
 }) {
   const isIsapi = protocol === "ISAPI";
 
-  const mutation = useMutation({
+  const mutation = useMutation<AxiosResponse<IsapiTestResult | GenericTestResult>, unknown, void>({
     mutationFn: () =>
       isIsapi
         ? axiosClient.post<IsapiTestResult>("/nvr/isapi/test-connection", {

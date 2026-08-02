@@ -15,7 +15,7 @@ const RECONNECT_DELAY_MS = 2000;
  * health check running so a dropped stream reconnects automatically instead of freezing.
  * Shared by the single-camera live feed modal and the multi-camera video matrix tiles.
  */
-export function useRtspStream(streamUrl: string, videoRef: RefObject<HTMLVideoElement>) {
+export function useRtspStream(streamUrl: string, videoRef: RefObject<HTMLVideoElement | null>) {
   const hlsRef = useRef<Hls | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const pollRef = useRef<number | null>(null);
