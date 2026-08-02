@@ -3,6 +3,7 @@ import { AppShell } from "./layout/AppShell";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { PermissionGate } from "./auth/PermissionGate";
 import { LoginPage } from "./pages/auth/LoginPage";
+import { SignupPage } from "./pages/auth/SignupPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { MagicLoginPage } from "./pages/auth/MagicLoginPage";
@@ -33,6 +34,7 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
       <Route path="/magic-login/:token" element={<MagicLoginPage />} />

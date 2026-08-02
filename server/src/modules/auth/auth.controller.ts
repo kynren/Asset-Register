@@ -2,7 +2,9 @@ import bcrypt from "bcryptjs";
 import QRCode from "qrcode";
 import { Request, Response } from "express";
 import { env } from "../../config/env";
-import { prisma } from "../../config/prisma";
+import { prisma, runWithTenant } from "../../config/prisma";
+import { registerToken, resolveAccountSchema, resolveTokenSchema } from "../../config/controlPlane";
+import { provisionOrganization } from "../../lib/tenantProvisioning";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { sendEventEmail } from "../../lib/emailNotify";
@@ -36,43 +38,56 @@ const REFRESH_COOKIE_OPTIONS = {
 
 export async function login(req: Request, res: Response) {
   const { email, password, mfaToken } = req.body;
-  const user = await verifyCredentials(email, password);
+  const schemaName = await resolveAccountSchema(email);
+  if (!schemaName) throw new ApiError(401, "Invalid email or password");
 
-  if (user.mfaEnabled) {
-    if (!mfaToken) {
-      res.json({ mfaRequired: true });
-      return;
+  await runWithTenant(schemaName, async () => {
+    const user = await verifyCredentials(email, password);
+
+    if (user.mfaEnabled) {
+      if (!mfaToken) {
+        res.json({ mfaRequired: true });
+        return;
+      }
+      if (!user.mfaSecret || !(await verifyMfaToken(user.mfaSecret, mfaToken))) {
+        throw new ApiError(401, "Invalid authentication code");
+      }
     }
-    if (!user.mfaSecret || !(await verifyMfaToken(user.mfaSecret, mfaToken))) {
-      throw new ApiError(401, "Invalid authentication code");
-    }
-  }
 
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
-  const accessToken = issueAccessToken(user);
-  const refreshToken = await createRefreshSession(user.id, req.headers["user-agent"] as string | undefined, (await resolveClientIp(req.ip)) ?? undefined);
-  res.cookie(env.REFRESH_COOKIE_NAME, refreshToken, REFRESH_COOKIE_OPTIONS);
+    const accessToken = issueAccessToken(user);
+    const refreshToken = await createRefreshSession(user.id, req.headers["user-agent"] as string | undefined, (await resolveClientIp(req.ip)) ?? undefined);
+    res.cookie(env.REFRESH_COOKIE_NAME, refreshToken, REFRESH_COOKIE_OPTIONS);
 
-  await logAudit({ userId: user.id, action: "auth.login", entityType: "User", entityId: user.id, ipAddress: req.ip });
+    await logAudit({ userId: user.id, action: "auth.login", entityType: "User", entityId: user.id, ipAddress: req.ip });
 
-  const permissions = await getPermissionMap(user.roleId);
-  res.json({ accessToken, user: sanitizeUser(user), permissions });
+    const permissions = await getPermissionMap(user.roleId);
+    res.json({ accessToken, user: sanitizeUser(user), permissions });
+  });
 }
 
 export async function refresh(req: Request, res: Response) {
   const token = req.cookies?.[env.REFRESH_COOKIE_NAME];
   if (!token) throw new ApiError(401, "No refresh token");
 
-  const session = await validateRefreshSession(token);
-  if (!session) throw new ApiError(401, "Invalid or expired session");
+  // The refresh cookie is an opaque token, not a JWT — it carries no tenant claim of its own, so
+  // the control plane has to tell us which schema to even look for the session in.
+  const tokenHash = hashToken(token);
+  const schemaName = await resolveTokenSchema(tokenHash);
+  if (!schemaName) throw new ApiError(401, "Invalid or expired session");
 
-  const user = await prisma.user.findUnique({ where: { id: session.userId }, include: { role: true } });
-  if (!user || !user.isActive) throw new ApiError(401, "Invalid refresh token");
+  await runWithTenant(schemaName, async () => {
+    const session = await validateRefreshSession(token);
+    if (!session) throw new ApiError(401, "Invalid or expired session");
 
-  const accessToken = issueAccessToken(user);
-  const permissions = await getPermissionMap(user.roleId);
-  res.json({ accessToken, user: sanitizeUser(user), permissions });
+    const user = await prisma.user.findUnique({ where: { id: session.userId }, include: { role: true } });
+    if (!user || !user.isActive) throw new ApiError(401, "Invalid refresh token");
+
+    const accessToken = issueAccessToken(user);
+    const permissions = await getPermissionMap(user.roleId);
+    res.json({ accessToken, user: sanitizeUser(user), permissions });
+  });
 }
 
 export async function logout(req: Request, res: Response) {
@@ -119,29 +134,62 @@ export async function changePassword(req: Request, res: Response) {
   res.json({ ok: true });
 }
 
+// ───────────────────────── Organization signup ─────────────────────────
+// Public — creates a brand-new tenant (its own Postgres schema, seeded role matrix, and first
+// Super Admin user), registers it with the control plane, then logs the new admin straight in.
+
+export async function signupOrganization(req: Request, res: Response) {
+  const { organizationName, firstName, lastName, email, password } = req.body;
+
+  const existingSchema = await resolveAccountSchema(email);
+  if (existingSchema) throw new ApiError(409, "An account with this email already exists.");
+
+  const { schemaName } = await provisionOrganization({ organizationName, firstName, lastName, email, password });
+
+  await runWithTenant(schemaName, async () => {
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: email.toLowerCase() }, include: { role: true } });
+
+    const accessToken = issueAccessToken(user);
+    const refreshToken = await createRefreshSession(user.id, req.headers["user-agent"] as string | undefined, (await resolveClientIp(req.ip)) ?? undefined);
+    res.cookie(env.REFRESH_COOKIE_NAME, refreshToken, REFRESH_COOKIE_OPTIONS);
+
+    await logAudit({ userId: user.id, action: "auth.signup_organization", entityType: "User", entityId: user.id, ipAddress: req.ip });
+
+    const permissions = await getPermissionMap(user.roleId);
+    res.status(201).json({ accessToken, user: sanitizeUser(user), permissions });
+  });
+}
+
 // ───────────────────────── Forgot / reset password ─────────────────────────
 
 export async function forgotPassword(req: Request, res: Response) {
   const { email } = req.body;
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  const schemaName = await resolveAccountSchema(email);
 
-  // Always respond the same way whether or not the account exists, to avoid leaking
-  // which emails are registered.
-  if (user && user.isActive) {
-    const rawToken = generateOpaqueToken();
-    const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt } });
+  // Always respond the same way whether or not the account exists, to avoid leaking which
+  // emails are registered — so a miss on the control-plane index just skips straight to that
+  // generic response instead of erroring.
+  if (schemaName) {
+    await runWithTenant(schemaName, async () => {
+      const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+      if (user && user.isActive) {
+        const rawToken = generateOpaqueToken();
+        const tokenHash = hashToken(rawToken);
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+        await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt } });
+        await registerToken(tokenHash, schemaName, "reset");
 
-    const resetUrl = `${env.CLIENT_ORIGIN}/reset-password/${rawToken}`;
-    await sendEventEmail({
-      eventType: "PASSWORD_RESET",
-      to: user.email,
-      variables: { firstName: user.firstName, resetUrl },
-      fallbackSubject: "Reset your Kynren Asset Register password",
-      fallbackText: `Hello ${user.firstName},\n\nA password reset was requested for your account. This link expires in 1 hour:\n\n${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
+        const resetUrl = `${env.CLIENT_ORIGIN}/reset-password/${rawToken}`;
+        await sendEventEmail({
+          eventType: "PASSWORD_RESET",
+          to: user.email,
+          variables: { firstName: user.firstName, resetUrl },
+          fallbackSubject: "Reset your Kynren Asset Register password",
+          fallbackText: `Hello ${user.firstName},\n\nA password reset was requested for your account. This link expires in 1 hour:\n\n${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
+        });
+        await logAudit({ userId: user.id, action: "auth.forgot_password_requested", entityType: "User", entityId: user.id, ipAddress: req.ip });
+      }
     });
-    await logAudit({ userId: user.id, action: "auth.forgot_password_requested", entityType: "User", entityId: user.id, ipAddress: req.ip });
   }
 
   res.json({ ok: true, message: "If that email is registered, a reset link has been sent." });
@@ -150,31 +198,36 @@ export async function forgotPassword(req: Request, res: Response) {
 export async function resetPassword(req: Request, res: Response) {
   const { token, newPassword } = req.body;
   const tokenHash = hashToken(token);
-  const resetToken = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+  const schemaName = await resolveTokenSchema(tokenHash);
+  if (!schemaName) throw new ApiError(400, "This reset link is invalid or has expired.");
 
-  if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
-    throw new ApiError(400, "This reset link is invalid or has expired.");
-  }
+  await runWithTenant(schemaName, async () => {
+    const resetToken = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
 
-  const settings = await getSecuritySettings();
-  const complexityError = validatePasswordComplexity(newPassword, settings.passwordMinLength, settings.passwordRequireComplexity);
-  if (complexityError) throw new ApiError(400, complexityError);
+    if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
+      throw new ApiError(400, "This reset link is invalid or has expired.");
+    }
 
-  if (await isPasswordReused(resetToken.userId, newPassword, settings.passwordHistoryCount)) {
-    throw new ApiError(400, `New password must not match your last ${settings.passwordHistoryCount} password(s).`);
-  }
+    const settings = await getSecuritySettings();
+    const complexityError = validatePasswordComplexity(newPassword, settings.passwordMinLength, settings.passwordRequireComplexity);
+    if (complexityError) throw new ApiError(400, complexityError);
 
-  const passwordHash = await bcrypt.hash(newPassword, 12);
-  await prisma.user.update({
-    where: { id: resetToken.userId },
-    data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date(), failedLoginAttempts: 0, lockedUntil: null },
+    if (await isPasswordReused(resetToken.userId, newPassword, settings.passwordHistoryCount)) {
+      throw new ApiError(400, `New password must not match your last ${settings.passwordHistoryCount} password(s).`);
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: resetToken.userId },
+      data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date(), failedLoginAttempts: 0, lockedUntil: null },
+    });
+    await recordPasswordHistory(resetToken.userId, passwordHash, settings.passwordHistoryCount);
+    await prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { usedAt: new Date() } });
+    await prisma.refreshSession.updateMany({ where: { userId: resetToken.userId, revokedAt: null }, data: { revokedAt: new Date() } });
+
+    await logAudit({ userId: resetToken.userId, action: "auth.password_reset_completed", entityType: "User", entityId: resetToken.userId });
+    res.json({ ok: true });
   });
-  await recordPasswordHistory(resetToken.userId, passwordHash, settings.passwordHistoryCount);
-  await prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { usedAt: new Date() } });
-  await prisma.refreshSession.updateMany({ where: { userId: resetToken.userId, revokedAt: null }, data: { revokedAt: new Date() } });
-
-  await logAudit({ userId: resetToken.userId, action: "auth.password_reset_completed", entityType: "User", entityId: resetToken.userId });
-  res.json({ ok: true });
 }
 
 // ───────────────────────── Magic login link ─────────────────────────
@@ -187,26 +240,31 @@ export async function resetPassword(req: Request, res: Response) {
 export async function magicLogin(req: Request, res: Response) {
   const { token } = req.body;
   const tokenHash = hashToken(token);
-  const magicToken = await prisma.magicLoginToken.findUnique({ where: { tokenHash } });
+  const schemaName = await resolveTokenSchema(tokenHash);
+  if (!schemaName) throw new ApiError(400, "This login link is invalid or has expired.");
 
-  if (!magicToken || magicToken.usedAt || magicToken.expiresAt < new Date()) {
-    throw new ApiError(400, "This login link is invalid or has expired.");
-  }
+  await runWithTenant(schemaName, async () => {
+    const magicToken = await prisma.magicLoginToken.findUnique({ where: { tokenHash } });
 
-  const user = await prisma.user.findUnique({ where: { id: magicToken.userId }, include: { role: true } });
-  if (!user || !user.isActive) throw new ApiError(400, "This login link is invalid or has expired.");
+    if (!magicToken || magicToken.usedAt || magicToken.expiresAt < new Date()) {
+      throw new ApiError(400, "This login link is invalid or has expired.");
+    }
 
-  await prisma.magicLoginToken.update({ where: { id: magicToken.id }, data: { usedAt: new Date() } });
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    const user = await prisma.user.findUnique({ where: { id: magicToken.userId }, include: { role: true } });
+    if (!user || !user.isActive) throw new ApiError(400, "This login link is invalid or has expired.");
 
-  const accessToken = issueAccessToken(user);
-  const refreshToken = await createRefreshSession(user.id, req.headers["user-agent"] as string | undefined, (await resolveClientIp(req.ip)) ?? undefined);
-  res.cookie(env.REFRESH_COOKIE_NAME, refreshToken, REFRESH_COOKIE_OPTIONS);
+    await prisma.magicLoginToken.update({ where: { id: magicToken.id }, data: { usedAt: new Date() } });
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
-  await logAudit({ userId: user.id, action: "auth.magic_login", entityType: "User", entityId: user.id, ipAddress: req.ip });
+    const accessToken = issueAccessToken(user);
+    const refreshToken = await createRefreshSession(user.id, req.headers["user-agent"] as string | undefined, (await resolveClientIp(req.ip)) ?? undefined);
+    res.cookie(env.REFRESH_COOKIE_NAME, refreshToken, REFRESH_COOKIE_OPTIONS);
 
-  const permissions = await getPermissionMap(user.roleId);
-  res.json({ accessToken, user: sanitizeUser(user), permissions });
+    await logAudit({ userId: user.id, action: "auth.magic_login", entityType: "User", entityId: user.id, ipAddress: req.ip });
+
+    const permissions = await getPermissionMap(user.roleId);
+    res.json({ accessToken, user: sanitizeUser(user), permissions });
+  });
 }
 
 // ───────────────────────── MFA ─────────────────────────

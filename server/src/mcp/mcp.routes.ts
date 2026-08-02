@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { prisma } from "../config/prisma";
+import { prisma, runWithTenant } from "../config/prisma";
+import { resolveTokenSchema } from "../config/controlPlane";
 import { createMcpServer } from "./server";
 
 const router = Router();
@@ -17,12 +18,17 @@ async function verifyMcpKey(req: McpRequest, res: Response, next: NextFunction) 
   const key = header.startsWith("Bearer ") ? header.slice(7) : null;
   if (!key) return res.status(401).json({ error: "Missing MCP API key. Use Authorization: Bearer <key>." });
 
-  const record = await prisma.mcpApiKey.findUnique({ where: { key } });
-  if (!record || !record.isActive) return res.status(401).json({ error: "Invalid or revoked MCP API key." });
+  const schemaName = await resolveTokenSchema(key);
+  if (!schemaName) return res.status(401).json({ error: "Invalid or revoked MCP API key." });
 
-  prisma.mcpApiKey.update({ where: { id: record.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);
-  req.mcpOwnerId = record.ownerId;
-  next();
+  await runWithTenant(schemaName, async () => {
+    const record = await prisma.mcpApiKey.findUnique({ where: { key } });
+    if (!record || !record.isActive) return res.status(401).json({ error: "Invalid or revoked MCP API key." });
+
+    prisma.mcpApiKey.update({ where: { id: record.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);
+    req.mcpOwnerId = record.ownerId;
+    next();
+  });
 }
 
 // Stateless mode: a fresh server + transport per request. This app's MCP usage is low-frequency

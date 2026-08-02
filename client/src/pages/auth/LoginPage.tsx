@@ -84,6 +84,14 @@ export function LoginPage() {
         <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 4 }}>
           {loading ? "Signing in..." : mfaRequired ? "Verify" : "Sign in"}
         </button>
+
+        {!mfaRequired && (
+          <div className="row" style={{ justifyContent: "center", marginTop: 8 }}>
+            <span className="muted" style={{ fontSize: 12 }}>
+              New here? <Link to="/signup">Create an organization</Link>
+            </span>
+          </div>
+        )}
       </form>
     </div>
   );

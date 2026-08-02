@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma";
+import { runForEachOrganization } from "../config/controlPlane";
 import { env } from "../config/env";
 import { mapLimit } from "./concurrency";
 import { runScheduledScan, enqueueRelayScan, isNetworkRelayEnabled } from "../modules/network/scan.service";
@@ -252,17 +253,18 @@ let intervalHandle: NodeJS.Timeout | null = null;
 // the setInterval call itself.
 export function startNetworkMonitorScheduler() {
   if (intervalHandle) return;
-  const tick = async () => {
-    try {
-      const settings = await prisma.networkMonitorSettings.findUnique({ where: { id: 1 } });
-      if (!settings?.enabled) return;
-      const dueAt = settings.lastRunAt ? new Date(settings.lastRunAt.getTime() + settings.intervalMinutes * 60_000) : new Date(0);
-      if (new Date() < dueAt) return;
-      await runNetworkMonitorCycle();
-    } catch (err) {
+  const tickForOrg = async () => {
+    const settings = await prisma.networkMonitorSettings.findUnique({ where: { id: 1 } });
+    if (!settings?.enabled) return;
+    const dueAt = settings.lastRunAt ? new Date(settings.lastRunAt.getTime() + settings.intervalMinutes * 60_000) : new Date(0);
+    if (new Date() < dueAt) return;
+    await runNetworkMonitorCycle();
+  };
+  const tick = () => {
+    runForEachOrganization(tickForOrg).catch((err) => {
       // eslint-disable-next-line no-console
       console.error("Network monitor cycle failed:", err);
-    }
+    });
   };
   tick();
   intervalHandle = setInterval(tick, 60_000);

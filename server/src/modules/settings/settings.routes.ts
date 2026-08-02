@@ -71,9 +71,14 @@ router.get("/agent-keys", requirePermission("admin", "view"), async (_req, res) 
 
 router.post("/agent-keys", requirePermission("admin", "create"), async (req, res) => {
   const { generateApiKey } = await import("../../lib/passwords");
+  const { registerToken } = await import("../../config/controlPlane");
+  const { currentSchemaName } = await import("../../config/prisma");
   const key = generateApiKey();
   const label = (req.body?.label as string) || undefined;
   const record = await prisma.agentApiKey.create({ data: { key, label } });
+  // The device agent / network relay authenticate with this raw key and no other tenant claim
+  // (see middleware/agentAuth.ts), so the control plane needs to be able to resolve it too.
+  await registerToken(key, currentSchemaName(), "agent");
   await logAudit({ userId: req.user!.id, action: "agentKey.create", entityType: "AgentApiKey", entityId: record.id });
   res.status(201).json(record);
 });

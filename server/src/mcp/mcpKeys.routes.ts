@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { prisma } from "../config/prisma";
+import { currentSchemaName, prisma } from "../config/prisma";
+import { registerToken } from "../config/controlPlane";
 import { verifyJwt } from "../middleware/auth";
 import { ApiError } from "../middleware/errorHandler";
 import { generateApiKey } from "../lib/passwords";
@@ -21,6 +22,7 @@ router.post("/", async (req, res) => {
   const key = generateApiKey();
   const label = (req.body?.label as string) || undefined;
   const record = await prisma.mcpApiKey.create({ data: { key, label, ownerId: req.user!.id } });
+  await registerToken(key, currentSchemaName(), "mcp");
   await logAudit({ userId: req.user!.id, action: "mcpKey.create", entityType: "McpApiKey", entityId: record.id });
   // Full key value is only ever returned once, at creation — same convention as the agent keys.
   res.status(201).json(record);
