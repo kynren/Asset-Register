@@ -153,11 +153,16 @@
   }
 
   .page-content {
-    @apply px-7 py-6 flex-1 overflow-y-auto min-h-0;
+    /* No top padding here on purpose — it lives on .page-header instead (see below). A sticky
+       child ignores its scroll-container's own top padding (it sticks to the scrollport edge,
+       not the padding edge), so that padding would sit above the stuck header as permanently
+       unpainted space, letting scrolled-past rows show through it. Baking the same spacing into
+       the sticky header's own box means its opaque background covers that space too. */
+    @apply px-7 pb-6 flex-1 overflow-y-auto min-h-0;
   }
 
   .page-header {
-    @apply flex items-center justify-between mb-5 gap-3 flex-wrap sticky top-0 z-10 bg-surface;
+    @apply flex items-center justify-between mb-5 gap-3 flex-wrap sticky top-0 z-10 bg-surface pt-6;
   }
 
   .page-title {
