@@ -36,6 +36,7 @@ const MODULE_INFO: Record<ModuleName, { label: string; description: string }> = 
   dashboard: { label: "Dashboard", description: "KPI widgets, charts, and recent activity feed." },
   assets: { label: "Asset Inventory", description: "Asset CRUD, check-in/check-out, CSV/QR import-export, asset detail (Profile, Reports, Logs, sub-resources)." },
   harness: { label: "Harness Register", description: "Fall-arrest harness compliance register — separate from general Asset Inventory access." },
+  "operational-context": { label: "Operational Context", description: "Live show-status dashboard — Active Show Assets reachability gauge and client battery state." },
   network: { label: "Network Topology Map", description: "Topology graph, ICMP ping console, IP range scanner, agent-reported client devices." },
   stock: { label: "Stock Register & Analytics", description: "Stock items, multi-location stock levels & transfers, analytics — and Suppliers & Purchase Orders." },
   helpdesk: { label: "Helpdesk & Ticketing", description: "Ticket CRUD, comments, status workflow." },
