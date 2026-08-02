@@ -2,6 +2,8 @@ import { ReactNode, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../api/axiosClient";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { PermissionGate } from "../auth/PermissionGate";
+import { ModuleName } from "../lib/permissions";
 
 interface BulkActionsBarProps {
   count: number;
@@ -30,12 +32,15 @@ interface BulkDeleteButtonProps {
   entityLabel: string;
   invalidateKeys: string[][];
   onDone: () => void;
+  /** RBAC module/action gating the button — defaults match the most common call sites. */
+  module?: ModuleName;
+  action?: "delete";
 }
 
 // Fires one DELETE per selected id (best-effort — Promise.allSettled so one failure doesn't
 // block the rest), matching the per-row delete endpoints every module already exposes rather
 // than requiring a bespoke bulk-delete route per resource.
-export function BulkDeleteButton({ selectedIds, baseUrl, entityLabel, invalidateKeys, onDone }: BulkDeleteButtonProps) {
+export function BulkDeleteButton({ selectedIds, baseUrl, entityLabel, invalidateKeys, onDone, module = "admin", action = "delete" }: BulkDeleteButtonProps) {
   const [confirming, setConfirming] = useState(false);
   const queryClient = useQueryClient();
 
@@ -53,7 +58,7 @@ export function BulkDeleteButton({ selectedIds, baseUrl, entityLabel, invalidate
   });
 
   return (
-    <>
+    <PermissionGate module={module} action={action}>
       <button className="btn btn-danger btn-sm" disabled={selectedIds.length === 0} onClick={() => setConfirming(true)}>
         Delete Selected
       </button>
@@ -67,6 +72,6 @@ export function BulkDeleteButton({ selectedIds, baseUrl, entityLabel, invalidate
           onConfirm={() => mutation.mutate()}
         />
       )}
-    </>
+    </PermissionGate>
   );
 }

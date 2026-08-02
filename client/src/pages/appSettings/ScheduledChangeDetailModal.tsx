@@ -7,6 +7,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useToast } from "../../components/toast/ToastProvider";
 import { CHANGE_TYPE_INFO, ScheduledChangeRow } from "./scheduledChangeTypes";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 function nowLocalDatetime(): string {
   const d = new Date(Date.now() + 5 * 60 * 1000);
@@ -222,9 +223,11 @@ export function ScheduledChangeDetailModal({
                   min={nowLocalDatetime()}
                   onChange={(e) => setRescheduleValue(e.target.value)}
                 />
-                <button className="btn btn-primary btn-sm" disabled={rescheduleMutation.isPending} onClick={() => rescheduleMutation.mutate()}>
-                  {rescheduleMutation.isPending ? "Saving..." : "Confirm"}
-                </button>
+                <PermissionGate module="app-settings" action="edit">
+                  <button className="btn btn-primary btn-sm" disabled={rescheduleMutation.isPending} onClick={() => rescheduleMutation.mutate()}>
+                    {rescheduleMutation.isPending ? "Saving..." : "Confirm"}
+                  </button>
+                </PermissionGate>
                 <button className="btn btn-secondary btn-sm" onClick={() => setRescheduling(false)}>Cancel</button>
               </div>
             </div>
@@ -233,7 +236,7 @@ export function ScheduledChangeDetailModal({
 
         <div className="modal-footer" style={{ flexWrap: "wrap" }}>
           {isPending ? (
-            <>
+            <PermissionGate module="app-settings" action="edit">
               <button className="btn btn-danger" disabled={cancelMutation.isPending} onClick={() => setConfirmingCancel(true)}>
                 Cancel Change
               </button>
@@ -246,7 +249,7 @@ export function ScheduledChangeDetailModal({
               <button className="btn btn-primary" disabled={publishNowMutation.isPending} onClick={() => publishNowMutation.mutate()}>
                 {publishNowMutation.isPending ? "Publishing..." : "Publish Now"}
               </button>
-            </>
+            </PermissionGate>
           ) : (
             <button className="btn btn-secondary" onClick={onClose}>Close</button>
           )}

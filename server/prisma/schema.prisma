@@ -99,6 +99,7 @@ model User {
   teamMemberships               TeamMember[]
   emailIngestFallbackFor        EmailIngestSettings[]
   systemStatusSettingsUpdates   SystemStatusSettings[]
+  notificationPreferences       NotificationPreference[]
 }
 
 model RefreshSession {
@@ -1577,6 +1578,29 @@ model Notification {
   isRead    Boolean  @default(false)
   linkUrl   String?
   createdAt DateTime @default(now())
+}
+
+enum NotificationEventKind {
+  TICKET_ASSIGNED
+  TICKET_WATCHING
+  ASSET_ASSIGNED
+  LOW_STOCK
+  MAINTENANCE_DUE
+  DEVICE_OFFLINE
+}
+
+// Per-user, per-event-kind opt-out toggle. A missing row for a (userId, kind) pair means
+// "enabled" for both channels — matches the pre-existing always-on behavior, so no backfill is
+// needed; a row only appears once a user actually changes a default in Profile > Notifications.
+model NotificationPreference {
+  id           Int                    @id @default(autoincrement())
+  userId       Int
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind         NotificationEventKind
+  inAppEnabled Boolean                @default(true)
+  emailEnabled Boolean                @default(true)
+
+  @@unique([userId, kind])
 }
 
 enum EmailEventType {

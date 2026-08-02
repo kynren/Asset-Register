@@ -5,6 +5,7 @@ import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { SkeletonText } from "../../../components/Skeleton";
+import { PermissionGate } from "../../../auth/PermissionGate";
 
 interface License {
   id: number;
@@ -97,9 +98,11 @@ export function LicensesTab() {
           <div className="ad-field"><label>Vendor</label><input className="ad-input" placeholder="e.g. Microsoft" value={vendor} onChange={(e) => setVendor(e.target.value)} /></div>
           <div className="ad-field"><label>Seats</label><input className="ad-input" type="number" min={1} value={seats} onChange={(e) => setSeats(e.target.value)} /></div>
           <div className="ad-field"><label>Expires</label><input className="ad-input" type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} /></div>
-          <button className="ad-btn ad-btn-primary" disabled={!name.trim() || createMutation.isPending} onClick={() => createMutation.mutate()}>
-            <Icon name="plus" size={12} /> Add License
-          </button>
+          <PermissionGate module="operations" action="create">
+            <button className="ad-btn ad-btn-primary" disabled={!name.trim() || createMutation.isPending} onClick={() => createMutation.mutate()}>
+              <Icon name="plus" size={12} /> Add License
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -128,7 +131,9 @@ export function LicensesTab() {
                     <button className="ad-btn" onClick={() => setExpanded(expanded === l.id ? null : l.id)}>
                       {expanded === l.id ? "Hide" : "Manage"} Assignments
                     </button>
-                    <button className="ad-btn ad-btn-danger" onClick={() => setDeletingLicense(l)}><Icon name="trash" size={12} /></button>
+                    <PermissionGate module="operations" action="delete">
+                      <button className="ad-btn ad-btn-danger" onClick={() => setDeletingLicense(l)}><Icon name="trash" size={12} /></button>
+                    </PermissionGate>
                   </div>
                 </div>
 
@@ -139,9 +144,11 @@ export function LicensesTab() {
                         <option value="">Assign to user...</option>
                         {users?.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
                       </select>
-                      <button className="ad-btn ad-btn-primary" disabled={!assignUserId || seatsFull || assignMutation.isPending} onClick={() => assignMutation.mutate(l.id)}>
-                        Assign
-                      </button>
+                      <PermissionGate module="operations" action="edit">
+                        <button className="ad-btn ad-btn-primary" disabled={!assignUserId || seatsFull || assignMutation.isPending} onClick={() => assignMutation.mutate(l.id)}>
+                          Assign
+                        </button>
+                      </PermissionGate>
                     </div>
                     {assignments && assignments.length > 0 ? (
                       <div className="stack gap-1">
@@ -150,18 +157,20 @@ export function LicensesTab() {
                             <div className="ad-row-value">
                               {a.user ? `${a.user.firstName} ${a.user.lastName}` : a.asset ? `${a.asset.name} (${a.asset.assetTag})` : "Unknown"}
                             </div>
-                            <button
-                              className="ad-btn ad-btn-danger"
-                              onClick={() =>
-                                setUnassigning({
-                                  licenseId: l.id,
-                                  assignmentId: a.id,
-                                  label: a.user ? `${a.user.firstName} ${a.user.lastName}` : a.asset ? `${a.asset.name} (${a.asset.assetTag})` : "this assignment",
-                                })
-                              }
-                            >
-                              <Icon name="trash" size={12} />
-                            </button>
+                            <PermissionGate module="operations" action="edit">
+                              <button
+                                className="ad-btn ad-btn-danger"
+                                onClick={() =>
+                                  setUnassigning({
+                                    licenseId: l.id,
+                                    assignmentId: a.id,
+                                    label: a.user ? `${a.user.firstName} ${a.user.lastName}` : a.asset ? `${a.asset.name} (${a.asset.assetTag})` : "this assignment",
+                                  })
+                                }
+                              >
+                                <Icon name="trash" size={12} />
+                              </button>
+                            </PermissionGate>
                           </div>
                         ))}
                       </div>

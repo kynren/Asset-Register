@@ -4,6 +4,7 @@ import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { SkeletonTableRows } from "../../../components/Skeleton";
+import { PermissionGate } from "../../../auth/PermissionGate";
 
 interface Column {
   key: string;
@@ -114,9 +115,11 @@ export function SubResourceTab({ assetId, resource, title, subtitle, addLabel, c
               />
             </div>
           ))}
-          <button className="ad-btn ad-btn-primary" disabled={!canSubmit || createMutation.isPending} onClick={handleSubmit}>
-            <Icon name="plus" size={12} /> {addLabel}
-          </button>
+          <PermissionGate module="assets" action="edit">
+            <button className="ad-btn ad-btn-primary" disabled={!canSubmit || createMutation.isPending} onClick={handleSubmit}>
+              <Icon name="plus" size={12} /> {addLabel}
+            </button>
+          </PermissionGate>
         </div>
 
         {isLoading ? (
@@ -144,9 +147,11 @@ export function SubResourceTab({ assetId, resource, title, subtitle, addLabel, c
                 <tr key={item.id}>
                   {columns.map((c) => <td key={c.key}>{item[c.key] ?? "—"}</td>)}
                   <td>
-                    <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(item)} disabled={deleteMutation.isPending}>
-                      <Icon name="trash" size={12} />
-                    </button>
+                    <PermissionGate module="assets" action="edit">
+                      <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(item)} disabled={deleteMutation.isPending}>
+                        <Icon name="trash" size={12} />
+                      </button>
+                    </PermissionGate>
                   </td>
                 </tr>
               ))}

@@ -8,6 +8,7 @@ import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/FormModal";
 import { FormTemplateBuilderModal } from "./FormTemplateBuilderModal";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 interface FormTemplate {
   id: number;
@@ -67,18 +68,24 @@ export function FormTemplatesSection() {
       id: "actions",
       cell: ({ row }) => (
         <div className="row gap-1">
-          <button className="btn btn-secondary btn-sm" onClick={() => setManagingFields(row.original)}>
-            <Icon name="grid" size={12} /> Manage Fields
-          </button>
-          <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setRenaming(row.original)} title="Rename">
-            <Icon name="edit" size={12} />
-          </button>
-          <button className="btn btn-secondary btn-sm btn-icon" onClick={() => duplicateMutation.mutate(row.original.id)} title="Duplicate">
-            <Icon name="paperclip" size={12} />
-          </button>
-          <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
-            <Icon name="trash" size={13} />
-          </button>
+          <PermissionGate module="admin" action="edit">
+            <button className="btn btn-secondary btn-sm" onClick={() => setManagingFields(row.original)}>
+              <Icon name="grid" size={12} /> Manage Fields
+            </button>
+            <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setRenaming(row.original)} title="Rename">
+              <Icon name="edit" size={12} />
+            </button>
+          </PermissionGate>
+          <PermissionGate module="admin" action="create">
+            <button className="btn btn-secondary btn-sm btn-icon" onClick={() => duplicateMutation.mutate(row.original.id)} title="Duplicate">
+              <Icon name="paperclip" size={12} />
+            </button>
+          </PermissionGate>
+          <PermissionGate module="admin" action="delete">
+            <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
+              <Icon name="trash" size={13} />
+            </button>
+          </PermissionGate>
         </div>
       ),
     },
@@ -93,9 +100,11 @@ export function FormTemplatesSection() {
             Custom field sets that appear on the Add/Edit Asset form when a linked category is selected.
           </p>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
-          <Icon name="plus" size={13} /> New Template
-        </button>
+        <PermissionGate module="admin" action="create">
+          <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+            <Icon name="plus" size={13} /> New Template
+          </button>
+        </PermissionGate>
       </div>
       <DataTable columns={columns} data={templates ?? []} isLoading={isLoading} clientPageSize={8} emptyMessage="No form templates yet." />
 

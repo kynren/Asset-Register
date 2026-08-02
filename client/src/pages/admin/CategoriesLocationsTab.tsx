@@ -8,6 +8,7 @@ import { AssetCategoriesTable } from "./AssetCategoriesTable";
 import { FormTemplatesSection } from "./FormTemplatesSection";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { BulkActionsBar, BulkDeleteButton } from "../../components/BulkActionsBar";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 interface ListItem {
   id: number;
@@ -71,15 +72,21 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
       id: "actions",
       cell: ({ row }) => (
         <div className="row gap-1">
-          <button className="btn btn-secondary btn-sm btn-icon" onClick={() => startEdit(row.original)}>
-            <Icon name="edit" size={13} />
-          </button>
-          <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
-            <Icon name="paperclip" size={13} />
-          </button>
-          <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
-            <Icon name="trash" size={13} />
-          </button>
+          <PermissionGate module="admin" action="edit">
+            <button className="btn btn-secondary btn-sm btn-icon" onClick={() => startEdit(row.original)}>
+              <Icon name="edit" size={13} />
+            </button>
+          </PermissionGate>
+          <PermissionGate module="admin" action="create">
+            <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
+              <Icon name="paperclip" size={13} />
+            </button>
+          </PermissionGate>
+          <PermissionGate module="admin" action="delete">
+            <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
+              <Icon name="trash" size={13} />
+            </button>
+          </PermissionGate>
         </div>
       ),
     },
@@ -90,16 +97,18 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
   return (
     <div className="card">
       <h3 className="mt-0">{title}</h3>
-      <form className="row gap-2" onSubmit={handleSubmit} style={{ marginBottom: 14 }}>
-        <input className="input" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-        {extraField && <input className="input" placeholder={extraField} value={extra} onChange={(e) => setExtra(e.target.value)} />}
-        <button className="btn btn-primary btn-sm" type="submit" disabled={saving}>
-          {editingId != null ? <><Icon name="check" size={13} /> Save</> : <><Icon name="plus" size={13} /> Add</>}
-        </button>
-        {editingId != null && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>Cancel</button>
-        )}
-      </form>
+      <PermissionGate module="admin" action={editingId != null ? "edit" : "create"}>
+        <form className="row gap-2" onSubmit={handleSubmit} style={{ marginBottom: 14 }}>
+          <input className="input" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          {extraField && <input className="input" placeholder={extraField} value={extra} onChange={(e) => setExtra(e.target.value)} />}
+          <button className="btn btn-primary btn-sm" type="submit" disabled={saving}>
+            {editingId != null ? <><Icon name="check" size={13} /> Save</> : <><Icon name="plus" size={13} /> Add</>}
+          </button>
+          {editingId != null && (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>Cancel</button>
+          )}
+        </form>
+      </PermissionGate>
       <BulkActionsBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
         <BulkDeleteButton
           selectedIds={[...selectedIds]}

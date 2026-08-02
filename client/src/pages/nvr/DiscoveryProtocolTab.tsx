@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 interface Nvr {
   id: number;
@@ -108,14 +109,16 @@ export function DiscoveryProtocolTab() {
                 </label>
               ))}
             </div>
-            <button
-              className="ad-btn ad-btn-primary"
-              style={{ marginTop: 10 }}
-              disabled={selected.size === 0 || importMutation.isPending}
-              onClick={() => importMutation.mutate(channels.filter((_, i) => selected.has(i)))}
-            >
-              <Icon name="download" size={13} /> Import {selected.size || ""} Selected
-            </button>
+            <PermissionGate module="nvr" action="create">
+              <button
+                className="ad-btn ad-btn-primary"
+                style={{ marginTop: 10 }}
+                disabled={selected.size === 0 || importMutation.isPending}
+                onClick={() => importMutation.mutate(channels.filter((_, i) => selected.has(i)))}
+              >
+                <Icon name="download" size={13} /> Import {selected.size || ""} Selected
+              </button>
+            </PermissionGate>
           </>
         )}
         {importMutation.isSuccess && <div className="alert alert-success" style={{ marginTop: 10 }}>Cameras imported — check Config Server or the Live Video Matrix.</div>}

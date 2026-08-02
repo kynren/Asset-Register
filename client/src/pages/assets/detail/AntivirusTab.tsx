@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { axiosClient } from "../../../api/axiosClient";
 import { Icon } from "../../../components/Icon";
 import { AssetDetail } from "./types";
+import { PermissionGate } from "../../../auth/PermissionGate";
 
 const STATUS_OPTIONS = ["PROTECTED", "AT_RISK", "DISABLED", "UNKNOWN"];
 
@@ -59,9 +60,11 @@ export function AntivirusTab({ asset, onUpdated }: { asset: AssetDetail; onUpdat
           <input className="ad-input" type="date" value={lastScan} onChange={(e) => setLastScan(e.target.value)} />
         </div>
 
-        <button className="ad-btn ad-btn-primary" style={{ marginTop: 14 }} disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-          {saveMutation.isPending ? "Saving..." : "Save Changes"}
-        </button>
+        <PermissionGate module="assets" action="edit">
+          <button className="ad-btn ad-btn-primary" style={{ marginTop: 14 }} disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+            {saveMutation.isPending ? "Saving..." : "Save Changes"}
+          </button>
+        </PermissionGate>
       </div>
     </div>
   );

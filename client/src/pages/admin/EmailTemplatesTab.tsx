@@ -9,6 +9,7 @@ import { FormModal } from "../../components/FormModal";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { EmailTemplateBuilderModal } from "./EmailTemplateBuilderModal";
 import { EmailEventType, EVENT_DESCRIPTIONS, EVENT_LABELS, EVENT_TYPES } from "./emailTemplateConstants";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 interface EmailTemplate {
   id: number;
@@ -73,27 +74,33 @@ export function EmailTemplatesTab() {
       id: "actions",
       cell: ({ row }) => (
         <div className="row gap-1">
-          <button className="btn btn-secondary btn-sm" onClick={() => setEditing(row.original)}>
-            <Icon name="wand" size={12} /> Design
-          </button>
-          {row.original.isActive ? (
-            <button className="btn btn-secondary btn-sm" onClick={() => deactivateMutation.mutate(row.original.id)}>
-              Deactivate
+          <PermissionGate module="admin" action="edit">
+            <button className="btn btn-secondary btn-sm" onClick={() => setEditing(row.original)}>
+              <Icon name="wand" size={12} /> Design
             </button>
-          ) : (
-            <button className="btn btn-secondary btn-sm" onClick={() => activateMutation.mutate(row.original.id)}>
-              Activate
+            {row.original.isActive ? (
+              <button className="btn btn-secondary btn-sm" onClick={() => deactivateMutation.mutate(row.original.id)}>
+                Deactivate
+              </button>
+            ) : (
+              <button className="btn btn-secondary btn-sm" onClick={() => activateMutation.mutate(row.original.id)}>
+                Activate
+              </button>
+            )}
+            <button className="btn btn-secondary btn-sm btn-icon" title="Send test email" onClick={() => setTesting(row.original)}>
+              <Icon name="mail" size={12} />
             </button>
-          )}
-          <button className="btn btn-secondary btn-sm btn-icon" title="Send test email" onClick={() => setTesting(row.original)}>
-            <Icon name="mail" size={12} />
-          </button>
-          <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
-            <Icon name="paperclip" size={12} />
-          </button>
-          <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
-            <Icon name="trash" size={13} />
-          </button>
+          </PermissionGate>
+          <PermissionGate module="admin" action="create">
+            <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
+              <Icon name="paperclip" size={12} />
+            </button>
+          </PermissionGate>
+          <PermissionGate module="admin" action="delete">
+            <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(row.original)}>
+              <Icon name="trash" size={13} />
+            </button>
+          </PermissionGate>
         </div>
       ),
     },
@@ -109,9 +116,11 @@ export function EmailTemplatesTab() {
             resets. Only one template can be active per event at a time.
           </p>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
-          <Icon name="plus" size={13} /> New Template
-        </button>
+        <PermissionGate module="admin" action="create">
+          <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+            <Icon name="plus" size={13} /> New Template
+          </button>
+        </PermissionGate>
       </div>
 
       <div className="row gap-2" style={{ marginBottom: 12 }}>

@@ -34,6 +34,7 @@ import auditRoutes from "./modules/audit/audit.routes";
 import settingsRoutes from "./modules/settings/settings.routes";
 import settingsPublicRoutes from "./modules/settings/settingsPublic.routes";
 import notificationsRoutes from "./modules/notifications/notifications.routes";
+import notificationPreferencesRoutes from "./modules/notifications/notificationPreferences.routes";
 import vaultRoutes from "./modules/vault/vault.routes";
 import systemRoutes from "./modules/system/system.routes";
 import assetResourcesRoutes from "./modules/assetResources/assetResources.routes";
@@ -95,6 +96,7 @@ export function createApp() {
   app.use("/api/settings/public", settingsPublicRoutes);
   app.use("/api/settings", settingsRoutes);
   app.use("/api/notifications", notificationsRoutes);
+  app.use("/api/notification-preferences", notificationPreferencesRoutes);
   app.use("/api/vault", vaultRoutes);
   app.use("/api/system", systemRoutes);
   app.use("/api/licenses", licensesRoutes);

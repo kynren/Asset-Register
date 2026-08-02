@@ -8,6 +8,7 @@ import { DataTable } from "../../components/DataTable";
 import { useToast } from "../../components/toast/ToastProvider";
 import { PublishOrScheduleModal } from "./PublishOrScheduleModal";
 import { ScheduledChangeRow } from "./scheduledChangeTypes";
+import { PermissionGate } from "../../auth/PermissionGate";
 
 function BrandingUploader({ type, label, currentUrl }: { type: "appIcon" | "favicon"; label: string; currentUrl: string | null }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,9 +43,11 @@ function BrandingUploader({ type, label, currentUrl }: { type: "appIcon" | "favi
         <div className="muted" style={{ fontSize: 11 }}>PNG, JPEG, or SVG, up to 2MB</div>
       </div>
       <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleChange} />
-      <button className="btn btn-secondary btn-sm" onClick={() => inputRef.current?.click()} disabled={uploadMutation.isPending}>
-        {uploadMutation.isPending ? "Uploading..." : "Upload"}
-      </button>
+      <PermissionGate module="app-settings" action="edit">
+        <button className="btn btn-secondary btn-sm" onClick={() => inputRef.current?.click()} disabled={uploadMutation.isPending}>
+          {uploadMutation.isPending ? "Uploading..." : "Upload"}
+        </button>
+      </PermissionGate>
     </div>
   );
 }
@@ -127,9 +130,11 @@ export function SystemSettingsTab({
       header: "",
       id: "actions",
       cell: ({ row }) => (
-        <button className="btn btn-secondary btn-sm" onClick={() => toggleKeyMutation.mutate({ id: row.original.id, isActive: !row.original.isActive })}>
-          {row.original.isActive ? "Revoke" : "Reactivate"}
-        </button>
+        <PermissionGate module="app-settings" action="edit">
+          <button className="btn btn-secondary btn-sm" onClick={() => toggleKeyMutation.mutate({ id: row.original.id, isActive: !row.original.isActive })}>
+            {row.original.isActive ? "Revoke" : "Reactivate"}
+          </button>
+        </PermissionGate>
       ),
     },
   ];
@@ -150,9 +155,11 @@ export function SystemSettingsTab({
         <div className="field"><label>Minimum Password Length</label><input className="input" type="number" value={values.passwordMinLength ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordMinLength: e.target.value }))} /></div>
         <div className="field"><label>Device Offline Threshold (minutes)</label><input className="input" type="number" value={values.deviceOfflineThresholdMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, deviceOfflineThresholdMinutes: e.target.value }))} /></div>
         <div className="field"><label>Camera Recording Retention (days)</label><input className="input" type="number" value={values.cameraRetentionDays ?? ""} onChange={(e) => setValues((v) => ({ ...v, cameraRetentionDays: e.target.value }))} /></div>
-        <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
-          {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
-        </button>
+        <PermissionGate module="app-settings" action="edit">
+          <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
+            {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
+          </button>
+        </PermissionGate>
       </div>
 
       <div className="card" style={{ maxWidth: 480 }}>
@@ -171,9 +178,11 @@ export function SystemSettingsTab({
         <div className="field"><label>Prevent Reuse of Last N Passwords</label><input className="input" type="number" value={values.passwordHistoryCount ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordHistoryCount: e.target.value }))} /></div>
         <div className="field"><label>Max Failed Login Attempts</label><input className="input" type="number" value={values.maxFailedLoginAttempts ?? ""} onChange={(e) => setValues((v) => ({ ...v, maxFailedLoginAttempts: e.target.value }))} /></div>
         <div className="field"><label>Lockout Duration (minutes)</label><input className="input" type="number" value={values.lockoutDurationMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, lockoutDurationMinutes: e.target.value }))} /></div>
-        <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
-          {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
-        </button>
+        <PermissionGate module="app-settings" action="edit">
+          <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
+            {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
+          </button>
+        </PermissionGate>
       </div>
 
       <div className="card" style={{ maxWidth: 480 }}>
@@ -204,15 +213,19 @@ export function SystemSettingsTab({
             Route network scans through an on-prem relay agent
           </label>
         </div>
-        <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
-          {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
-        </button>
+        <PermissionGate module="app-settings" action="edit">
+          <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
+            {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
+          </button>
+        </PermissionGate>
       </div>
 
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <h3 className="mt-0">Agent API Keys</h3>
-          <button className="btn btn-secondary btn-sm" onClick={() => createKeyMutation.mutate("New Key")}><Icon name="plus" size={13} /> Generate Key</button>
+          <PermissionGate module="app-settings" action="create">
+            <button className="btn btn-secondary btn-sm" onClick={() => createKeyMutation.mutate("New Key")}><Icon name="plus" size={13} /> Generate Key</button>
+          </PermissionGate>
         </div>
         <p className="muted" style={{ fontSize: 12 }}>
           Shared by both agents: the per-machine device agent's <code>.env</code> as <code>AGENT_API_KEY</code>, and the
