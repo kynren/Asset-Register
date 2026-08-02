@@ -8,6 +8,8 @@ import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
 import { PasswordInput } from "../../components/PasswordInput";
 import { PermissionGate } from "../../auth/PermissionGate";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../auth/AuthContext";
 
 interface OrganizationRow {
   id: number;
@@ -18,17 +20,55 @@ interface OrganizationRow {
 
 export function OrganizationsTab() {
   const [showCreate, setShowCreate] = useState(false);
+  const [editingOrg, setEditingOrg] = useState<OrganizationRow | null>(null);
   const queryClient = useQueryClient();
+  const { organization, switchOrganization } = useAuth();
+  const [switchingId, setSwitchingId] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({
     queryKey: ["app-settings-organizations"],
     queryFn: async () => (await axiosClient.get("/app-settings/organizations")).data as OrganizationRow[],
   });
 
+  async function handleEnter(org: OrganizationRow) {
+    setSwitchingId(org.id);
+    try {
+      await switchOrganization(org.id);
+      navigate("/");
+    } finally {
+      setSwitchingId(null);
+    }
+  }
+
   const columns: ColumnDef<OrganizationRow, any>[] = [
     { header: "Organization", accessorKey: "name" },
     { header: "Schema", cell: ({ row }) => <span style={{ fontFamily: "monospace", fontSize: 12 }}>{row.original.schemaName}</span> },
     { header: "Created", accessorFn: (r) => dayjs(r.createdAt).format("DD MMM YYYY") },
+    {
+      header: "",
+      id: "actions",
+      cell: ({ row }) => {
+        const isActive = row.original.id === organization?.id;
+        return (
+          <div className="row gap-1">
+            <button
+              className="btn btn-secondary btn-sm btn-icon"
+              title={isActive ? "Currently viewing this organization" : "View as this organization"}
+              disabled={isActive || switchingId !== null}
+              onClick={() => handleEnter(row.original)}
+            >
+              <Icon name={isActive ? "check" : "arrowRight"} size={12} />
+            </button>
+            <PermissionGate module="app-settings" action="edit">
+              <button className="btn btn-secondary btn-sm btn-icon" title="Edit organization" onClick={() => setEditingOrg(row.original)}>
+                <Icon name="edit" size={12} />
+              </button>
+            </PermissionGate>
+          </div>
+        );
+      },
+    },
   ];
 
   return (
@@ -37,7 +77,7 @@ export function OrganizationsTab() {
         <p className="muted" style={{ margin: 0, maxWidth: 560 }}>
           Every organization gets its own isolated database schema. Creating one here provisions that schema and its
           first Super Admin user — they run their own organization end to end, but can't create further organizations
-          or reach App Settings themselves.
+          or reach App Settings themselves. Use the arrow icon to view the app as any organization.
         </p>
         <PermissionGate module="app-settings" action="create">
           <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
@@ -59,7 +99,59 @@ export function OrganizationsTab() {
           }}
         />
       )}
+
+      {editingOrg && (
+        <EditOrganizationModal
+          organization={editingOrg}
+          onClose={() => setEditingOrg(null)}
+          onSaved={() => {
+            setEditingOrg(null);
+            queryClient.invalidateQueries({ queryKey: ["app-settings-organizations"] });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function EditOrganizationModal({ organization, onClose, onSaved }: { organization: OrganizationRow; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(organization.name);
+  const [schemaName, setSchemaName] = useState(organization.schemaName);
+  const isDefaultOrg = organization.schemaName === "public";
+
+  const mutation = useMutation({
+    mutationFn: () => axiosClient.patch(`/app-settings/organizations/${organization.id}`, { name, schemaName }),
+    onSuccess: () => onSaved(),
+  });
+
+  const canSubmit = name.trim() && schemaName.trim();
+
+  return (
+    <FormModal title="Edit Organization" onClose={onClose} onSubmit={() => mutation.mutate()} submitting={mutation.isPending} submitDisabled={!canSubmit}>
+      {mutation.isError && <div className="alert alert-danger">{(mutation.error as any)?.response?.data?.error ?? "Could not save this organization."}</div>}
+
+      <div className="field"><label>Organization Name *</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
+
+      <div className="field">
+        <label>Schema Name {isDefaultOrg ? <span className="muted">(the default organization's schema cannot be renamed)</span> : "*"}</label>
+        <input
+          className="input"
+          style={{ fontFamily: "monospace" }}
+          value={schemaName}
+          onChange={(e) => setSchemaName(e.target.value.toLowerCase())}
+          disabled={isDefaultOrg}
+        />
+      </div>
+      {!isDefaultOrg && schemaName !== organization.schemaName && (
+        <p className="muted" style={{ fontSize: 12 }}>
+          This physically renames the database schema. Any session currently viewing this organization will need to switch back into it again.
+        </p>
+      )}
+      <p className="muted" style={{ fontSize: 12 }}>
+        Branding, logo, and every other per-organization setting is edited by viewing the app as this organization
+        (use the arrow icon in the Organizations table) and opening System Settings there.
+      </p>
+    </FormModal>
   );
 }
 

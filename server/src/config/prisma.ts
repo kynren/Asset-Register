@@ -68,3 +68,13 @@ export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
 export function primeClientForSchema(schemaName: string): PrismaClient {
   return getClientForSchema(schemaName);
 }
+
+// Used by controlPlane.ts's renameOrganizationSchema right after `ALTER SCHEMA ... RENAME TO` —
+// the cached client's connection string has the OLD name baked into its `?schema=` param, so any
+// further query through it would silently target a schema that no longer exists under that name.
+export async function evictSchemaClient(schemaName: string): Promise<void> {
+  const client = clientCache.get(schemaName);
+  if (!client) return;
+  clientCache.delete(schemaName);
+  await client.$disconnect();
+}

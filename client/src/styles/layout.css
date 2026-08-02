@@ -38,6 +38,13 @@
   .sidebar-link.active {
     @apply bg-white text-primary shadow-sm;
   }
+  .sidebar-link-indent {
+    @apply pl-9;
+  }
+  .sidebar-group-toggle {
+    @apply w-full text-left bg-transparent border-0 cursor-pointer;
+    font: inherit;
+  }
 
   .sidebar-battery {
     @apply flex items-center gap-2 mx-2 mb-1 px-2.5 py-2 rounded-md border border-white/10 text-sidebar-text text-xs whitespace-nowrap overflow-hidden;

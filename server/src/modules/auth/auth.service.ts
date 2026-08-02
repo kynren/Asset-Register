@@ -4,8 +4,9 @@ import jwt from "jsonwebtoken";
 import { generateSecret as generateOtpSecret, generateURI as generateOtpUri, verify as verifyOtp } from "otplib";
 import { env } from "../../config/env";
 import { currentSchemaName, prisma } from "../../config/prisma";
-import { registerToken } from "../../config/controlPlane";
+import { listOrganizations, OrganizationRow, registerToken } from "../../config/controlPlane";
 import { ApiError } from "../../middleware/errorHandler";
+import { MODULES } from "../../constants/modules";
 
 export function generateOpaqueToken(): string {
   return crypto.randomBytes(32).toString("hex");
@@ -128,9 +129,9 @@ export async function verifyCredentials(email: string, password: string) {
 
 // ───────────────────────── Tokens & sessions ─────────────────────────
 
-export function issueAccessToken(user: { id: number; roleId: number; role: { name: string } }) {
+export function issueAccessToken(user: { id: number; roleId: number; role: { name: string } }, schemaNameOverride?: string) {
   return jwt.sign(
-    { id: user.id, roleId: user.roleId, roleName: user.role.name, schemaName: currentSchemaName() },
+    { id: user.id, roleId: user.roleId, roleName: user.role.name, schemaName: schemaNameOverride ?? currentSchemaName() },
     env.JWT_SECRET,
     { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions
   );
@@ -200,6 +201,28 @@ export async function getPermissionMap(roleId: number) {
     };
   }
   return map;
+}
+
+const ALL_TRUE_PERMISSION = { canView: true, canCreate: true, canEdit: true, canDelete: true, canExport: true };
+
+// System Admin's roleId is only meaningful within its own home schema — the moment it's viewing
+// another organization (see appSettings.controller.ts switchOrganization), looking that id up in
+// the target org's RolePermission table would return nonsense or nothing. It's a platform role by
+// design (see rbac.ts's own by-name bypass), so its permission map is just "everything, always"
+// rather than a real query, in every schema.
+export async function getEffectivePermissionMap(roleId: number, roleName: string) {
+  if (roleName === "System Admin") {
+    return Object.fromEntries(MODULES.map((m) => [m, ALL_TRUE_PERMISSION]));
+  }
+  return getPermissionMap(roleId);
+}
+
+// Which organization's schema is currently active, for display ("Viewing: Acme Testing Co") —
+// included in every auth response, not just System Admin's, since it's cheap and harmless for a
+// normal org user to see their own organization's name reflected back.
+export async function getViewingOrganization(schemaName: string): Promise<OrganizationRow | null> {
+  const orgs = await listOrganizations();
+  return orgs.find((o) => o.schemaName === schemaName) ?? null;
 }
 
 export function sanitizeUser(user: {

@@ -81,7 +81,59 @@ reports results back over the internet. **Skip this whole section** if the
 app is self-hosted on a machine already inside your LAN — direct scanning
 just works there.
 
-### Setup
+### Windows: KynrenRelayAgent.exe (recommended)
+
+For a Windows relay machine, `KynrenRelayAgent.exe` is a single, self-contained
+executable — no Python install, no `pip install`, nothing else to set up
+first. It's the same relay agent above, just packaged the way Tailscale's or
+Domotz's own agent installers work.
+
+1. Build it once (from a machine with Python 3.10+ and this folder's deps —
+   see "Building the .exe" below), or grab a pre-built copy if your team
+   already publishes one.
+2. Copy `KynrenRelayAgent.exe` to the Windows machine that's on the target
+   LAN and stays powered on.
+3. Right-click it and choose **Run as administrator**. First run:
+   - Prompts for the server URL and an agent key (generate one under
+     **Admin & Setup → System Settings → Agent API Keys**, or **App Settings
+     → System Settings → Agent API Keys** for a System Admin) and saves them
+     to a `.env` file next to the `.exe`.
+   - Installs and starts itself as a real Windows Service
+     (`KynrenNetworkRelayAgent`, set to start automatically at boot) — no
+     separate `install`/`start` step.
+4. In the web app, check **"Route network scans through an on-prem relay
+   agent"** under System Settings → Network Relay Agent, then run a scan from
+   **Network Topology Map → IP Range Scanner** to confirm it picks the job up.
+
+Once installed, manage it like any other Windows Service:
+```
+Get-Service KynrenNetworkRelayAgent
+Restart-Service KynrenNetworkRelayAgent
+```
+Running the `.exe` again later (with `.env` already present) just reports
+whether the service is installed/running and reinstalls it if not — safe to
+re-run any time. `KynrenRelayAgent.exe install|start|stop|restart|remove|debug`
+also works directly, same as running `kynren_network_relay_service.py
+<command>` from Python would.
+
+To reconfigure (new server URL or key), stop the service, delete the `.env`
+next to the `.exe`, and run it again.
+
+#### Building the .exe
+
+From this `agent` folder, in a Python 3.10+ environment with the relay's
+dependencies installed:
+```
+pip install -r requirements-network-relay.txt pyinstaller
+pyinstaller relay_agent.spec --noconfirm
+```
+The output is `dist/KynrenRelayAgent.exe` — copy just that one file to the
+target machine. `relay_agent.spec` bundles `kynren_relay_agent_main.py`
+(which wraps `kynren_network_relay_service.py`'s Windows Service around
+`kynren_network_relay.py`'s scan logic) plus every pywin32 module the service
+wrapper needs — nothing else has to be installed on the target machine.
+
+### Manual setup (any OS, or for development)
 
 1. Install Python 3.10+ on a machine that's on the same LAN as the devices
    you want to monitor, and stays powered on.

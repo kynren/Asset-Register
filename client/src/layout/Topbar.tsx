@@ -70,8 +70,14 @@ function useLatency() {
   return latency;
 }
 
+interface OrganizationRow {
+  id: number;
+  name: string;
+  schemaName: string;
+}
+
 export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }) {
-  const { user, logout } = useAuth();
+  const { user, organization, logout, switchOrganization } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -83,6 +89,25 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
   const latency = useLatency();
 
   const { data: clientInfo } = useClientInfo();
+
+  const isSystemAdmin = user?.roleName === "System Admin";
+  const { data: organizations } = useQuery({
+    queryKey: ["app-settings-organizations-switcher"],
+    queryFn: async () => (await axiosClient.get<OrganizationRow[]>("/app-settings/organizations")).data,
+    enabled: isSystemAdmin && menuOpen,
+  });
+  const [switchingOrgId, setSwitchingOrgId] = useState<number | null>(null);
+
+  async function handleSwitchOrganization(orgId: number) {
+    setSwitchingOrgId(orgId);
+    try {
+      await switchOrganization(orgId);
+      setMenuOpen(false);
+      navigate("/");
+    } finally {
+      setSwitchingOrgId(null);
+    }
+  }
 
   const debouncedSearch = useDebouncedValue(search.trim(), 250);
   const { data: searchResults, isFetching: searchLoading } = useQuery({
@@ -219,7 +244,10 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
             </div>
             <div className="topbar-user-info">
               <div className="topbar-user-name">{user?.firstName} {user?.lastName}</div>
-              <div className="topbar-user-role">{user?.roleName?.toUpperCase()}</div>
+              <div className="topbar-user-role">
+                {user?.roleName?.toUpperCase()}
+                {isSystemAdmin && organization && ` · ${organization.name}`}
+              </div>
             </div>
             <span className="topbar-user-chevron"><Icon name="chevronDown" size={14} /></span>
           </div>
@@ -229,6 +257,32 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
                 <div className="name">{user?.firstName} {user?.lastName}</div>
                 <div className="role">{user?.roleName}</div>
               </div>
+
+              {isSystemAdmin && (
+                <>
+                  <div className="user-menu-header" style={{ padding: "6px 14px", fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase", color: "var(--color-text-muted)" }}>
+                    Switch Organization
+                  </div>
+                  <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                    {(organizations ?? []).map((org) => {
+                      const isActive = org.id === organization?.id;
+                      return (
+                        <div
+                          key={org.id}
+                          className="user-menu-item"
+                          style={{ opacity: switchingOrgId !== null && !isActive ? 0.5 : 1, cursor: isActive ? "default" : "pointer" }}
+                          onClick={() => { if (!isActive && switchingOrgId === null) handleSwitchOrganization(org.id); }}
+                        >
+                          <Icon name={isActive ? "check" : "layers"} size={15} />
+                          <span style={{ fontWeight: isActive ? 600 : 400 }}>{org.name}</span>
+                        </div>
+                      );
+                    })}
+                    {!organizations && <div className="user-menu-item muted" style={{ fontSize: 12 }}>Loading...</div>}
+                  </div>
+                </>
+              )}
+
               <div className="user-menu-item" onClick={() => { setMenuOpen(false); navigate("/profile"); }}>
                 <Icon name="profile" size={15} /> Profile
               </div>

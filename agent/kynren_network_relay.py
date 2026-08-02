@@ -39,7 +39,10 @@ import requests
 from dotenv import load_dotenv
 
 AGENT_VERSION = "1.0.0"
-SCRIPT_DIR = Path(__file__).resolve().parent
+# When frozen into a standalone .exe (see kynren_relay_agent_main.py + relay_agent.spec),
+# __file__ resolves inside PyInstaller's disposable per-run extraction folder — .env and the log
+# file need to live next to the actual .exe instead, or every restart would "forget" its config.
+SCRIPT_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 LOG_PATH = SCRIPT_DIR / "network_relay.log"
 
 IS_WINDOWS = platform.system() == "Windows"

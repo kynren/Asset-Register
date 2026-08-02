@@ -6,25 +6,64 @@ import { useBranding } from "../theme/BrandingContext";
 import { useBattery } from "../hooks/useBattery";
 import { useClientInfo } from "../hooks/useClientInfo";
 import { useUserPreference } from "../hooks/useUserPreference";
-import { NavItem, settingsNav, systemConsoleNav } from "./navConfig";
+import { NavItem, controlsNavGroup, settingsNav, systemConsoleNav } from "./navConfig";
 
 function readCollapsed() {
   return localStorage.getItem("sidebar:collapsed") === "true";
 }
 
-function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+function SidebarLink({ item, collapsed, indent }: { item: NavItem; collapsed: boolean; indent?: boolean }) {
   return (
     <NavLink
       to={item.path}
       end={item.path === "/"}
       className={({ isActive }) =>
-        `sidebar-link${isActive ? " active" : ""}`
+        `sidebar-link${isActive ? " active" : ""}${indent && !collapsed ? " sidebar-link-indent" : ""}`
       }
       title={collapsed ? item.label : undefined}
     >
       <Icon name={item.icon} size={18} />
       {!collapsed && <span>{item.label}</span>}
     </NavLink>
+  );
+}
+
+function readGroupExpanded(label: string) {
+  const raw = localStorage.getItem(`sidebar:group:${label}`);
+  return raw === null ? true : raw === "true";
+}
+
+// Renders as a collapsible section header + indented children when the sidebar itself is
+// expanded; when the sidebar is collapsed to icon-only, the grouping header wouldn't mean
+// anything so the children just render as flat icon links like every other top-level item.
+function SidebarGroup({ label, icon, items, collapsed }: { label: string; icon: string; items: NavItem[]; collapsed: boolean }) {
+  const [expanded, setExpanded] = useState(() => readGroupExpanded(label));
+
+  useEffect(() => {
+    localStorage.setItem(`sidebar:group:${label}`, String(expanded));
+  }, [label, expanded]);
+
+  if (items.length === 0) return null;
+
+  if (collapsed) {
+    return (
+      <>
+        {items.map((item) => (
+          <SidebarLink key={item.path} item={item} collapsed={collapsed} />
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <button type="button" className="sidebar-link sidebar-group-toggle" onClick={() => setExpanded((e) => !e)}>
+        <Icon name={icon} size={18} />
+        <span className="flex-1">{label}</span>
+        <Icon name={expanded ? "chevronDown" : "chevronRight"} size={14} />
+      </button>
+      {expanded && items.map((item) => <SidebarLink key={item.path} item={item} collapsed={collapsed} indent />)}
+    </>
   );
 }
 
@@ -120,6 +159,14 @@ export function Sidebar({ pageTitle }: { pageTitle: string }) {
 
   const visibleConsole = systemConsoleNav.filter((item) => !item.module || hasPermission(item.module, "view"));
   const visibleSettings = settingsNav.filter((item) => !item.module || hasPermission(item.module, "view"));
+  const visibleControls = controlsNavGroup.children.filter((item) => !item.module || hasPermission(item.module, "view"));
+
+  // "Controls" sits where NVRs & Cameras / Access Control / Lighting used to be flat — right
+  // after Operations Tools, before Docs & SOPs — so splice the group in at that same spot rather
+  // than always appending it at the end.
+  const docsIndex = visibleConsole.findIndex((item) => item.path === "/docs");
+  const consoleBeforeControls = docsIndex === -1 ? visibleConsole : visibleConsole.slice(0, docsIndex);
+  const consoleAfterControls = docsIndex === -1 ? [] : visibleConsole.slice(docsIndex);
 
   return (
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
@@ -135,7 +182,11 @@ export function Sidebar({ pageTitle }: { pageTitle: string }) {
 
       <nav className="sidebar-nav">
         {!collapsed && <div className="sidebar-section-label">System Console</div>}
-        {visibleConsole.map((item) => (
+        {consoleBeforeControls.map((item) => (
+          <SidebarLink key={item.path} item={item} collapsed={collapsed} />
+        ))}
+        <SidebarGroup label={controlsNavGroup.label} icon={controlsNavGroup.icon} items={visibleControls} collapsed={collapsed} />
+        {consoleAfterControls.map((item) => (
           <SidebarLink key={item.path} item={item} collapsed={collapsed} />
         ))}
 
