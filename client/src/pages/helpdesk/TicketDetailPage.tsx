@@ -27,9 +27,11 @@ export function TicketDetailPage() {
   const isStaff = usePermission("helpdesk", "edit");
   const [comment, setComment] = useState("");
   const [isInternal, setIsInternal] = useState(false);
+  const [commentFile, setCommentFile] = useState<File | null>(null);
   const [ratingValue, setRatingValue] = useState(5);
   const [ratingComment, setRatingComment] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const commentFileInputRef = useRef<HTMLInputElement>(null);
   const [deletingAttachment, setDeletingAttachment] = useState<{ id: number; filename: string } | null>(null);
   const [showQr, setShowQr] = useState(false);
 
@@ -56,6 +58,16 @@ export function TicketDetailPage() {
     },
   });
 
+  const uploadMutation = useMutation({
+    mutationFn: ({ file, commentId }: { file: File; commentId?: number }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      if (commentId) formData.append("commentId", String(commentId));
+      return axiosClient.post(`/tickets/${id}/attachments`, formData, { headers: { "Content-Type": "multipart/form-data" } });
+    },
+    onSuccess: invalidate,
+  });
+
   const watchMutation = useMutation({
     mutationFn: () => axiosClient.post(`/tickets/${id}/watch`),
     onSuccess: invalidate,
@@ -66,30 +78,31 @@ export function TicketDetailPage() {
     onSuccess: invalidate,
   });
 
-  const uploadMutation = useMutation({
-    mutationFn: (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      return axiosClient.post(`/tickets/${id}/attachments`, formData, { headers: { "Content-Type": "multipart/form-data" } });
-    },
-    onSuccess: invalidate,
-  });
-
   const deleteAttachmentMutation = useMutation({
     mutationFn: (attachmentId: number) => axiosClient.delete(`/tickets/${id}/attachments/${attachmentId}`),
     onSuccess: () => { invalidate(); setDeletingAttachment(null); },
   });
 
-  function handleAddComment(e: FormEvent) {
+  async function handleAddComment(e: FormEvent) {
     e.preventDefault();
     if (!comment.trim()) return;
-    commentMutation.mutate({ body: comment, isInternal });
+    const fileToAttach = commentFile;
+    setCommentFile(null);
+    if (commentFileInputRef.current) commentFileInputRef.current.value = "";
+    const res = await commentMutation.mutateAsync({ body: comment, isInternal });
+    if (fileToAttach) {
+      await uploadMutation.mutateAsync({ file: fileToAttach, commentId: res.data.id });
+    }
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) uploadMutation.mutate(file);
+    if (file) uploadMutation.mutate({ file });
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleCommentFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setCommentFile(e.target.files?.[0] ?? null);
   }
 
   async function downloadAttachment(attachmentId: number, filename: string) {
@@ -100,6 +113,19 @@ export function TicketDetailPage() {
     a.download = filename;
     a.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  function renderAttachmentRow(a: any) {
+    return (
+      <div key={a.id} className="row gap-2" style={{ justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--color-border)" }}>
+        <span className="row gap-1" style={{ fontSize: 13, cursor: "pointer", color: "var(--color-primary)" }} onClick={() => downloadAttachment(a.id, a.filename)}>
+          <Icon name="paperclip" size={13} /> {a.filename} <span className="muted">({formatBytes(a.sizeBytes)})</span>
+        </span>
+        <PermissionGate module="helpdesk" action="edit">
+          <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeletingAttachment({ id: a.id, filename: a.filename })}><Icon name="trash" size={12} /></button>
+        </PermissionGate>
+      </div>
+    );
   }
 
   if (isLoading || !ticket) {
@@ -133,6 +159,7 @@ export function TicketDetailPage() {
         </div>
         <div className="row gap-2">
           {isOverdue && <span className="badge badge-danger">OVERDUE</span>}
+          <StatusBadge status={ticket.type} />
           <StatusBadge status={ticket.priority} />
           <StatusBadge status={ticket.status} />
           <button className={`btn btn-sm ${ticket.isWatching ? "btn-primary" : "btn-secondary"}`} onClick={() => watchMutation.mutate()}>
@@ -151,6 +178,7 @@ export function TicketDetailPage() {
           {ticket.asset && (
             <p className="muted">Related asset: <a onClick={() => navigate(`/assets/${ticket.asset.id}`)} style={{ cursor: "pointer", color: "var(--color-primary)" }}>{ticket.asset.assetTag} — {ticket.asset.name}</a></p>
           )}
+          {ticket.location && <p className="muted">Location: {ticket.location.name}</p>}
           {ticket.dueAt && (
             <p className="muted">Due: <span style={{ color: isOverdue ? "var(--color-danger)" : undefined, fontWeight: isOverdue ? 600 : undefined }}>{dayjs(ticket.dueAt).format("DD MMM YYYY, HH:mm")}</span></p>
           )}
@@ -174,6 +202,9 @@ export function TicketDetailPage() {
           </PermissionGate>
           <p className="muted" style={{ marginTop: 12 }}>
             Assignee: {ticket.assignee ? `${ticket.assignee.firstName} ${ticket.assignee.lastName}` : "Unassigned"}
+          </p>
+          <p className="muted">
+            Team: {ticket.assignedTeam ? ticket.assignedTeam.name : "No team"}
           </p>
           {ticket.satisfactionRating && (
             <p className="muted">
@@ -209,22 +240,14 @@ export function TicketDetailPage() {
             </button>
           </PermissionGate>
         </div>
-        {ticket.attachments?.length ? (
-          <div className="stack gap-1">
-            {ticket.attachments.map((a: any) => (
-              <div key={a.id} className="row gap-2" style={{ justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--color-border)" }}>
-                <span className="row gap-1" style={{ fontSize: 13, cursor: "pointer", color: "var(--color-primary)" }} onClick={() => downloadAttachment(a.id, a.filename)}>
-                  <Icon name="paperclip" size={13} /> {a.filename} <span className="muted">({formatBytes(a.sizeBytes)})</span>
-                </span>
-                <PermissionGate module="helpdesk" action="edit">
-                  <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeletingAttachment({ id: a.id, filename: a.filename })}><Icon name="trash" size={12} /></button>
-                </PermissionGate>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="muted" style={{ fontSize: 13 }}>No attachments yet.</div>
-        )}
+        {(() => {
+          const ticketLevelAttachments = (ticket.attachments ?? []).filter((a: any) => !a.commentId);
+          return ticketLevelAttachments.length ? (
+            <div className="stack gap-1">{ticketLevelAttachments.map(renderAttachmentRow)}</div>
+          ) : (
+            <div className="muted" style={{ fontSize: 13 }}>No attachments yet.</div>
+          );
+        })()}
       </div>
 
       <div className="card">
@@ -248,20 +271,39 @@ export function TicketDetailPage() {
                 {c.isInternal && <span className="badge badge-warning">Internal Note</span>}
               </div>
               <p style={{ margin: "4px 0 0", whiteSpace: "pre-wrap" }}>{c.body}</p>
+              {(ticket.attachments ?? []).filter((a: any) => a.commentId === c.id).length > 0 && (
+                <div className="stack gap-1" style={{ marginTop: 6 }}>
+                  {(ticket.attachments ?? []).filter((a: any) => a.commentId === c.id).map(renderAttachmentRow)}
+                </div>
+              )}
             </div>
           ))}
         </div>
         <PermissionGate module="helpdesk" action="edit">
           <form className="stack gap-2" onSubmit={handleAddComment}>
             <input className="input" placeholder="Add a comment..." value={comment} onChange={(e) => setComment(e.target.value)} />
-            <div className="row gap-2" style={{ justifyContent: "space-between" }}>
-              {isStaff && (
-                <label className="row gap-1" style={{ fontSize: 12, cursor: "pointer" }}>
-                  <input type="checkbox" checked={isInternal} onChange={(e) => setIsInternal(e.target.checked)} />
-                  Internal note (staff only)
-                </label>
-              )}
-              <button className="btn btn-primary" type="submit" disabled={commentMutation.isPending} style={{ marginLeft: "auto" }}>Post</button>
+            <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "center" }}>
+              <div className="row gap-2" style={{ alignItems: "center" }}>
+                {isStaff && (
+                  <label className="row gap-1" style={{ fontSize: 12, cursor: "pointer" }}>
+                    <input type="checkbox" checked={isInternal} onChange={(e) => setIsInternal(e.target.checked)} />
+                    Internal note (staff only)
+                  </label>
+                )}
+                <input ref={commentFileInputRef} type="file" style={{ display: "none" }} onChange={handleCommentFileChange} />
+                <button type="button" className="btn btn-secondary btn-sm btn-icon" title="Attach a file to this comment" onClick={() => commentFileInputRef.current?.click()}>
+                  <Icon name="paperclip" size={13} />
+                </button>
+                {commentFile && (
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    {commentFile.name}
+                    <button type="button" className="btn btn-secondary btn-sm btn-icon" style={{ marginLeft: 4 }} onClick={() => { setCommentFile(null); if (commentFileInputRef.current) commentFileInputRef.current.value = ""; }}>
+                      <Icon name="close" size={11} />
+                    </button>
+                  </span>
+                )}
+              </div>
+              <button className="btn btn-primary" type="submit" disabled={commentMutation.isPending || uploadMutation.isPending}>Post</button>
             </div>
           </form>
         </PermissionGate>

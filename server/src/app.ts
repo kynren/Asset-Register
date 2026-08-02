@@ -20,6 +20,8 @@ import networkRelayRoutes from "./modules/network/relay.routes";
 import stockRoutes from "./modules/stock/stock.routes";
 import ticketsRoutes from "./modules/tickets/tickets.routes";
 import ticketCategoriesRoutes from "./modules/tickets/ticketCategories.routes";
+import teamsRoutes from "./modules/tickets/teams.routes";
+import emailIngestSettingsRoutes from "./modules/tickets/emailIngestSettings.routes";
 import operationsRoutes from "./modules/operations/operations.routes";
 import nvrRoutes from "./modules/nvr/nvr.routes";
 import accessControlRoutes from "./modules/accessControl/accessControl.routes";
@@ -79,6 +81,8 @@ export function createApp() {
   app.use("/api/stock", stockRoutes);
   app.use("/api/tickets", ticketsRoutes);
   app.use("/api/ticket-categories", ticketCategoriesRoutes);
+  app.use("/api/teams", teamsRoutes);
+  app.use("/api/email-ingest-settings", emailIngestSettingsRoutes);
   app.use("/api/operations", operationsRoutes);
   app.use("/api/nvr", nvrRoutes);
   app.use("/api/access-control", accessControlRoutes);

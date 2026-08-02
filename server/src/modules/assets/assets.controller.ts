@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import PDFDocument from "pdfkit";
 import { env } from "../../config/env";
-import { prisma } from "../../config/prisma";
+import { prisma, currentSchemaName } from "../../config/prisma";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { getPagination, paginatedResponse } from "../../lib/pagination";
@@ -11,6 +11,7 @@ import { notifyUsers } from "../../lib/notify";
 import { sendEventEmail } from "../../lib/emailNotify";
 import { generateTempPassword } from "../../lib/passwords";
 import { pingHost } from "../../lib/ping";
+import { getAssetHeartbeatSnapshot, subscribeToAssetHeartbeat } from "../../lib/assetHeartbeat";
 
 const include = {
   category: true,
@@ -137,6 +138,28 @@ export async function pingAsset(req: Request, res: Response) {
   const target = asset.staticIpAddress || asset.assetTag;
   const result = await pingHost(target);
   res.json({ ...result, target });
+}
+
+// Live push feed for the whole inventory's online/offline status, backed by the shared
+// background sweep in lib/assetHeartbeat.ts (one bounded-concurrency ping cycle every 5s,
+// covering every asset at once) instead of each table row polling /ping independently. Read via
+// fetch()+ReadableStream on the client rather than EventSource, same reason as network's
+// /ping-stream: auth here is a Bearer token, which EventSource can't attach.
+export function assetStatusStream(req: Request, res: Response) {
+  const schemaName = currentSchemaName();
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  res.write(`data: ${JSON.stringify({ type: "snapshot", assets: getAssetHeartbeatSnapshot(schemaName) })}\n\n`);
+  const unsubscribe = subscribeToAssetHeartbeat(schemaName, res);
+
+  req.on("close", () => {
+    unsubscribe();
+    res.end();
+  });
 }
 
 // "Show assets" are whatever categories an admin has flagged AssetCategory.isShowAsset on

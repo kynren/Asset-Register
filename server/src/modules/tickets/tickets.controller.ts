@@ -13,6 +13,8 @@ const include = {
   requester: { select: { id: true, firstName: true, lastName: true } },
   assignee: { select: { id: true, firstName: true, lastName: true } },
   asset: { select: { id: true, assetTag: true, name: true } },
+  location: { select: { id: true, name: true } },
+  assignedTeam: { select: { id: true, name: true } },
   category: true,
 };
 
@@ -25,13 +27,19 @@ async function watcherIds(ticketId: number): Promise<number[]> {
   return watchers.map((w) => w.userId);
 }
 
+async function teamMemberIds(teamId: number): Promise<number[]> {
+  const members = await prisma.teamMember.findMany({ where: { teamId }, select: { userId: true } });
+  return members.map((m) => m.userId);
+}
+
 export async function list(req: Request, res: Response) {
   const { page, pageSize, skip, take } = getPagination(req);
-  const { status, priority, categoryId, assignedToMe, mine, overdue, search } = req.query as Record<string, string | undefined>;
+  const { status, priority, type, categoryId, assignedToMe, mine, overdue, search } = req.query as Record<string, string | undefined>;
 
   const where: Record<string, unknown> = {};
   if (status) where.status = status;
   if (priority) where.priority = priority;
+  if (type) where.type = type;
   if (categoryId) where.categoryId = Number(categoryId);
   if (assignedToMe === "true") where.assigneeId = req.user!.id;
   if (mine === "true") where.requesterId = req.user!.id;
@@ -86,7 +94,7 @@ export async function create(req: Request, res: Response) {
   const ticketNumber = await nextTicketNumber();
   const priority = req.body.priority || "MEDIUM";
   const ticket = await prisma.ticket.create({
-    data: { ...req.body, ticketNumber, requesterId: req.user!.id, dueAt: computeDueAt(priority) },
+    data: { ...req.body, ticketNumber, requesterId: req.user!.id, dueAt: req.body.dueAt ?? computeDueAt(priority) },
     include,
   });
   await logAudit({ userId: req.user!.id, action: "ticket.create", entityType: "Ticket", entityId: ticket.id });
@@ -97,6 +105,16 @@ export async function create(req: Request, res: Response) {
       excludeUserId: req.user!.id,
       type: "ticket_assigned",
       message: `You were assigned ticket ${ticket.ticketNumber}: ${ticket.title}`,
+      linkUrl: `/helpdesk/${ticket.id}`,
+    });
+  }
+  if (ticket.assignedTeamId) {
+    const memberIds = await teamMemberIds(ticket.assignedTeamId);
+    await notifyUsers({
+      userIds: memberIds,
+      excludeUserId: req.user!.id,
+      type: "ticket_assigned",
+      message: `Your team was assigned ticket ${ticket.ticketNumber}: ${ticket.title}`,
       linkUrl: `/helpdesk/${ticket.id}`,
     });
   }
@@ -116,6 +134,16 @@ export async function update(req: Request, res: Response) {
       excludeUserId: req.user!.id,
       type: "ticket_assigned",
       message: `You were assigned ticket ${ticket.ticketNumber}: ${ticket.title}`,
+      linkUrl: `/helpdesk/${ticket.id}`,
+    });
+  }
+  if (req.body.assignedTeamId && req.body.assignedTeamId !== before?.assignedTeamId) {
+    const memberIds = await teamMemberIds(req.body.assignedTeamId);
+    await notifyUsers({
+      userIds: memberIds,
+      excludeUserId: req.user!.id,
+      type: "ticket_assigned",
+      message: `Your team was assigned ticket ${ticket.ticketNumber}: ${ticket.title}`,
       linkUrl: `/helpdesk/${ticket.id}`,
     });
   }
@@ -211,9 +239,17 @@ export async function addAttachment(req: Request, res: Response) {
   if (!req.file) throw new ApiError(400, "No file uploaded");
   const ticketId = Number(req.params.id);
 
+  let commentId: number | undefined;
+  if (req.body.commentId) {
+    const comment = await prisma.ticketComment.findUnique({ where: { id: Number(req.body.commentId) } });
+    if (!comment || comment.ticketId !== ticketId) throw new ApiError(400, "Comment does not belong to this ticket");
+    commentId = comment.id;
+  }
+
   const attachment = await prisma.ticketAttachment.create({
     data: {
       ticketId,
+      commentId,
       filename: req.file.originalname,
       storedPath: req.file.filename,
       sizeBytes: req.file.size,

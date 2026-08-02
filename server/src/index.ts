@@ -12,6 +12,8 @@ import { backfillOperationalContextPermission } from "./lib/backfillOperationalC
 import { backfillSystemAdmin } from "./lib/backfillSystemAdmin";
 import { startBackupScheduler } from "./lib/backupScheduler";
 import { startScheduledChangeScheduler } from "./lib/scheduledChangeScheduler";
+import { startEmailIngestScheduler } from "./lib/emailIngestScheduler";
+import { startAssetHeartbeatScheduler } from "./lib/assetHeartbeat";
 
 const app = createApp();
 
@@ -31,6 +33,8 @@ bootstrapControlPlane()
       startSystemStatusScheduler();
       startBackupScheduler();
       startScheduledChangeScheduler();
+      startEmailIngestScheduler();
+      startAssetHeartbeatScheduler();
       backfillHarnessPermission().catch((err) => {
         // eslint-disable-next-line no-console
         console.error("Harness permission backfill failed:", err);
