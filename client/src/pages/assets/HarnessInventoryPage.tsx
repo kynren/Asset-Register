@@ -46,7 +46,7 @@ export function HarnessInventoryPage() {
           <h1 className="page-title">Harness Register</h1>
           <p className="page-subtitle">Fall-arrest harness certification, life span, and test history — separate from general IT asset inventory.</p>
         </div>
-        <PermissionGate module="assets" action="create">
+        <PermissionGate module="harness" action="create">
           <button className="btn btn-primary" disabled={!harnessCategory} onClick={() => setShowForm(true)}>
             <Icon name="plus" size={14} /> Add Harness
           </button>

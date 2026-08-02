@@ -6,6 +6,7 @@ export interface EmailMessage {
   subject: string;
   text: string;
   html?: string;
+  attachments?: { filename: string; path: string }[];
 }
 
 let transporter: Transporter | null | undefined;
@@ -50,6 +51,7 @@ export async function sendEmail(message: EmailMessage): Promise<{ delivered: boo
     subject: message.subject,
     text: message.text,
     html: message.html,
+    attachments: message.attachments,
   });
   return { delivered: true };
 }

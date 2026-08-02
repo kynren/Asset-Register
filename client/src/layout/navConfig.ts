@@ -10,7 +10,7 @@ export interface NavItem {
 export const systemConsoleNav: NavItem[] = [
   { label: "Dashboard", path: "/", icon: "dashboard", module: "dashboard" },
   { label: "Asset Inventory", path: "/assets", icon: "assets", module: "assets" },
-  { label: "Harness Register", path: "/harness", icon: "shield", module: "assets" },
+  { label: "Harness Register", path: "/harness", icon: "shield", module: "harness" },
   { label: "Network Topology Map", path: "/network", icon: "network", module: "network" },
   { label: "Stock Register & Analytics", path: "/stock", icon: "stock", module: "stock" },
   { label: "Helpdesk & Ticketing", path: "/helpdesk", icon: "helpdesk", module: "helpdesk" },
