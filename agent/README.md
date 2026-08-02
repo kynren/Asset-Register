@@ -91,33 +91,41 @@ Domotz's own agent installers work.
 1. Build it once (from a machine with Python 3.10+ and this folder's deps —
    see "Building the .exe" below), or grab a pre-built copy if your team
    already publishes one.
-2. Copy `KynrenRelayAgent.exe` to the Windows machine that's on the target
-   LAN and stays powered on.
-3. Right-click it and choose **Run as administrator**. First run:
+2. Copy `KynrenRelayAgent.exe` to a plain top-level folder on the Windows
+   machine that's on the target LAN and stays powered on — e.g.
+   `C:\Kynren-Agent\`, not a Downloads/Documents/OneDrive-synced folder
+   (those sometimes have ACLs or antivirus behavior that blocks it) and not
+   the `dist\` folder you built it in.
+3. Run it (as Administrator isn't required for this — it's just a console
+   process, not a service installer). First run:
    - Prompts for the server URL and an agent key (generate one under
      **Admin & Setup → System Settings → Agent API Keys**, or **App Settings
      → System Settings → Agent API Keys** for a System Admin) and saves them
      to a `.env` file next to the `.exe`.
-   - Installs and starts itself as a real Windows Service
-     (`KynrenNetworkRelayAgent`, set to start automatically at boot) — no
-     separate `install`/`start` step.
+   - Then runs the exact same polling loop as the plain script below,
+     forever, in that console window.
 4. In the web app, check **"Route network scans through an on-prem relay
    agent"** under System Settings → Network Relay Agent, then run a scan from
    **Network Topology Map → IP Range Scanner** to confirm it picks the job up.
 
-Once installed, manage it like any other Windows Service:
-```
-Get-Service KynrenNetworkRelayAgent
-Restart-Service KynrenNetworkRelayAgent
-```
-Running the `.exe` again later (with `.env` already present) just reports
-whether the service is installed/running and reinstalls it if not — safe to
-re-run any time. `KynrenRelayAgent.exe install|start|stop|restart|remove|debug`
-also works directly, same as running `kynren_network_relay_service.py
-<command>` from Python would.
+Leave the console window open — closing it stops the agent, same as closing
+a console running the plain script would. `network_relay.log` (next to the
+`.exe`) fills in as it runs; if it's still empty after the window shows the
+"polling ... every 3s" banner, something's wrong with reaching it, not with
+the exe itself.
 
-To reconfigure (new server URL or key), stop the service, delete the `.env`
-next to the `.exe`, and run it again.
+To reconfigure (new server URL or key), delete the `.env` next to the `.exe`
+and run it again — it'll prompt for fresh values.
+
+**Starting automatically without a console window left open:** run
+`install_relay_task.ps1` (as Administrator, from the same folder as the
+`.exe`, after configuring it once by hand) to register it as a Windows
+Scheduled Task that starts at logon. This intentionally isn't a Windows
+Service — a Service runs as `LocalSystem`, a different network/security
+context than your own logged-on session, which has been the actual cause of
+"the agent reports success but never actually connects" on some networks. A
+Scheduled Task set to run "at log on" keeps it in the same context that's
+already proven to work.
 
 #### Building the .exe
 
@@ -128,10 +136,17 @@ pip install -r requirements-network-relay.txt pyinstaller
 pyinstaller relay_agent.spec --noconfirm
 ```
 The output is `dist/KynrenRelayAgent.exe` — copy just that one file to the
-target machine. `relay_agent.spec` bundles `kynren_relay_agent_main.py`
-(which wraps `kynren_network_relay_service.py`'s Windows Service around
-`kynren_network_relay.py`'s scan logic) plus every pywin32 module the service
-wrapper needs — nothing else has to be installed on the target machine.
+target machine (not the whole `dist\` folder — see the placement note
+above). `relay_agent.spec` bundles `kynren_relay_agent_main.py`, which just
+runs `kynren_network_relay.py`'s own `main()` directly — no pywin32, no
+Windows Service, nothing else has to be installed on the target machine.
+
+If you specifically want a real Windows Service instead (starts before any
+user logs on, Windows can auto-restart it on crash), that's still available
+as an advanced, Python-only path — see `install_relay_service.ps1` and
+`kynren_network_relay_service.py`. It's no longer what the packaged `.exe`
+does by default, since the LocalSystem context it runs under has been an
+actual source of silent connection failures.
 
 ### Manual setup (any OS, or for development)
 

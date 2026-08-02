@@ -10,7 +10,7 @@ import { parseCsvRaw, toCsv } from "../../lib/csv";
 import { notifyUsers } from "../../lib/notify";
 import { sendEventEmail } from "../../lib/emailNotify";
 import { generateTempPassword } from "../../lib/passwords";
-import { pingHost } from "../../lib/ping";
+import { relayAwarePing } from "../../lib/relayTransport";
 import { getAssetHeartbeatSnapshot, subscribeToAssetHeartbeat } from "../../lib/assetHeartbeat";
 
 const include = {
@@ -136,7 +136,7 @@ export async function pingAsset(req: Request, res: Response) {
   if (!asset) throw new ApiError(404, "Asset not found");
 
   const target = asset.staticIpAddress || asset.assetTag;
-  const result = await pingHost(target);
+  const result = await relayAwarePing(target);
   res.json({ ...result, target });
 }
 
@@ -175,7 +175,7 @@ export async function showStatus(_req: Request, res: Response) {
 
   const results = await Promise.all(
     assets.map(async (asset) => {
-      const result = await pingHost(asset.staticIpAddress || asset.assetTag);
+      const result = await relayAwarePing(asset.staticIpAddress || asset.assetTag);
       return { id: asset.id, assetTag: asset.assetTag, name: asset.name, ...result };
     })
   );

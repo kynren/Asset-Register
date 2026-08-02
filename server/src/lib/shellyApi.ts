@@ -22,6 +22,9 @@
  * LightingDevice row so a normal status poll only needs one follow-up request.
  */
 
+import { isNetworkRelayEnabled } from "../modules/network/scan.service";
+import { relayAwareFetch } from "./relayTransport";
+
 const TIMEOUT_MS = 4000;
 
 export type ShellyKind = "SWITCH" | "LIGHT";
@@ -37,7 +40,14 @@ function connectionErrorMessage(err: unknown): string {
   return e?.message ?? "Unknown network error.";
 }
 
-async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+async function fetchWithTimeout(url: string, init?: RequestInit) {
+  if (await isNetworkRelayEnabled()) {
+    try {
+      return await relayAwareFetch(url, { method: init?.method as string | undefined, headers: init?.headers as Record<string, string> | undefined, body: init?.body as string | undefined, timeoutMs: TIMEOUT_MS });
+    } catch (err) {
+      throw new ShellyError(err instanceof Error ? err.message : "Relay request failed.");
+    }
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {

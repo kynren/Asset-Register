@@ -19,6 +19,7 @@ Run manually:
 """
 
 import argparse
+import base64
 import ipaddress
 import json
 import logging
@@ -31,6 +32,7 @@ import socket
 import struct
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -48,6 +50,9 @@ LOG_PATH = SCRIPT_DIR / "network_relay.log"
 IS_WINDOWS = platform.system() == "Windows"
 
 POLL_INTERVAL_SECONDS = 3          # how often to ask "any scans queued?" while idle
+DEVICE_JOB_WORKERS = 20             # matches server's assetHeartbeat.ts PING_CONCURRENCY so this
+                                    # agent can actually keep pace with a full asset-sweep burst
+DEVICE_JOB_IDLE_POLL_SECONDS = 1    # how often each idle device-job worker re-checks the queue
 HOST_CONCURRENCY = 24              # mirrors server SCAN_CONCURRENCY
 PROGRESS_REPORT_EVERY = 15         # PATCH progress every N hosts scanned
 PING_TIMEOUT_MS = 800
@@ -837,6 +842,108 @@ def report_discovery(api_base_url: str, api_key: str, subnets: list[dict], logge
         logger.warning(f"discovery report failed: {exc}")
 
 
+# ───────────────────────── Generic device job (PING/HTTP) ─────────────────────────
+#
+# The counterpart to fetch_next_job/run_job/submit_results above, but for on-demand relayed
+# device calls — ISAPI (NVR/Access Control), Shelly/Tasmota/generic-HTTP lighting control, and
+# asset ping. See server/src/lib/relayDeviceJobs.ts for the job queue this polls and
+# server/src/lib/relayTransport.ts for the server-side callers. Polled every cycle of the same
+# run_loop(), ahead of the scan-job check, so an on-demand action (toggle a light, open a door)
+# isn't stuck waiting behind a potentially slow scan job.
+
+def fetch_next_device_job(api_base_url: str, api_key: str, logger: logging.Logger) -> dict | None:
+    url = f"{api_base_url.rstrip('/')}/api/network-relay/next-device-job"
+    try:
+        response = requests.get(url, headers={"X-Agent-Key": api_key}, timeout=10)
+        if response.status_code == 204:
+            return None
+        if response.status_code != 200:
+            logger.warning(f"next-device-job responded {response.status_code} — {response.text[:200]}")
+            return None
+        return response.json()
+    except requests.RequestException as exc:
+        logger.warning(f"next-device-job request failed: {exc}")
+        return None
+
+
+def submit_device_job_result(api_base_url: str, api_key: str, job_id: int, result: dict, logger: logging.Logger) -> None:
+    url = f"{api_base_url.rstrip('/')}/api/network-relay/device-jobs/{job_id}/complete"
+    try:
+        response = requests.post(
+            url,
+            headers={"X-Agent-Key": api_key, "Content-Type": "application/json"},
+            data=json.dumps(result),
+            timeout=10,
+        )
+        if response.status_code != 200:
+            logger.warning(f"device-job {job_id} complete responded {response.status_code} — {response.text[:200]}")
+    except requests.RequestException as exc:
+        logger.warning(f"device-job {job_id} complete request failed: {exc}")
+
+
+def run_device_job(job: dict, api_base_url: str, api_key: str, logger: logging.Logger) -> None:
+    job_id = job["id"]
+    kind = job.get("kind")
+    timeout_s = max(1, (job.get("timeoutMs") or 8000) / 1000)
+
+    if kind == "PING":
+        target = job["target"]
+        alive, response_time_ms = ping_host(target, int(timeout_s * 1000))
+        body = base64.b64encode(json.dumps({"alive": alive, "responseTimeMs": response_time_ms}).encode("utf-8")).decode("ascii")
+        logger.info(f"Device job {job_id}: PING {target} -> alive={alive} ({response_time_ms}ms)")
+        submit_device_job_result(api_base_url, api_key, job_id, {"status": "COMPLETED", "responseBodyBase64": body}, logger)
+        return
+
+    if kind == "HTTP":
+        scheme = job.get("protocolScheme") or "http"
+        url = f"{scheme}://{job['target']}{job.get('path') or ''}"
+        method = job.get("method") or "GET"
+        headers = job.get("requestHeaders") or {}
+        data = job.get("requestBody")
+        auth = None
+        if job.get("digestUsername") and job.get("digestPassword"):
+            auth = requests.auth.HTTPDigestAuth(job["digestUsername"], job["digestPassword"])
+        try:
+            response = requests.request(method, url, headers=headers, data=data, auth=auth, timeout=timeout_s)
+            body_b64 = base64.b64encode(response.content).decode("ascii")
+            logger.info(f"Device job {job_id}: {method} {url} -> {response.status_code}")
+            submit_device_job_result(
+                api_base_url,
+                api_key,
+                job_id,
+                {
+                    "status": "COMPLETED",
+                    "responseStatus": response.status_code,
+                    "responseHeaders": dict(response.headers),
+                    "responseBodyBase64": body_b64,
+                },
+                logger,
+            )
+        except requests.RequestException as exc:
+            logger.warning(f"Device job {job_id}: {method} {url} failed: {exc}")
+            submit_device_job_result(api_base_url, api_key, job_id, {"status": "FAILED", "errorMessage": str(exc)}, logger)
+        return
+
+    logger.warning(f"Device job {job_id}: unrecognized kind {kind!r}")
+    submit_device_job_result(api_base_url, api_key, job_id, {"status": "FAILED", "errorMessage": f"Unrecognized job kind: {kind}"}, logger)
+
+
+def device_job_worker_loop(worker_id: int, api_base_url: str, api_key: str, logger: logging.Logger, stop_event) -> None:
+    """One of DEVICE_JOB_WORKERS background workers continuously draining the device-job queue.
+    Each claim (GET /next-device-job) is atomic server-side, so any number of these can run
+    concurrently without two workers ever picking up the same job."""
+    while stop_event is None or not stop_event.is_set():
+        try:
+            job = fetch_next_device_job(api_base_url, api_key, logger)
+            if job is None:
+                (stop_event.wait if stop_event else time.sleep)(DEVICE_JOB_IDLE_POLL_SECONDS)
+                continue
+            run_device_job(job, api_base_url, api_key, logger)
+        except Exception:
+            logger.exception(f"Unexpected error in device-job worker {worker_id}")
+            (stop_event.wait if stop_event else time.sleep)(DEVICE_JOB_IDLE_POLL_SECONDS)
+
+
 def run_job(job: dict, api_base_url: str, api_key: str, logger: logging.Logger) -> None:
     job_id = job["id"]
     addresses = expand_range(job["startIp"], job["endIp"])
@@ -910,6 +1017,20 @@ def run_loop(api_base_url: str, api_key: str, logger: logging.Logger, stop_event
             report_discovery(api_base_url, api_key, subnets, logger)
     except Exception:
         logger.exception("Local subnet discovery failed (non-fatal, continuing)")
+
+    # Device jobs (PING/HTTP) are handled by a small pool of background worker threads, not
+    # inline in the scan-job loop below — the asset-heartbeat sweep alone can enqueue ~20 PING
+    # jobs at once every 5s (see server's assetHeartbeat.ts PING_CONCURRENCY), and a single
+    # job-at-a-time consumer can't keep up, causing a growing backlog and stale pushed status.
+    # Each worker independently claims one job at a time via the same atomic
+    # GET /next-device-job (server-side updateMany makes concurrent claims race-safe), so workers
+    # never double-process a job.
+    for worker_id in range(DEVICE_JOB_WORKERS):
+        threading.Thread(
+            target=device_job_worker_loop,
+            args=(worker_id, api_base_url, api_key, logger, stop_event),
+            daemon=True,
+        ).start()
 
     while stop_event is None or not stop_event.is_set():
         try:
