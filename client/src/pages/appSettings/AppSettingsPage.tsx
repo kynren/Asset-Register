@@ -3,8 +3,11 @@ import { OrganizationsTab } from "./OrganizationsTab";
 import { BackupsTab } from "./BackupsTab";
 import { SystemSettingsTab } from "./SystemSettingsTab";
 import { SystemStatusTab } from "./SystemStatusTab";
+import { ChangeManagementTab } from "./ChangeManagementTab";
 import { RolesTab } from "../admin/RolesTab";
+import { Icon } from "../../components/Icon";
 import { useAuth } from "../../auth/AuthContext";
+import { CHANGE_TYPE_INFO, ScheduledChangeRow } from "./scheduledChangeTypes";
 
 const TABS = [
   { key: "organizations", label: "Organizations" },
@@ -12,6 +15,7 @@ const TABS = [
   { key: "backups", label: "Backups" },
   { key: "settings", label: "System Settings" },
   { key: "status", label: "System Status" },
+  { key: "changeManagement", label: "Change Management" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -19,6 +23,42 @@ type TabKey = (typeof TABS)[number]["key"];
 export function AppSettingsPage() {
   const [tab, setTab] = useState<TabKey>("organizations");
   const { organization } = useAuth();
+
+  // Deliberately NOT persisted anywhere (localStorage, server preference, etc.) — a System Admin
+  // must re-confirm which organization they're managing every single time they navigate into App
+  // Settings, even if `organization` is already set from a previous visit. Resets to false on
+  // every mount of this component, which is exactly what "every visit" means here.
+  const [orgConfirmed, setOrgConfirmed] = useState(false);
+
+  // Set when "Edit" is clicked on a pending scheduled change in Change Management — routes the
+  // admin to the tab the change came from, with that tab's form seeded from the change's payload
+  // instead of live data, and its Save button re-targeted at PATCHing this same change.
+  const [editingChange, setEditingChange] = useState<ScheduledChangeRow | null>(null);
+
+  function handleOrgSelected() {
+    setOrgConfirmed(true);
+  }
+
+  function handleChangeOrganization() {
+    setOrgConfirmed(false);
+    setEditingChange(null);
+    setTab("organizations");
+  }
+
+  function handleEditScheduledChange(change: ScheduledChangeRow) {
+    setEditingChange(change);
+    setTab(CHANGE_TYPE_INFO[change.changeType].tab);
+  }
+
+  function handleTabClick(key: TabKey) {
+    if (!orgConfirmed && key !== "organizations") return;
+    if (key !== CHANGE_TYPE_INFO.SYSTEM_SETTINGS.tab && key !== CHANGE_TYPE_INFO.BACKUP_SETTINGS.tab && key !== CHANGE_TYPE_INFO.ROLE_PERMISSIONS.tab) {
+      setEditingChange(null);
+    }
+    setTab(key);
+  }
+
+  const activeTab: TabKey = orgConfirmed ? tab : "organizations";
 
   return (
     <div className="stack gap-3">
@@ -28,30 +68,63 @@ export function AppSettingsPage() {
             <h1 className="page-title">App Settings</h1>
             <p className="page-subtitle">Platform-level administration — organizations, backups, and system-wide settings. Visible only to System Admin.</p>
           </div>
+          {orgConfirmed && organization && (
+            <div className="row gap-2" style={{ alignItems: "center" }}>
+              <span className="muted" style={{ fontSize: 12 }}>
+                Organization: <strong style={{ color: "var(--color-text)" }}>{organization.name}</strong>
+              </span>
+              <button className="btn btn-secondary btn-sm" onClick={handleChangeOrganization}>
+                <Icon name="refresh" size={12} /> Change
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="row gap-2 flex-wrap">
-          {TABS.map((t) => (
-            <button key={t.key} className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab(t.key)}>
-              {t.label}
-            </button>
-          ))}
+          {TABS.map((t) => {
+            const disabled = !orgConfirmed && t.key !== "organizations";
+            return (
+              <button
+                key={t.key}
+                className={`btn btn-sm ${activeTab === t.key ? "btn-primary" : "btn-secondary"}`}
+                disabled={disabled}
+                title={disabled ? "Select an organization first" : undefined}
+                onClick={() => handleTabClick(t.key)}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {tab === "organizations" && <OrganizationsTab />}
-      {tab === "roles" && (
+      {activeTab === "organizations" && <OrganizationsTab onOrgSelected={handleOrgSelected} strictActiveDisable={orgConfirmed} />}
+      {activeTab === "roles" && (
         <div className="stack gap-3">
           <p className="muted" style={{ margin: 0 }}>
-            Editing roles for <strong>{organization?.name ?? "the current organization"}</strong>. Use the organization
-            switcher in the account menu (top right) to manage a different organization's roles.
+            Editing roles for <strong>{organization?.name ?? "the current organization"}</strong>.
           </p>
-          <RolesTab />
+          <RolesTab
+            enableScheduling
+            editingScheduledChange={editingChange?.changeType === "ROLE_PERMISSIONS" ? editingChange : null}
+            onDoneEditingScheduledChange={() => setEditingChange(null)}
+          />
         </div>
       )}
-      {tab === "backups" && <BackupsTab />}
-      {tab === "settings" && <SystemSettingsTab />}
-      {tab === "status" && <SystemStatusTab />}
+      {activeTab === "backups" && (
+        <BackupsTab
+          editingScheduledChange={editingChange?.changeType === "BACKUP_SETTINGS" ? editingChange : null}
+          onDoneEditingScheduledChange={() => setEditingChange(null)}
+        />
+      )}
+      {activeTab === "settings" && (
+        <SystemSettingsTab
+          editingScheduledChange={editingChange?.changeType === "SYSTEM_SETTINGS" ? editingChange : null}
+          onDoneEditingScheduledChange={() => setEditingChange(null)}
+        />
+      )}
+      {activeTab === "status" && <SystemStatusTab />}
+      {activeTab === "changeManagement" && <ChangeManagementTab onEdit={handleEditScheduledChange} />}
     </div>
   );
 }

@@ -85,11 +85,15 @@ export async function update(req: Request, res: Response) {
   res.json(role);
 }
 
-export async function updatePermissions(req: Request, res: Response) {
-  const id = Number(req.params.id);
-  const { permissions } = req.body;
+export type RolePermissionInput = { module: string; canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean };
 
-  const existing = await prisma.role.findUnique({ where: { id }, select: { name: true } });
+// Shared by the direct-save route below AND the App Settings "Change Management" scheduler/publish
+// path (see modules/scheduledChanges) — a scheduled permission change re-runs this exact function
+// at apply time, not just at schedule-creation time, so both guards below are re-validated against
+// the role's CURRENT state even if it was valid when the change was originally scheduled (e.g. the
+// role could have been renamed to "System Admin" or deleted in the meantime).
+export async function applyRolePermissions(roleId: number, permissions: RolePermissionInput[], userId: number) {
+  const existing = await prisma.role.findUnique({ where: { id: roleId }, select: { name: true } });
   if (!existing) throw new ApiError(404, "Role not found");
   if (isSystemAdminName(existing.name)) throw new ApiError(400, "System Admin always has full access and cannot be edited.");
 
@@ -98,25 +102,31 @@ export async function updatePermissions(req: Request, res: Response) {
   // allowed to be granted any part of it. The UI already hides this module's row for every role
   // except System Admin (see client RolesTab.tsx), but that's just presentation — this is the
   // actual enforcement, so a direct API call can't grant it either.
-  const grantsAppSettings = (permissions as { module: string; canView?: boolean; canCreate?: boolean; canEdit?: boolean; canDelete?: boolean; canExport?: boolean }[]).some(
+  const grantsAppSettings = permissions.some(
     (p) => p.module === APP_SETTINGS_MODULE && (p.canView || p.canCreate || p.canEdit || p.canDelete || p.canExport)
   );
   if (grantsAppSettings) throw new ApiError(400, "App Settings can only be granted to the System Admin role.");
 
   await prisma.$transaction(
-    permissions.map((p: { module: string; canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean }) =>
+    permissions.map((p) =>
       prisma.rolePermission.upsert({
-        where: { roleId_module: { roleId: id, module: p.module } },
+        where: { roleId_module: { roleId, module: p.module } },
         update: p,
-        create: { roleId: id, ...p },
+        create: { roleId, ...p },
       })
     )
   );
 
-  await logAudit({ userId: req.user!.id, action: "role.update_permissions", entityType: "Role", entityId: id });
-  const role = await prisma.role.findUnique({ where: { id }, include: { permissions: true } });
+  await logAudit({ userId, action: "role.update_permissions", entityType: "Role", entityId: roleId });
+  const role = await prisma.role.findUnique({ where: { id: roleId }, include: { permissions: true } });
   if (!role) throw new ApiError(404, "Role not found");
-  res.json(padPermissions(role));
+  return padPermissions(role);
+}
+
+export async function updatePermissions(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const { permissions } = req.body;
+  res.json(await applyRolePermissions(id, permissions, req.user!.id));
 }
 
 export async function remove(req: Request, res: Response) {

@@ -1,6 +1,10 @@
 @layer components {
   .sidebar {
-    @apply w-sidebar min-w-sidebar text-sidebar-text flex flex-col h-full overflow-y-auto transition-all duration-[180ms] ease-in-out;
+    /* overflow-hidden here, not overflow-y-auto — the sidebar itself never scrolls as a whole.
+       .sidebar-brand-block (top) and .sidebar-bottom-group (bottom) are shrink-0 and always fully
+       visible; only .sidebar-nav in between scrolls, so the logo/page-title and the battery/clock/
+       collapse controls stay pinned regardless of how many nav items are showing. */
+    @apply w-sidebar min-w-sidebar text-sidebar-text flex flex-col h-full overflow-hidden transition-all duration-[180ms] ease-in-out;
     background: var(--color-sidebar-bg);
   }
   .sidebar.collapsed {
@@ -27,7 +31,11 @@
   }
 
   .sidebar-nav {
-    @apply flex-1 px-2 py-2.5 flex flex-col gap-0.5;
+    @apply flex-1 min-h-0 overflow-y-auto px-2 py-2.5 flex flex-col gap-0.5;
+  }
+
+  .sidebar-bottom-group {
+    @apply shrink-0;
   }
 
   .sidebar-section-label {
@@ -68,7 +76,7 @@
   }
 
   .sidebar-collapse-btn {
-    @apply flex items-center gap-2 m-2 px-2.5 py-2 rounded-md border border-white/10 bg-transparent text-sidebar-text cursor-pointer text-xs shrink-0;
+    @apply flex items-center justify-end gap-2 m-2 px-2.5 py-2 rounded-md bg-transparent text-sidebar-text cursor-pointer text-xs shrink-0;
   }
   .sidebar-collapse-btn:hover {
     @apply bg-sidebar-hover;

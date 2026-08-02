@@ -22,6 +22,8 @@ export const NOTIFICATION_TYPES: NotificationTypeInfo[] = [
   { type: "device_offline", label: "Device Offline", description: "A monitored network device went offline.", defaultVariant: "error" },
   { type: "device_online", label: "Device Back Online", description: "A monitored network device came back online.", defaultVariant: "success" },
   { type: "lighting_automation_start", label: "Lighting Automation Started", description: "A scheduled lighting automation began running.", defaultVariant: "info" },
+  { type: "scheduled_change_published", label: "Scheduled Change Published", description: "A scheduled App Settings change (system settings, backups, or role permissions) was applied.", defaultVariant: "success" },
+  { type: "scheduled_change_failed", label: "Scheduled Change Failed", description: "A scheduled App Settings change failed to apply.", defaultVariant: "error" },
 ];
 
 export function findNotificationTypeInfo(type: string): NotificationTypeInfo | undefined {

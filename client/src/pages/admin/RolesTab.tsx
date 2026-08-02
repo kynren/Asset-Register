@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { MODULES, ModuleName } from "../../lib/permissions";
 import { Skeleton } from "../../components/Skeleton";
+import { useToast } from "../../components/toast/ToastProvider";
+import { PublishOrScheduleModal } from "../appSettings/PublishOrScheduleModal";
+import { ScheduledChangeRow } from "../appSettings/scheduledChangeTypes";
 
 interface RolePermission {
   module: string;
@@ -47,21 +50,57 @@ const MODULE_INFO: Record<ModuleName, { label: string; description: string }> = 
   "app-settings": { label: "App Settings", description: "Organizations (create new orgs), Backups, System Settings, System Status — platform-level, System Admin only." },
 };
 
-export function RolesTab() {
+export function RolesTab({
+  enableScheduling,
+  editingScheduledChange,
+  onDoneEditingScheduledChange,
+}: {
+  enableScheduling?: boolean;
+  editingScheduledChange?: ScheduledChangeRow | null;
+  onDoneEditingScheduledChange?: () => void;
+} = {}) {
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   const { data: roles, isLoading } = useQuery({ queryKey: ["roles"], queryFn: async () => (await axiosClient.get("/roles")).data as Role[] });
   const selectedRole = roles?.find((r) => r.id === selectedRoleId) ?? roles?.[0];
 
   const [draft, setDraft] = useState<RolePermission[] | null>(null);
+
+  useEffect(() => {
+    if (editingScheduledChange?.targetId) {
+      setSelectedRoleId(editingScheduledChange.targetId);
+      setDraft((editingScheduledChange.payload as { permissions: RolePermission[] }).permissions);
+    }
+  }, [editingScheduledChange]);
+
   const activePermissions = draft ?? selectedRole?.permissions ?? [];
 
   const saveMutation = useMutation({
     mutationFn: () => axiosClient.put(`/roles/${selectedRole!.id}/permissions`, { permissions: buildFullMatrix(activePermissions) }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["roles"] }); setDraft(null); },
   });
+
+  const updateScheduledMutation = useMutation({
+    mutationFn: () => axiosClient.patch(`/scheduled-changes/${editingScheduledChange!.id}`, { payload: { permissions: buildFullMatrix(activePermissions) } }),
+    onSuccess: () => {
+      showToast({ variant: "success", title: "Scheduled change updated", message: "The changes you made were saved to the pending schedule." });
+      queryClient.invalidateQueries({ queryKey: ["scheduled-changes"] });
+      setDraft(null);
+      onDoneEditingScheduledChange?.();
+    },
+  });
+
+  function handleSaveClick() {
+    if (editingScheduledChange) updateScheduledMutation.mutate();
+    else if (enableScheduling) setShowPublishModal(true);
+    else saveMutation.mutate();
+  }
+
+  const savingSchedule = editingScheduledChange ? updateScheduledMutation.isPending : saveMutation.isPending;
 
   const createMutation = useMutation({
     mutationFn: (values: { name: string; description: string }) => axiosClient.post("/roles", values),
@@ -128,11 +167,18 @@ export function RolesTab() {
             {isSystemAdminRole ? (
               <span className="muted" style={{ fontSize: 12 }}>Always full access — cannot be edited.</span>
             ) : (
-              <button className="btn btn-primary btn-sm" disabled={!draft || saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-                {saveMutation.isPending ? "Saving..." : "Save Permissions"}
+              <button className="btn btn-primary btn-sm" disabled={!draft || savingSchedule} onClick={handleSaveClick}>
+                {savingSchedule ? "Saving..." : editingScheduledChange ? "Update Scheduled Change" : "Save Permissions"}
               </button>
             )}
           </div>
+
+          {editingScheduledChange && (
+            <div className="alert alert-warning" style={{ fontSize: 12, marginBottom: 10 }}>
+              Editing scheduled change #{editingScheduledChange.id} — saving here updates the pending schedule instead of publishing immediately.{" "}
+              <button className="btn btn-secondary btn-sm" style={{ marginLeft: 8 }} onClick={() => { setDraft(null); onDoneEditingScheduledChange?.(); }}>Stop Editing</button>
+            </div>
+          )}
 
           <div style={{ overflowX: "auto" }}>
             <table className="data-table">
@@ -172,6 +218,19 @@ export function RolesTab() {
       )}
 
       {showCreate && <CreateRoleModal onClose={() => setShowCreate(false)} onSubmit={(v) => createMutation.mutate(v)} submitting={createMutation.isPending} />}
+
+      {showPublishModal && selectedRole && (
+        <PublishOrScheduleModal
+          title="Save Role Permissions"
+          changeType="ROLE_PERMISSIONS"
+          targetId={selectedRole.id}
+          payload={{ permissions: buildFullMatrix(activePermissions) }}
+          onPublishNow={async () => { await saveMutation.mutateAsync(); }}
+          publishing={saveMutation.isPending}
+          onScheduled={() => setShowPublishModal(false)}
+          onClose={() => setShowPublishModal(false)}
+        />
+      )}
     </div>
   );
 }

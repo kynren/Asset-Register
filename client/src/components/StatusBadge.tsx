@@ -17,6 +17,10 @@ const TONE_MAP: Record<string, string> = {
   UNKNOWN: "badge-neutral",
   ACTIVE: "badge-success",
   INACTIVE: "badge-neutral",
+  PENDING: "badge-warning",
+  PUBLISHED: "badge-success",
+  CANCELLED: "badge-neutral",
+  FAILED: "badge-danger",
 };
 
 export function StatusBadge({ status }: { status: string }) {

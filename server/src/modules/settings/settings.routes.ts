@@ -11,6 +11,7 @@ import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { generateApiKey } from "../../lib/passwords";
+import { applySystemSettings } from "./settings.service";
 
 const BRANDING_UPLOAD_ROOT = path.join(__dirname, "..", "..", "..", "uploads", "branding");
 fs.mkdirSync(BRANDING_UPLOAD_ROOT, { recursive: true });
@@ -43,12 +44,7 @@ const updateSchema = z.object({ values: z.record(z.string()) });
 
 router.put("/", requirePermission("app-settings", "edit"), validateBody(updateSchema), async (req, res) => {
   const { values } = req.body as { values: Record<string, string> };
-  await prisma.$transaction(
-    Object.entries(values).map(([key, value]) =>
-      prisma.systemSetting.upsert({ where: { key }, update: { value }, create: { key, value } })
-    )
-  );
-  await logAudit({ userId: req.user!.id, action: "settings.update", metadata: values });
+  await applySystemSettings(values, req.user!.id);
   res.json({ ok: true });
 });
 

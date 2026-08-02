@@ -2,6 +2,7 @@ import { useState } from "react";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { useCryptoReveal } from "../../hooks/useCryptoReveal";
+import { useToast } from "../../components/toast/ToastProvider";
 
 export interface VaultEntry {
   id: number;
@@ -28,6 +29,7 @@ export function VaultEntryRow({ entry, onEdit, onDelete }: { entry: VaultEntry; 
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const favicon = faviconFor(entry.websiteUrl);
+  const { showToast } = useToast();
 
   async function handleToggleReveal() {
     if (phase === "revealed" || phase === "decrypting") {
@@ -38,6 +40,11 @@ export function VaultEntryRow({ entry, onEdit, onDelete }: { entry: VaultEntry; 
     try {
       const res = await axiosClient.post(`/vault/${entry.id}/reveal`);
       reveal(res.data.password as string);
+    } catch (err: any) {
+      // Without this, a failed decrypt (or any request error) previously reset back to the
+      // hidden dots with zero indication anything went wrong — looked exactly like the button
+      // just "did nothing".
+      showToast({ variant: "error", title: "Couldn't reveal password", message: err?.response?.data?.error ?? "Something went wrong decrypting this entry." });
     } finally {
       setLoading(false);
     }
@@ -50,6 +57,8 @@ export function VaultEntryRow({ entry, onEdit, onDelete }: { entry: VaultEntry; 
       await navigator.clipboard.writeText(res.data.password);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
+    } catch (err: any) {
+      showToast({ variant: "error", title: "Couldn't copy password", message: err?.response?.data?.error ?? "Something went wrong decrypting this entry." });
     } finally {
       setLoading(false);
     }

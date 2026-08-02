@@ -45,10 +45,9 @@ interface GraphEdge {
   bandwidthMbps: number | null;
 }
 
-// Device reachability convention app-wide: ONLINE is red, OFFLINE is green (see .status-flash /
-// .tag-dot in global.css) — deliberately inverted from the usual instinct so a device coming
-// online draws the eye. DEGRADED sits outside that binary and keeps its own amber.
-const STATUS_COLOR: Record<string, string> = { ONLINE: "#ef4444", DEGRADED: "#f59e0b", OFFLINE: "#22c55e" };
+// Device reachability convention app-wide: ONLINE is green, OFFLINE is red (see .status-flash /
+// .tag-dot in global.css). DEGRADED sits outside that binary and keeps its own amber.
+const STATUS_COLOR: Record<string, string> = { ONLINE: "#22c55e", DEGRADED: "#f59e0b", OFFLINE: "#ef4444" };
 const ROLE_LABEL: Record<string, string> = {
   CORE_SWITCH: "Core Switch",
   DISTRIBUTION_SWITCH: "Distribution Switch",

@@ -10,6 +10,9 @@ import { PasswordInput } from "../../components/PasswordInput";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
+import { useToast } from "../../components/toast/ToastProvider";
+import { PublishOrScheduleModal } from "./PublishOrScheduleModal";
+import { ScheduledChangeRow } from "./scheduledChangeTypes";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -67,13 +70,21 @@ function formatBytes(n: number | null): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function BackupsTab() {
+export function BackupsTab({
+  editingScheduledChange,
+  onDoneEditingScheduledChange,
+}: {
+  editingScheduledChange?: ScheduledChangeRow | null;
+  onDoneEditingScheduledChange?: () => void;
+} = {}) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [draft, setDraft] = useState<BackupSettings | null>(null);
   const [showAddDestination, setShowAddDestination] = useState(false);
   const [editingDestination, setEditingDestination] = useState<BackupDestination | null>(null);
   const [deletingDestination, setDeletingDestination] = useState<BackupDestination | null>(null);
   const [runPage, setRunPage] = useState(1);
+  const [showPublishModal, setShowPublishModal] = useState(false);
 
   const { data: settings } = useQuery({
     queryKey: ["backup-settings"],
@@ -90,13 +101,30 @@ export function BackupsTab() {
   });
 
   useEffect(() => {
-    if (settings && !draft) setDraft(settings);
-  }, [settings, draft]);
+    if (editingScheduledChange) setDraft(editingScheduledChange.payload as BackupSettings);
+    else if (settings && !draft) setDraft(settings);
+  }, [settings, draft, editingScheduledChange]);
 
   const saveSettingsMutation = useMutation({
     mutationFn: (values: BackupSettings) => axiosClient.put("/backups/settings", values),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backup-settings"] }),
   });
+
+  const updateScheduledMutation = useMutation({
+    mutationFn: () => axiosClient.patch(`/scheduled-changes/${editingScheduledChange!.id}`, { payload: draft }),
+    onSuccess: () => {
+      showToast({ variant: "success", title: "Scheduled change updated", message: "The changes you made were saved to the pending schedule." });
+      queryClient.invalidateQueries({ queryKey: ["scheduled-changes"] });
+      onDoneEditingScheduledChange?.();
+    },
+  });
+
+  function handleSaveClick() {
+    if (editingScheduledChange) updateScheduledMutation.mutate();
+    else setShowPublishModal(true);
+  }
+
+  const savingSchedule = editingScheduledChange ? updateScheduledMutation.isPending : saveSettingsMutation.isPending;
 
   const deleteDestinationMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/backups/destinations/${id}`),
@@ -154,6 +182,13 @@ export function BackupsTab() {
           Runs a full database dump (via pg_dump) on the days/time below and pushes it to every enabled destination.
         </p>
 
+        {editingScheduledChange && (
+          <div className="alert alert-warning" style={{ fontSize: 12 }}>
+            Editing scheduled change #{editingScheduledChange.id} — saving here updates the pending schedule instead of publishing immediately.{" "}
+            <button className="btn btn-secondary btn-sm" style={{ marginLeft: 8 }} onClick={() => onDoneEditingScheduledChange?.()}>Stop Editing</button>
+          </div>
+        )}
+
         {draft && (
           <div className="stack gap-2">
             <label className="row gap-2" style={{ cursor: "pointer", alignItems: "center" }}>
@@ -185,14 +220,16 @@ export function BackupsTab() {
 
             <PermissionGate module="app-settings" action="edit">
               <div className="row gap-2">
-                <button className="btn btn-primary btn-sm" disabled={saveSettingsMutation.isPending} onClick={() => saveSettingsMutation.mutate(draft)}>
-                  {saveSettingsMutation.isPending ? "Saving..." : "Save Schedule"}
+                <button className="btn btn-primary btn-sm" disabled={savingSchedule} onClick={handleSaveClick}>
+                  {savingSchedule ? "Saving..." : editingScheduledChange ? "Update Scheduled Change" : "Save Schedule"}
                 </button>
-                <PermissionGate module="app-settings" action="create">
-                  <button className="btn btn-secondary btn-sm" disabled={runNowMutation.isPending} onClick={() => runNowMutation.mutate()}>
-                    <Icon name="refresh" size={12} /> {runNowMutation.isPending ? "Starting..." : "Run Now"}
-                  </button>
-                </PermissionGate>
+                {!editingScheduledChange && (
+                  <PermissionGate module="app-settings" action="create">
+                    <button className="btn btn-secondary btn-sm" disabled={runNowMutation.isPending} onClick={() => runNowMutation.mutate()}>
+                      <Icon name="refresh" size={12} /> {runNowMutation.isPending ? "Starting..." : "Run Now"}
+                    </button>
+                  </PermissionGate>
+                )}
               </div>
             </PermissionGate>
           </div>
@@ -287,6 +324,18 @@ export function BackupsTab() {
           loading={deleteDestinationMutation.isPending}
           onCancel={() => setDeletingDestination(null)}
           onConfirm={() => deleteDestinationMutation.mutate(deletingDestination.id)}
+        />
+      )}
+
+      {showPublishModal && draft && (
+        <PublishOrScheduleModal
+          title="Save Backup Schedule"
+          changeType="BACKUP_SETTINGS"
+          payload={draft as unknown as Record<string, unknown>}
+          onPublishNow={async () => { await saveSettingsMutation.mutateAsync(draft); }}
+          publishing={saveSettingsMutation.isPending}
+          onScheduled={() => setShowPublishModal(false)}
+          onClose={() => setShowPublishModal(false)}
         />
       )}
     </div>

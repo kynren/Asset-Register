@@ -94,6 +94,8 @@ model User {
   networkMonitorSettingsUpdates NetworkMonitorSettings[]
   backupSettingsUpdates         BackupSettings[]
   toastSettingUpdates           ToastSetting[]
+  scheduledChangesCreated       ScheduledChange[]        @relation("ScheduledChangeCreatedBy")
+  scheduledChangesCancelled     ScheduledChange[]        @relation("ScheduledChangeCancelledBy")
 }
 
 model RefreshSession {
@@ -1737,6 +1739,49 @@ model BackupSettings {
 enum BackupDestinationType {
   EMAIL
   S3
+}
+
+// A pending or completed edit to App Settings (system settings, backup schedule, or a role's
+// permission matrix) made from the App Settings "Change Management" area — either applied
+// immediately or deferred to a future scheduledFor time and picked up by
+// lib/scheduledChangeScheduler.ts. payload/beforeSnapshot shapes vary by changeType (see
+// modules/scheduledChanges/scheduledChanges.service.ts): SYSTEM_SETTINGS is `{values}` matching
+// PUT /settings, BACKUP_SETTINGS matches PUT /backups/settings, ROLE_PERMISSIONS is
+// `{permissions}` with targetId = the roleId being edited.
+enum ScheduledChangeType {
+  SYSTEM_SETTINGS
+  BACKUP_SETTINGS
+  ROLE_PERMISSIONS
+}
+
+enum ScheduledChangeStatus {
+  PENDING
+  PUBLISHED
+  CANCELLED
+  FAILED
+}
+
+model ScheduledChange {
+  id             Int                   @id @default(autoincrement())
+  changeType     ScheduledChangeType
+  status         ScheduledChangeStatus @default(PENDING)
+  summary        String
+  payload        Json
+  beforeSnapshot Json?
+  targetId       Int?
+  scheduledFor   DateTime
+  createdById    Int
+  createdBy      User                  @relation("ScheduledChangeCreatedBy", fields: [createdById], references: [id])
+  publishedAt    DateTime?
+  cancelledAt    DateTime?
+  cancelledById  Int?
+  cancelledBy    User?                 @relation("ScheduledChangeCancelledBy", fields: [cancelledById], references: [id])
+  errorMessage   String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([status, scheduledFor])
+  @@index([changeType, targetId])
 }
 
 // Per-notification-type customization of the in-app toast popped when a matching Notification

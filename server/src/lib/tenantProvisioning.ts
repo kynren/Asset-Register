@@ -38,7 +38,7 @@ async function generateUniqueSchemaName(organizationName: string): Promise<strin
 // Calling node directly against Prisma's own CLI entry point sidesteps both problems.
 const PRISMA_CLI_ENTRY = require.resolve("prisma/build/index.js");
 
-function runMigrateDeploy(schemaName: string): Promise<void> {
+export function runMigrateDeploy(schemaName: string): Promise<void> {
   return new Promise((resolve, reject) => {
     execFile(
       process.execPath,

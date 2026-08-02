@@ -44,11 +44,11 @@ export const systemConsoleNav: NavItem[] = [
   { label: "Docs & SOPs", path: "/docs", icon: "book", module: "docs" },
   { label: "Operational Context", path: "/operational-context", icon: "gauge", module: "assets" },
   { label: "Virtual Assistant", path: "/assistant", icon: "assistant", module: "virtual-assistant" },
+  { label: "Password Management", path: "/password", icon: "password", module: "password" },
 ];
 
 export const settingsNav: NavItem[] = [
   { label: "Profile", path: "/profile", icon: "profile" },
   { label: "Admin & Setup", path: "/admin", icon: "admin", module: "admin" },
   { label: "App Settings", path: "/app-settings", icon: "settings", module: "app-settings" },
-  { label: "Password Management", path: "/password", icon: "password", module: "password" },
 ];

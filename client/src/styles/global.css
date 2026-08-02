@@ -510,9 +510,8 @@
     @apply flex items-center gap-2.5 justify-end mt-3.5;
   }
 
-  /* Device reachability convention app-wide: ONLINE flashes red, OFFLINE flashes green — the
-     inverse of the usual traffic-light instinct, chosen deliberately so a device coming online
-     draws the eye the same way an alert would. Shared by every online/offline dot in the app
+  /* Device reachability convention app-wide: ONLINE flashes green, OFFLINE flashes red — the
+     standard traffic-light convention. Shared by every online/offline dot in the app
      (.tag-dot, .ad-status-dot, .nvx-group-dot, .ips-dot) so they never drift out of sync. */
   @keyframes kynren-status-blink {
     0%, 100% { opacity: 1; }
@@ -526,10 +525,10 @@
     @apply w-2 h-2 rounded-full inline-block;
   }
   .tag-dot.online {
-    @apply bg-danger;
+    @apply bg-success;
   }
   .tag-dot.offline {
-    @apply bg-success;
+    @apply bg-danger;
   }
 
   .alert {
@@ -691,6 +690,52 @@
 
 .toast-card-enter {
   animation: toast-card-in 0.18s ease-out;
+}
+
+@keyframes timeline-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes timeline-dot-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  70% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.timeline-rail {
+  position: relative;
+}
+.timeline-rail::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--color-border), transparent);
+}
+.timeline-item {
+  position: relative;
+  padding-left: 40px;
+  animation: timeline-card-in 0.32s ease-out both;
+}
+.timeline-dot {
+  position: absolute;
+  left: 8px;
+  top: 14px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 3px solid var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border);
+  animation: timeline-dot-pop 0.4s ease-out both;
 }
 
 @media print {

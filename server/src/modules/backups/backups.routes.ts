@@ -9,6 +9,7 @@ import { encryptSecret } from "../../lib/crypto";
 import { testDestinationConnection } from "../../lib/backupService";
 import { runBackupNow } from "../../lib/backupRunner";
 import { createBackupDestinationSchema, updateBackupDestinationSchema, updateBackupSettingsSchema } from "./backups.schema";
+import { applyBackupSettings } from "./backups.service";
 
 const router = Router();
 router.use(verifyJwt);
@@ -21,13 +22,7 @@ router.get("/settings", requirePermission("app-settings","view"), async (_req, r
 });
 
 router.put("/settings", requirePermission("app-settings","edit"), validateBody(updateBackupSettingsSchema), async (req, res) => {
-  const settings = await prisma.backupSettings.upsert({
-    where: { id: 1 },
-    update: { ...req.body, updatedById: req.user!.id },
-    create: { id: 1, ...req.body, updatedById: req.user!.id },
-  });
-  await logAudit({ userId: req.user!.id, action: "backups.settings_update", entityType: "BackupSettings", entityId: 1, metadata: req.body });
-  res.json(settings);
+  res.json(await applyBackupSettings(req.body, req.user!.id));
 });
 
 // ───────────────────────── Destinations ─────────────────────────

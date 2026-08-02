@@ -5,10 +5,10 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/FormModal";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Icon } from "../../components/Icon";
 import { PasswordInput } from "../../components/PasswordInput";
 import { PermissionGate } from "../../auth/PermissionGate";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 
 interface OrganizationRow {
@@ -18,24 +18,26 @@ interface OrganizationRow {
   createdAt: string;
 }
 
-export function OrganizationsTab() {
+export function OrganizationsTab({ onOrgSelected, strictActiveDisable }: { onOrgSelected?: () => void; strictActiveDisable?: boolean }) {
   const [showCreate, setShowCreate] = useState(false);
   const [editingOrg, setEditingOrg] = useState<OrganizationRow | null>(null);
+  const [pendingSwitchOrg, setPendingSwitchOrg] = useState<OrganizationRow | null>(null);
   const queryClient = useQueryClient();
   const { organization, switchOrganization } = useAuth();
   const [switchingId, setSwitchingId] = useState<number | null>(null);
-  const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({
     queryKey: ["app-settings-organizations"],
     queryFn: async () => (await axiosClient.get("/app-settings/organizations")).data as OrganizationRow[],
   });
 
-  async function handleEnter(org: OrganizationRow) {
-    setSwitchingId(org.id);
+  async function confirmSwitch() {
+    if (!pendingSwitchOrg) return;
+    setSwitchingId(pendingSwitchOrg.id);
     try {
-      await switchOrganization(org.id);
-      navigate("/");
+      await switchOrganization(pendingSwitchOrg.id);
+      setPendingSwitchOrg(null);
+      onOrgSelected?.();
     } finally {
       setSwitchingId(null);
     }
@@ -54,9 +56,9 @@ export function OrganizationsTab() {
           <div className="row gap-1">
             <button
               className="btn btn-secondary btn-sm btn-icon"
-              title={isActive ? "Currently viewing this organization" : "View as this organization"}
-              disabled={isActive || switchingId !== null}
-              onClick={() => handleEnter(row.original)}
+              title={isActive ? "Currently managing this organization" : "Manage this organization"}
+              disabled={(strictActiveDisable ? isActive : false) || switchingId !== null}
+              onClick={() => setPendingSwitchOrg(row.original)}
             >
               <Icon name={isActive ? "check" : "arrowRight"} size={12} />
             </button>
@@ -77,7 +79,7 @@ export function OrganizationsTab() {
         <p className="muted" style={{ margin: 0, maxWidth: 560 }}>
           Every organization gets its own isolated database schema. Creating one here provisions that schema and its
           first Super Admin user — they run their own organization end to end, but can't create further organizations
-          or reach App Settings themselves. Use the arrow icon to view the app as any organization.
+          or reach App Settings themselves. Use the arrow icon to select an organization to manage here.
         </p>
         <PermissionGate module="app-settings" action="create">
           <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
@@ -89,6 +91,16 @@ export function OrganizationsTab() {
       <div className="card">
         <DataTable columns={columns} data={data ?? []} isLoading={isLoading} emptyMessage="No organizations yet." />
       </div>
+
+      {pendingSwitchOrg && (
+        <ConfirmDialog
+          title={`Manage ${pendingSwitchOrg.name}?`}
+          message='You are now managing this organization. Changes you save here take effect immediately for its users — use "Schedule for Later" when saving a change if you want to avoid disrupting them.'
+          loading={switchingId !== null}
+          onCancel={() => setPendingSwitchOrg(null)}
+          onConfirm={confirmSwitch}
+        />
+      )}
 
       {showCreate && (
         <CreateOrganizationModal
@@ -148,7 +160,7 @@ function EditOrganizationModal({ organization, onClose, onSaved }: { organizatio
         </p>
       )}
       <p className="muted" style={{ fontSize: 12 }}>
-        Branding, logo, and every other per-organization setting is edited by viewing the app as this organization
+        Branding, logo, and every other per-organization setting is edited by selecting this organization to manage
         (use the arrow icon in the Organizations table) and opening System Settings there.
       </p>
     </FormModal>
