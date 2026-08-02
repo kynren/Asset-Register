@@ -165,6 +165,21 @@
     @apply flex items-center justify-between mb-5 gap-3 flex-wrap sticky top-0 z-10 bg-surface pt-6;
   }
 
+  /* For pages with a tab-button row directly under the title (Lighting, NVRs & Cameras, Access
+     Control, Network Topology Map, App Settings, Admin & Setup): the title and the tab row need
+     to scroll off together as ONE sticky unit, not separately — otherwise the tab row (which isn't
+     itself the "header") scrolls out of view while the title stays pinned. `.page-header` already
+     owns its own sticky/background/top-padding for pages that don't have a tab row; these two
+     classes move that same treatment onto the wrapper instead, so the title row underneath can be
+     a plain flex layout with no positioning of its own. */
+  .page-header-sticky {
+    @apply flex flex-col gap-3 sticky top-0 z-10 bg-surface pt-6 pb-4;
+  }
+
+  .page-header-content {
+    @apply flex items-center justify-between gap-3 flex-wrap;
+  }
+
   .page-title {
     @apply text-xl font-semibold m-0;
   }

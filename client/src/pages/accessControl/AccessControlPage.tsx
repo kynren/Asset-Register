@@ -24,19 +24,21 @@ export function AccessControlPage() {
 
   return (
     <div className="stack gap-3">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Access Control</h1>
-          <p className="page-subtitle">Door controllers, persons, access groups, remote door control, credentials, and the access event log — over Hikvision ISAPI.</p>
+      <div className="page-header-sticky">
+        <div className="page-header-content">
+          <div>
+            <h1 className="page-title">Access Control</h1>
+            <p className="page-subtitle">Door controllers, persons, access groups, remote door control, credentials, and the access event log — over Hikvision ISAPI.</p>
+          </div>
         </div>
-      </div>
 
-      <div className="row gap-2 flex-wrap">
-        {TABS.map((t) => (
-          <button key={t.key} className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab(t.key)}>
-            {t.label}
-          </button>
-        ))}
+        <div className="row gap-2 flex-wrap">
+          {TABS.map((t) => (
+            <button key={t.key} className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab(t.key)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === "doors" && <DoorStatusTab />}

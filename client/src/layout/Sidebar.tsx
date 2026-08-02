@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../auth/AuthContext";
 import { useBranding } from "../theme/BrandingContext";
@@ -28,20 +28,23 @@ function SidebarLink({ item, collapsed, indent }: { item: NavItem; collapsed: bo
   );
 }
 
-function readGroupExpanded(label: string) {
-  const raw = localStorage.getItem(`sidebar:group:${label}`);
-  return raw === null ? true : raw === "true";
-}
-
 // Renders as a collapsible section header + indented children when the sidebar itself is
 // expanded; when the sidebar is collapsed to icon-only, the grouping header wouldn't mean
 // anything so the children just render as flat icon links like every other top-level item.
+//
+// Defaults closed on every page — it only auto-opens while the active route is one of its own
+// children, never remembered across navigation. A manual click can still expand/collapse it for
+// browsing, but that override is dropped the moment the route changes, so the next page load (or
+// next unrelated page visited) starts closed again rather than "sticking" open.
 function SidebarGroup({ label, icon, items, collapsed }: { label: string; icon: string; items: NavItem[]; collapsed: boolean }) {
-  const [expanded, setExpanded] = useState(() => readGroupExpanded(label));
+  const location = useLocation();
+  const isChildActive = items.some((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
+  const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
+  const expanded = manualExpanded ?? isChildActive;
 
   useEffect(() => {
-    localStorage.setItem(`sidebar:group:${label}`, String(expanded));
-  }, [label, expanded]);
+    setManualExpanded(null);
+  }, [location.pathname]);
 
   if (items.length === 0) return null;
 
@@ -57,7 +60,7 @@ function SidebarGroup({ label, icon, items, collapsed }: { label: string; icon: 
 
   return (
     <>
-      <button type="button" className="sidebar-link sidebar-group-toggle" onClick={() => setExpanded((e) => !e)}>
+      <button type="button" className="sidebar-link sidebar-group-toggle" onClick={() => setManualExpanded(!expanded)}>
         <Icon name={icon} size={18} />
         <span className="flex-1">{label}</span>
         <Icon name={expanded ? "chevronDown" : "chevronRight"} size={14} />

@@ -8,7 +8,12 @@
   }
 
   .sidebar-brand-block {
-    @apply px-4 py-[18px] border-b border-white/[8%] whitespace-nowrap overflow-hidden;
+    /* shrink-0: without it, a flex child with overflow-hidden gets squeezed below its own content
+       height whenever the sidebar's total content (nav + battery + clock) exceeds the viewport —
+       e.g. once the Controls group auto-expands and adds a few extra rows — silently clipping the
+       bottom of the page-title text instead of letting the sidebar itself scroll (it already can,
+       see .sidebar's own overflow-y-auto). */
+    @apply px-4 py-[18px] border-b border-white/[8%] whitespace-nowrap overflow-hidden shrink-0;
   }
   .sidebar-brand {
     @apply flex items-center gap-2.5 font-bold text-sm text-white;
@@ -47,7 +52,7 @@
   }
 
   .sidebar-battery {
-    @apply flex items-center gap-2 mx-2 mb-1 px-2.5 py-2 rounded-md border border-white/10 text-sidebar-text text-xs whitespace-nowrap overflow-hidden;
+    @apply flex items-center gap-2 mx-2 mb-1 px-2.5 py-2 rounded-md border border-white/10 text-sidebar-text text-xs whitespace-nowrap overflow-hidden shrink-0;
   }
   .sidebar-battery-collapsed {
     @apply justify-center mx-2 mb-1 px-0 py-2;
@@ -63,7 +68,7 @@
   }
 
   .sidebar-collapse-btn {
-    @apply flex items-center gap-2 m-2 px-2.5 py-2 rounded-md border border-white/10 bg-transparent text-sidebar-text cursor-pointer text-xs;
+    @apply flex items-center gap-2 m-2 px-2.5 py-2 rounded-md border border-white/10 bg-transparent text-sidebar-text cursor-pointer text-xs shrink-0;
   }
   .sidebar-collapse-btn:hover {
     @apply bg-sidebar-hover;

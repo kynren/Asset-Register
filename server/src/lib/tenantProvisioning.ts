@@ -6,7 +6,7 @@ import crypto from "crypto";
 import path from "path";
 import bcrypt from "bcryptjs";
 import { controlPlanePool, createOrganization, registerAccount } from "../config/controlPlane";
-import { primeClientForSchema, runWithTenant, tenantDatabaseUrl } from "../config/prisma";
+import { primeClientForSchema, prisma, runWithTenant, tenantDatabaseUrl } from "../config/prisma";
 import { env } from "../config/env";
 import { seedRoles } from "./seedRoles";
 
@@ -74,10 +74,10 @@ export async function provisionOrganization(input: ProvisionOrganizationInput): 
   primeClientForSchema(schemaName);
 
   const userId = await runWithTenant(schemaName, async () => {
-    // Import lazily so this file doesn't create its own top-level binding to the tenant-scoped
-    // `prisma` proxy before runWithTenant's ALS context exists — matches how every other module
-    // consumes it, just written explicitly here since we're intentionally crossing tenants.
-    const { prisma } = await import("../config/prisma");
+    // `prisma` is a Proxy that resolves the current tenant's client on every property access
+    // (see config/prisma.ts) — so importing it at module scope is safe even though we're crossing
+    // tenants here; nothing actually touches the database until a call happens inside this
+    // runWithTenant callback, by which point its ALS context is already active.
     await seedRoles(prisma);
     const superAdminRole = await prisma.role.findUniqueOrThrow({ where: { name: "Super Admin" } });
     const passwordHash = await bcrypt.hash(input.password, 12);

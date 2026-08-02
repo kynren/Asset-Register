@@ -25,19 +25,21 @@ export function AdminPage() {
 
   return (
     <div className="stack gap-3">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Admin & Setup</h1>
-          <p className="page-subtitle">Manage users, roles, categories, email templates, and the audit log.</p>
+      <div className="page-header-sticky">
+        <div className="page-header-content">
+          <div>
+            <h1 className="page-title">Admin & Setup</h1>
+            <p className="page-subtitle">Manage users, roles, categories, email templates, and the audit log.</p>
+          </div>
         </div>
-      </div>
 
-      <div className="row gap-2 flex-wrap">
-        {visibleTabs.map((t) => (
-          <button key={t.key} className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab(t.key)}>
-            {t.label}
-          </button>
-        ))}
+        <div className="row gap-2 flex-wrap">
+          {visibleTabs.map((t) => (
+            <button key={t.key} className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab(t.key)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === "users" && <UsersTab />}
