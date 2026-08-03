@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface AssetOption {
   id: number;
@@ -140,15 +141,16 @@ export function QrScannerModal({ onClose }: { onClose: () => void }) {
 
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 10, letterSpacing: "0.05em", color: "var(--color-text-muted)", marginBottom: 6, textTransform: "uppercase" }}>Or simulate a scan</div>
-            <select
-              className="select"
+            <ChipSelect
               style={{ background: "var(--color-bg)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
               value={simulateValue}
-              onChange={(e) => handleSimulate(e.target.value)}
-            >
-              <option value="">-- Select an asset to simulate scanning its label --</option>
-              {assetOptions?.map((a) => <option key={a.id} value={a.assetTag}>{a.assetTag} — {a.name}</option>)}
-            </select>
+              onChange={handleSimulate}
+              placeholder="-- Select an asset to simulate scanning its label --"
+              options={[
+                { value: "", label: "-- Select an asset to simulate scanning its label --" },
+                ...(assetOptions ?? []).map((a) => ({ value: a.assetTag, label: `${a.assetTag} — ${a.name}` })),
+              ]}
+            />
           </div>
 
           <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 8, padding: 12, marginTop: 14, fontSize: 12, color: "var(--color-text-muted)" }}>

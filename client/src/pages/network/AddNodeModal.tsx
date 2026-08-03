@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { FormModal } from "../../components/FormModal";
+import { ChipSelect } from "../../components/ChipSelect";
 
 export interface NodeFormValues {
   type: string;
@@ -25,15 +26,20 @@ export function AddNodeModal({ onClose, onSubmit, submitting }: { onClose: () =>
     <FormModal title="Add Infrastructure Node" onClose={onClose} onSubmit={() => onSubmit(values)} submitting={submitting}>
       <div className="field">
         <label>Type</label>
-        <select className="select" value={values.type} onChange={(e) => setValues((v) => ({ ...v, type: e.target.value }))}>
-          {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
+        <ChipSelect
+          value={values.type}
+          onChange={(v) => setValues((prev) => ({ ...prev, type: v }))}
+          options={TYPES.map((t) => ({ value: t, label: t }))}
+        />
       </div>
       <div className="field">
         <label>Role</label>
-        <select className="select" value={values.role ?? ""} onChange={(e) => setValues((v) => ({ ...v, role: e.target.value || null }))}>
-          {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-        </select>
+        <ChipSelect
+          value={values.role ?? ""}
+          onChange={(v) => setValues((prev) => ({ ...prev, role: v || null }))}
+          placeholder="— No specific role —"
+          options={ROLES}
+        />
       </div>
       <div className="field">
         <label>Label *</label>

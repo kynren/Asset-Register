@@ -6,6 +6,7 @@ import { Icon } from "../../components/Icon";
 import { FormModal } from "../../components/FormModal";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { SkeletonText } from "../../components/Skeleton";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface Supplier {
   id: number;
@@ -245,9 +246,11 @@ function PurchaseOrderFormModal({ suppliers, onClose }: { suppliers: Supplier[];
       <div className="grid grid-cols-2">
         <div className="field">
           <label>Supplier</label>
-          <select className="select" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+          <ChipSelect
+            value={supplierId}
+            onChange={setSupplierId}
+            options={suppliers.map((s) => ({ value: String(s.id), label: s.name }))}
+          />
         </div>
         <div className="field"><label>Expected Date</label><input className="input" type="date" value={expectedAt} onChange={(e) => setExpectedAt(e.target.value)} /></div>
       </div>
@@ -256,10 +259,16 @@ function PurchaseOrderFormModal({ suppliers, onClose }: { suppliers: Supplier[];
         <div className="stack gap-2">
           {lines.map((line, idx) => (
             <div key={idx} className="row gap-2">
-              <select className="select" style={{ flex: 2 }} value={line.stockItemId} onChange={(e) => updateLine(idx, { stockItemId: e.target.value })}>
-                <option value="">Select stock item...</option>
-                {stockItems?.map((si: any) => <option key={si.id} value={si.id}>{si.name} ({si.sku})</option>)}
-              </select>
+              <ChipSelect
+                style={{ flex: 2 }}
+                value={line.stockItemId}
+                onChange={(v) => updateLine(idx, { stockItemId: v })}
+                placeholder="Select stock item..."
+                options={[
+                  { value: "", label: "Select stock item..." },
+                  ...(stockItems ?? []).map((si: any) => ({ value: String(si.id), label: `${si.name} (${si.sku})` })),
+                ]}
+              />
               <input className="input" style={{ flex: 1 }} type="number" min={1} placeholder="Qty" value={line.quantityOrdered} onChange={(e) => updateLine(idx, { quantityOrdered: Number(e.target.value) })} />
               <input className="input" style={{ flex: 1 }} type="number" min={0} step="0.01" placeholder="Unit cost" value={line.unitCost} onChange={(e) => updateLine(idx, { unitCost: e.target.value })} />
               <button type="button" className="btn btn-secondary btn-sm" onClick={() => setLines((ls) => ls.filter((_, i) => i !== idx))} disabled={lines.length === 1}>
@@ -303,10 +312,15 @@ function ReceiveStockModal({ po, onClose }: { po: PurchaseOrder; onClose: () => 
       {mutation.isError && <div className="alert alert-danger">{(mutation.error as any)?.response?.data?.error ?? "Something went wrong."}</div>}
       <div className="field">
         <label>Receiving Location</label>
-        <select className="select" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-          <option value="">Select location...</option>
-          {locations?.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
+        <ChipSelect
+          value={locationId}
+          onChange={setLocationId}
+          placeholder="Select location..."
+          options={[
+            { value: "", label: "Select location..." },
+            ...(locations ?? []).map((l: any) => ({ value: String(l.id), label: l.name })),
+          ]}
+        />
       </div>
       <div className="field">
         <label>Quantities to Receive</label>

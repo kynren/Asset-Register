@@ -19,6 +19,8 @@ const schema = z.object({
   collectionId: z.number().int().nullable().optional(),
   // null = reset to the generic default column set (see client/src/pages/assets/assetTableColumns.ts).
   tableColumns: z.array(z.string()).nullable().optional(),
+  // null = legacy/default behavior (see AssetCategory.capacities doc comment in schema.prisma).
+  capacities: z.array(z.string()).nullable().optional(),
 });
 
 const categorySelect = {
@@ -32,6 +34,7 @@ const categorySelect = {
   collectionId: true,
   collection: { select: { id: true, name: true } },
   tableColumns: true,
+  capacities: true,
 };
 
 router.get("/", requirePermission("assets", "view"), async (_req, res) => {
@@ -88,6 +91,8 @@ router.post("/:id/duplicate", requirePermission("admin", "create"), async (req, 
       isShowAsset: source.isShowAsset,
       isSwitchingDevice: source.isSwitchingDevice,
       collectionId: source.collectionId,
+      tableColumns: source.tableColumns ?? undefined,
+      capacities: source.capacities ?? undefined,
     },
     select: categorySelect,
   });

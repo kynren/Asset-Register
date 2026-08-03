@@ -30,6 +30,9 @@ model RolePermission {
   canEdit   Boolean @default(false)
   canDelete Boolean @default(false)
   canExport Boolean @default(false)
+  // Only consulted for module="helpdesk" today: when true, a holder of this role only sees tickets
+  // they're assigned to or requested, instead of every ticket canView would otherwise grant.
+  scopeAssignedOnly Boolean @default(false)
 
   @@unique([roleId, module])
 }
@@ -72,6 +75,11 @@ model User {
   images            UserImage[]
   dashboardsOwned         Dashboard[]      @relation("DashboardOwner")
   dashboardSharesReceived DashboardShare[] @relation("DashboardShareUser")
+  savedViewsOwned         SavedView[]      @relation("SavedViewOwner")
+  savedViewSharesReceived SavedViewShare[] @relation("SavedViewShareUser")
+  approvalSubstituteDelegations TicketApprovalSubstitute[] @relation("ApprovalSubstituteDelegator")
+  approvalSubstituteAssignments TicketApprovalSubstitute[] @relation("ApprovalSubstituteDelegate")
+  contactEmails           UserContactEmail[]
   preferences             UserPreference[]
   mcpApiKeys        McpApiKey[]
 
@@ -229,6 +237,53 @@ model DashboardShare {
   @@unique([dashboardId, sharedWithTeamId])
 }
 
+// A named, saved filter/column/sort/view-mode preset for a specific DataTable (identified by that
+// table's own `tableId` prop, e.g. "assets.category.9") — GLPI's "Saved Search" concept. `filters`
+// is an opaque JSON blob whose shape is entirely owned by whichever page wires SavedViewBar in;
+// this model only owns naming, ownership, defaulting, and sharing, mirroring Dashboard/
+// DashboardShare exactly so both features share one mental model.
+model SavedView {
+  id        Int      @id @default(autoincrement())
+  name      String
+  tableId   String
+  ownerId   Int
+  owner     User     @relation("SavedViewOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  filters   Json
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shares SavedViewShare[]
+
+  @@index([ownerId, tableId])
+}
+
+model SavedViewShare {
+  id               Int       @id @default(autoincrement())
+  savedViewId      Int
+  savedView        SavedView @relation(fields: [savedViewId], references: [id], onDelete: Cascade)
+  sharedWithUserId Int?
+  sharedWithUser   User?     @relation("SavedViewShareUser", fields: [sharedWithUserId], references: [id], onDelete: Cascade)
+  sharedWithTeamId Int?
+  sharedWithTeam   Team?     @relation(fields: [sharedWithTeamId], references: [id], onDelete: Cascade)
+  canEdit          Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+
+  @@unique([savedViewId, sharedWithUserId])
+  @@unique([savedViewId, sharedWithTeamId])
+}
+
+// Additional contact email addresses beyond the login/primary email — GLPI's UserEmail concept.
+// Purely informational contact info today (not consumed for auth or notification routing).
+model UserContactEmail {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String
+  label     String?
+  createdAt DateTime @default(now())
+}
+
 // Generic per-user UI-state store (grid layouts, panel selections, collapsed states, etc.) so
 // changes a user makes follow their account instead of resetting every session. One row per
 // (user, key); `value` holds whatever shape that key's feature needs.
@@ -260,6 +315,11 @@ model AssetCategory {
   // A JSON array of column keys — generic keys (e.g. "status") or "field:<fieldKey>" for a custom
   // field from this category's formTemplate.
   tableColumns      Json?
+  // null = legacy/default behavior (Components tab follows isComputerAsset; Contracts, Documents,
+  // and Financial Info always shown) — see client/src/pages/assets/assetCapacities.ts. A JSON
+  // string array of independently toggleable capacity keys ("components","contracts","documents",
+  // "financialInfo") once an admin opts a category into explicit control via Configure Capacities.
+  capacities        Json?
 }
 
 model AssetCollection {
@@ -362,6 +422,12 @@ model Asset {
   purchaseCost      Decimal?       @db.Decimal(12, 2)
   warrantyExpiresAt DateTime?
   nextServiceDate   DateTime?
+  // Financial & Administrative Information tab (see client AssetFinancialTab) — kept as plain
+  // scalar fields on Asset rather than a separate Infocom-style table since this app's assets
+  // don't need per-item amortization/depreciation tracking, just a place to record who it was
+  // bought from and under what reference.
+  supplier          String?
+  invoiceNumber     String?
   notes             String?
   signOffStatus     SignOffStatus  @default(PENDING)
   deviceId          Int?           @unique
@@ -1038,6 +1104,7 @@ model Team {
   ticketAssignments TicketAssignedTeam[]
   ticketApprovals   TicketApproval[]
   dashboardShares   DashboardShare[]
+  savedViewShares   SavedViewShare[]
   createdAt         DateTime             @default(now())
 }
 
@@ -1323,6 +1390,22 @@ model TicketApproval {
   answerComment String?
   answeredAt    DateTime?
   createdAt     DateTime       @default(now())
+}
+
+// Lets a user delegate their pending ticket approvals to a substitute for a date range (e.g. while
+// on leave), mirroring GLPI's "Authorized Substitutes" preference-page concept. Approval-listing
+// and answer-approval logic treats the substitute as standing in for the delegator whenever
+// today's date falls within [startDate, endDate] — see tickets.controller.ts listMyApprovals /
+// answerApproval.
+model TicketApprovalSubstitute {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  user         User     @relation("ApprovalSubstituteDelegator", fields: [userId], references: [id], onDelete: Cascade)
+  substituteId Int
+  substitute   User     @relation("ApprovalSubstituteDelegate", fields: [substituteId], references: [id], onDelete: Cascade)
+  startDate    DateTime
+  endDate      DateTime
+  createdAt    DateTime @default(now())
 }
 
 // Attaches an existing Knowledge Base article to a ticket (suggested reading / documented fix) —
@@ -2279,6 +2362,7 @@ model ToastSetting {
   isEnabled   Boolean  @default(true)
   variant     String   @default("info")
   title       String?
+  message     String?
   updatedById Int?
   updatedBy   User?    @relation(fields: [updatedById], references: [id])
   updatedAt   DateTime @updatedAt

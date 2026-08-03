@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
+import { ChipSelect } from "../../components/ChipSelect";
 
 export function DeviceLinkModal({ device, onClose }: { device: { id: number; hostname: string }; onClose: () => void }) {
   const [assetId, setAssetId] = useState<number | "">("");
@@ -31,12 +32,15 @@ export function DeviceLinkModal({ device, onClose }: { device: { id: number; hos
     >
       <div className="field">
         <label>Asset</label>
-        <select className="select" value={assetId} onChange={(e) => setAssetId(e.target.value ? Number(e.target.value) : "")}>
-          <option value="">Select an asset...</option>
-          {assets?.filter((a: any) => !a.device).map((a: any) => (
-            <option key={a.id} value={a.id}>{a.assetTag} — {a.name}</option>
-          ))}
-        </select>
+        <ChipSelect
+          value={String(assetId)}
+          onChange={(v) => setAssetId(v ? Number(v) : "")}
+          placeholder="Select an asset..."
+          options={[
+            { value: "", label: "Select an asset..." },
+            ...(assets ?? []).filter((a: any) => !a.device).map((a: any) => ({ value: String(a.id), label: `${a.assetTag} — ${a.name}` })),
+          ]}
+        />
       </div>
     </FormModal>
   );

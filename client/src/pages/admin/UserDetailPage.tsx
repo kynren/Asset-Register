@@ -9,6 +9,7 @@ import { FormModal } from "../../components/FormModal";
 import { QrCodeModal } from "../../components/QrCodeModal";
 import { Skeleton, SkeletonText } from "../../components/Skeleton";
 import { PermissionGate } from "../../auth/PermissionGate";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface UserDetail {
   id: number;
@@ -152,9 +153,11 @@ export function UserDetailPage() {
           </div>
           <div className="field">
             <label>Role</label>
-            <select className="select" value={roleId} onChange={(e) => setRoleId(Number(e.target.value))}>
-              {roles?.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
+            <ChipSelect
+              value={String(roleId)}
+              onChange={(v) => setRoleId(Number(v))}
+              options={(roles ?? []).map((r: any) => ({ value: String(r.id), label: r.name }))}
+            />
           </div>
           <PermissionGate module="admin" action="edit">
             <button className="btn btn-primary btn-sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>Save Changes</button>

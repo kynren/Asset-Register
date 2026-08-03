@@ -11,6 +11,7 @@ import { FormModal } from "../../components/FormModal";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { QrCodeModal } from "../../components/QrCodeModal";
 import { PermissionGate } from "../../auth/PermissionGate";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface UserRow {
   id: number;
@@ -159,9 +160,11 @@ function CreateUserModal({ roles, onClose, onSubmit, submitting }: { roles: any[
       <div className="field"><label>Email *</label><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
       <div className="field">
         <label>Role</label>
-        <select className="select" value={roleId} onChange={(e) => setRoleId(Number(e.target.value))}>
-          {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-        </select>
+        <ChipSelect
+          value={roleId !== "" ? String(roleId) : ""}
+          onChange={(v) => setRoleId(Number(v))}
+          options={roles.map((r) => ({ value: String(r.id), label: r.name }))}
+        />
       </div>
       <p className="muted" style={{ fontSize: 12 }}>A temporary password will be generated automatically.</p>
     </FormModal>

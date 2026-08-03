@@ -21,6 +21,7 @@ interface ToastSettingItem {
   isEnabled: boolean | null;
   variant: "success" | "error" | "warning" | "info" | null;
   title: string | null;
+  message: string | null;
 }
 
 export function NotificationBell() {
@@ -62,7 +63,7 @@ export function NotificationBell() {
       showToast({
         variant: setting?.variant ?? meta?.defaultVariant ?? "info",
         title: setting?.title ?? meta?.label,
-        message: n.message,
+        message: setting?.message || n.message,
       });
     }
     seenIdsRef.current = currentIds;

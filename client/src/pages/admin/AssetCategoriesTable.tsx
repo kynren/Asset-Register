@@ -8,6 +8,8 @@ import { FormModal } from "../../components/FormModal";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { CategoryColumnsModal } from "./CategoryColumnsModal";
+import { ALL_CAPACITY_KEYS, CAPACITY_INFO, defaultCapacitiesFor, AssetCapacityKey } from "../assets/assetCapacities";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface FormTemplateRef {
   id: number;
@@ -29,6 +31,7 @@ interface AssetCategory {
   formTemplate: FormTemplateRef | null;
   collectionId: number | null;
   collection: CollectionRef | null;
+  capacities: string[] | null;
 }
 
 export function AssetCategoriesTable() {
@@ -139,7 +142,7 @@ export function AssetCategoriesTable() {
           </button>
         </PermissionGate>
       </div>
-      <DataTable tableId="admin.assetCategories" columns={columns} data={categories ?? []} isLoading={isLoading} clientPageSize={8} emptyMessage="No asset categories yet." />
+      <DataTable tableId="admin.assetCategories" columns={columns} data={categories ?? []} isLoading={isLoading} clientPageSize={8} defaultViewMode="list" emptyMessage="No asset categories yet." />
 
       {showForm && (
         <CategoryFormModal
@@ -193,11 +196,27 @@ function CategoryFormModal({
   const [isComputerAsset, setIsComputerAsset] = useState(initial?.isComputerAsset ?? false);
   const [isShowAsset, setIsShowAsset] = useState(initial?.isShowAsset ?? false);
   const [isSwitchingDevice, setIsSwitchingDevice] = useState(initial?.isSwitchingDevice ?? false);
+  const [customizeCapacities, setCustomizeCapacities] = useState(Array.isArray(initial?.capacities));
+  const [capacities, setCapacities] = useState<AssetCapacityKey[]>(
+    Array.isArray(initial?.capacities) ? (initial!.capacities as AssetCapacityKey[]) : defaultCapacitiesFor(initial?.isComputerAsset ?? false)
+  );
   const queryClient = useQueryClient();
+
+  function toggleCapacity(key: AssetCapacityKey) {
+    setCapacities((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }
 
   const mutation = useMutation({
     mutationFn: () => {
-      const payload = { name, formTemplateId: formTemplateId ? Number(formTemplateId) : null, collectionId: collectionId ? Number(collectionId) : null, isComputerAsset, isShowAsset, isSwitchingDevice };
+      const payload = {
+        name,
+        formTemplateId: formTemplateId ? Number(formTemplateId) : null,
+        collectionId: collectionId ? Number(collectionId) : null,
+        isComputerAsset,
+        isShowAsset,
+        isSwitchingDevice,
+        capacities: customizeCapacities ? capacities : null,
+      };
       return initial ? axiosClient.patch(`/asset-categories/${initial.id}`, payload) : axiosClient.post("/asset-categories", payload);
     },
     onSuccess: () => {
@@ -265,23 +284,61 @@ function CategoryFormModal({
           <span className="form-toggle-switch-track" />
         </label>
       </div>
+      <div className="toggle-card">
+        <div className="toggle-card-icon"><Icon name="grid" size={16} /></div>
+        <div className="toggle-card-body">
+          <div className="toggle-card-title">Configure Capacities</div>
+          <div className="toggle-card-desc">
+            By default this category's Asset Detail tabs follow the standard rules above (Components
+            follows Computer / Network Related Asset; Contracts, Documents, and Financial Info always
+            show). Turn this on to independently choose exactly which of those tabs appear.
+          </div>
+        </div>
+        <label className="form-toggle-switch">
+          <input
+            type="checkbox"
+            checked={customizeCapacities}
+            onChange={(e) => {
+              setCustomizeCapacities(e.target.checked);
+              if (e.target.checked) setCapacities(defaultCapacitiesFor(isComputerAsset));
+            }}
+          />
+          <span className="form-toggle-switch-track" />
+        </label>
+      </div>
+      {customizeCapacities && (
+        <div className="field">
+          <label>Capacities</label>
+          <div className="grid gap-1">
+            {ALL_CAPACITY_KEYS.map((key) => (
+              <label key={key} className="row gap-2" style={{ alignItems: "flex-start", fontSize: 13, border: "1px solid var(--color-border)", borderRadius: 6, padding: "8px 10px" }}>
+                <input type="checkbox" checked={capacities.includes(key)} onChange={() => toggleCapacity(key)} style={{ marginTop: 2 }} />
+                <span>
+                  <div style={{ fontWeight: 600 }}>{CAPACITY_INFO[key].label}</div>
+                  <div className="muted" style={{ fontSize: 11 }}>{CAPACITY_INFO[key].description}</div>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="field">
         <label>Collection</label>
-        <select className="select" value={collectionId} onChange={(e) => setCollectionId(e.target.value)}>
-          <option value="">None</option>
-          {collections.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+        <ChipSelect
+          value={collectionId}
+          onChange={setCollectionId}
+          placeholder="None"
+          options={[{ value: "", label: "None" }, ...collections.map((c) => ({ value: String(c.id), label: c.name }))]}
+        />
       </div>
       <div className="field">
         <label>Linked Form Template</label>
-        <select className="select" value={formTemplateId} onChange={(e) => setFormTemplateId(e.target.value)}>
-          <option value="">None — use standard asset fields only</option>
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
+        <ChipSelect
+          value={formTemplateId}
+          onChange={setFormTemplateId}
+          placeholder="None — use standard asset fields only"
+          options={[{ value: "", label: "None — use standard asset fields only" }, ...templates.map((t) => ({ value: String(t.id), label: t.name }))]}
+        />
       </div>
       <p className="muted" style={{ fontSize: 12 }}>
         When this category is selected on an asset, the linked form template's custom fields appear on the Add/Edit Asset form.

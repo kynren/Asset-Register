@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../api/axiosClient";
 import { Icon } from "./Icon";
 import { usePermission } from "../auth/PermissionGate";
+import { ChipSelect } from "./ChipSelect";
 
 interface Option {
   id: number;
@@ -51,10 +52,15 @@ export function QuickAddSelect({
           </button>
         )}
       </div>
-      <select className="select" value={value ?? ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
-        <option value="">Select {label.toLowerCase()}...</option>
-        {options?.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-      </select>
+      <ChipSelect
+        value={value != null ? String(value) : ""}
+        onChange={(v) => onChange(v ? Number(v) : null)}
+        placeholder={`Select ${label.toLowerCase()}...`}
+        options={[
+          { value: "", label: `Select ${label.toLowerCase()}...` },
+          ...(options ?? []).map((o) => ({ value: String(o.id), label: o.name })),
+        ]}
+      />
       {adding && (
         <div className="field-quick-add-row">
           <input

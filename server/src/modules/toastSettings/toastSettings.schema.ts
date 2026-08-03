@@ -23,4 +23,5 @@ export const updateToastSettingSchema = z.object({
   isEnabled: z.boolean().optional(),
   variant: z.enum(["success", "error", "warning", "info"]).optional(),
   title: z.string().max(60).optional().nullable(),
+  message: z.string().max(240).optional().nullable(),
 });

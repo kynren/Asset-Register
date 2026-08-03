@@ -16,6 +16,7 @@ interface RolePermission {
   canEdit: boolean;
   canDelete: boolean;
   canExport: boolean;
+  scopeAssignedOnly?: boolean;
 }
 interface Role {
   id: number;
@@ -111,7 +112,7 @@ export function RolesTab({
   });
 
   function buildFullMatrix(perms: RolePermission[]): RolePermission[] {
-    return MODULES.map((m) => perms.find((p) => p.module === m) ?? { module: m, canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false });
+    return MODULES.map((m) => perms.find((p) => p.module === m) ?? { module: m, canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false, scopeAssignedOnly: false });
   }
 
   const isSystemAdminRole = selectedRole?.name === "System Admin";
@@ -120,6 +121,13 @@ export function RolesTab({
     if (isSystemAdminRole || !canEditAdmin) return;
     const full = buildFullMatrix(activePermissions);
     const updated = full.map((p) => (p.module === module ? { ...p, [action]: !p[action] } : p));
+    setDraft(updated);
+  }
+
+  function toggleScopeAssignedOnly(module: ModuleName) {
+    if (isSystemAdminRole || !canEditAdmin) return;
+    const full = buildFullMatrix(activePermissions);
+    const updated = full.map((p) => (p.module === module ? { ...p, scopeAssignedOnly: !p.scopeAssignedOnly } : p));
     setDraft(updated);
   }
 
@@ -193,6 +201,7 @@ export function RolesTab({
                 <tr>
                   <th>Module</th>
                   {ACTIONS.map((a) => <th key={a} style={{ textAlign: "center" }}>{ACTION_LABELS[a]}</th>)}
+                  <th style={{ textAlign: "center" }}>Assigned to Me Only</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,6 +224,19 @@ export function RolesTab({
                           />
                         </td>
                       ))}
+                      <td style={{ textAlign: "center" }}>
+                        {module === "helpdesk" ? (
+                          <input
+                            type="checkbox"
+                            title="Restrict this role to tickets assigned to them, instead of every ticket View would otherwise grant"
+                            checked={isSystemAdminRole ? false : Boolean(perm.scopeAssignedOnly)}
+                            disabled={isSystemAdminRole || !canEditAdmin}
+                            onChange={() => toggleScopeAssignedOnly(module)}
+                          />
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}

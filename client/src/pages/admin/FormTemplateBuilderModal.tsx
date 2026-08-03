@@ -7,6 +7,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { ChipSelect } from "../../components/ChipSelect";
 
 const FIELD_TYPES = [
   { value: "TEXT", label: "Text" },
@@ -199,9 +200,7 @@ function FieldEditor({
         </div>
         <div className="field">
           <label>Field Type</label>
-          <select className="select" value={fieldType} onChange={(e) => setFieldType(e.target.value)}>
-            {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+          <ChipSelect value={fieldType} onChange={setFieldType} options={FIELD_TYPES} />
         </div>
       </div>
       {fieldType === "SELECT" && (

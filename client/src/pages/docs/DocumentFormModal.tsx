@@ -5,6 +5,7 @@ import { FormModal } from "../../components/FormModal";
 import { SectionsEditor } from "./SectionsEditor";
 import { CollectionsManageModal, DocCollectionItem } from "./CollectionsManageModal";
 import { DOC_CATEGORIES, DOC_TYPES, DOC_TYPE_DESCRIPTIONS, DOC_TYPE_FIELDS, DOC_TYPE_LABELS, DocType, emptySections } from "./docsConstants";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface DocumentFull {
   id: number;
@@ -104,9 +105,11 @@ export function DocumentFormModal({
           <input className="input" value={DOC_TYPE_LABELS[docType]} disabled />
         ) : (
           <>
-            <select className="select" value={docType} onChange={(e) => handleDocTypeChange(e.target.value as DocType)}>
-              {DOC_TYPES.map((t) => <option key={t} value={t}>{DOC_TYPE_LABELS[t]}</option>)}
-            </select>
+            <ChipSelect
+              value={docType}
+              onChange={(v) => handleDocTypeChange(v as DocType)}
+              options={DOC_TYPES.map((t) => ({ value: t, label: DOC_TYPE_LABELS[t] }))}
+            />
             <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>{DOC_TYPE_DESCRIPTIONS[docType]}</p>
           </>
         )}
@@ -129,14 +132,12 @@ export function DocumentFormModal({
       <div className="field">
         <label>Collection</label>
         <div className="row gap-2">
-          <select
-            className="select"
-            value={collectionId}
-            onChange={(e) => setCollectionId(e.target.value ? Number(e.target.value) : "")}
-          >
-            <option value="">Select a collection…</option>
-            {(collections ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <ChipSelect
+            value={String(collectionId)}
+            onChange={(v) => setCollectionId(v ? Number(v) : "")}
+            placeholder="Select a collection…"
+            options={[{ value: "", label: "Select a collection…" }, ...(collections ?? []).map((c) => ({ value: String(c.id), label: c.name }))]}
+          />
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowManageCollections(true)} style={{ whiteSpace: "nowrap" }}>
             Manage
           </button>

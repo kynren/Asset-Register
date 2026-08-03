@@ -5,7 +5,7 @@ export interface AssetDetail {
   status: string;
   signOffStatus: string;
   categoryId: number | null;
-  category: { id: number; name: string; isComputerAsset: boolean } | null;
+  category: { id: number; name: string; isComputerAsset: boolean; capacities: string[] | null } | null;
   locationId: number | null;
   location: { id: number; name: string; address: string | null } | null;
   assignedToId: number | null;
@@ -17,6 +17,8 @@ export interface AssetDetail {
   purchaseCost: string | null;
   warrantyExpiresAt: string | null;
   nextServiceDate: string | null;
+  supplier: string | null;
+  invoiceNumber: string | null;
   notes: string | null;
   deviceId: number | null;
   device: {

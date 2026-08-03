@@ -56,7 +56,7 @@ export function DiscoverDevicesModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 1000, width: "95%" }} onClick={(e) => e.stopPropagation()}>
-        <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+        <div className="modal-header" style={{ alignItems: "flex-start" }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>Discover Unregistered Assets</div>
             <div className="muted" style={{ fontSize: 12 }}>Devices reported by the Kynren agent that aren't linked to an asset record yet.</div>

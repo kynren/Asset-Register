@@ -6,6 +6,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { DataTable } from "../../components/DataTable";
 import { Icon } from "../../components/Icon";
 import { PermissionGate } from "../../auth/PermissionGate";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface AccessEvent {
   id: number;
@@ -60,10 +61,13 @@ export function AccessEventLogTab() {
   return (
     <div className="stack gap-3">
       <div className="row gap-2 flex-wrap" style={{ justifyContent: "space-between" }}>
-        <select className="select" style={{ width: "auto" }} value={deviceId} onChange={(e) => setDeviceId(e.target.value ? Number(e.target.value) : "")}>
-          <option value="">All devices</option>
-          {devices?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
+        <ChipSelect
+          style={{ width: "auto" }}
+          value={String(deviceId)}
+          onChange={(v) => setDeviceId(v ? Number(v) : "")}
+          placeholder="All devices"
+          options={[{ value: "", label: "All devices" }, ...(devices ?? []).map((d) => ({ value: String(d.id), label: d.name }))]}
+        />
         <PermissionGate module="access-control" action="edit">
           <button
             className="btn btn-secondary btn-sm"

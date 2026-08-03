@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { QuickAddSelect } from "../../components/QuickAddSelect";
+import { ChipSelect } from "../../components/ChipSelect";
 
 export interface TicketFormValues {
   title: string;
@@ -133,16 +134,23 @@ export function TicketFormModal({ onClose, onSubmit, submitting }: { onClose: ()
       <div className="grid grid-cols-2">
         <div className="field">
           <label>Template <span className="muted">(optional)</span></label>
-          <select className="select" value={templateId ?? ""} onChange={(e) => setTemplateId(e.target.value ? Number(e.target.value) : null)}>
-            <option value="">No template</option>
-            {templates?.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          <ChipSelect
+            value={templateId != null ? String(templateId) : ""}
+            onChange={(v) => setTemplateId(v ? Number(v) : null)}
+            placeholder="No template"
+            options={[
+              { value: "", label: "No template" },
+              ...(templates?.map((t: any) => ({ value: String(t.id), label: t.name })) ?? []),
+            ]}
+          />
         </div>
         <div className="field">
           <label>ITIL Type</label>
-          <select className="select" value={itilType} onChange={(e) => setItilType(e.target.value)}>
-            {ITIL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <ChipSelect
+            value={itilType}
+            onChange={setItilType}
+            options={ITIL_TYPES.map((t) => ({ value: t, label: t }))}
+          />
         </div>
       </div>
 
@@ -161,16 +169,21 @@ export function TicketFormModal({ onClose, onSubmit, submitting }: { onClose: ()
       <div className="grid grid-cols-2">
         <div className="field">
           <label>Type</label>
-          <select className="select" value={type} onChange={(e) => setType(e.target.value)}>
-            {TYPES.map((t) => <option key={t} value={t}>{t === "ACTION" ? "Action" : "Information"}</option>)}
-          </select>
+          <ChipSelect
+            value={type}
+            onChange={setType}
+            options={TYPES.map((t) => ({ value: t, label: t === "ACTION" ? "Action" : "Information" }))}
+          />
         </div>
         {!isHidden("priority") && (
           <div className="field">
             <label>Priority {isMandatory("priority") ? "*" : ""}</label>
-            <select className="select" value={priority} onChange={(e) => setPriority(e.target.value)} disabled={isReadonly("priority")}>
-              {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
+            <ChipSelect
+              value={priority}
+              onChange={setPriority}
+              disabled={isReadonly("priority")}
+              options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+            />
           </div>
         )}
         {!isHidden("categoryId") && (
@@ -186,19 +199,31 @@ export function TicketFormModal({ onClose, onSubmit, submitting }: { onClose: ()
         {!isHidden("assetId") && (
           <div className="field">
             <label>Related Asset {isMandatory("assetId") ? "*" : ""}</label>
-            <select className="select" value={assetId ?? ""} onChange={(e) => setAssetId(e.target.value ? Number(e.target.value) : null)} disabled={isReadonly("assetId")}>
-              <option value="">—</option>
-              {assets?.map((a: any) => <option key={a.id} value={a.id}>{a.assetTag} — {a.name}</option>)}
-            </select>
+            <ChipSelect
+              value={assetId != null ? String(assetId) : ""}
+              onChange={(v) => setAssetId(v ? Number(v) : null)}
+              disabled={isReadonly("assetId")}
+              placeholder="—"
+              options={[
+                { value: "", label: "—" },
+                ...(assets?.map((a: any) => ({ value: String(a.id), label: `${a.assetTag} — ${a.name}` })) ?? []),
+              ]}
+            />
           </div>
         )}
         {!isHidden("locationId") && (
           <div className="field">
             <label>Location {isMandatory("locationId") ? "*" : ""}</label>
-            <select className="select" value={locationId ?? ""} onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)} disabled={isReadonly("locationId")}>
-              <option value="">—</option>
-              {locations?.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
+            <ChipSelect
+              value={locationId != null ? String(locationId) : ""}
+              onChange={(v) => setLocationId(v ? Number(v) : null)}
+              disabled={isReadonly("locationId")}
+              placeholder="—"
+              options={[
+                { value: "", label: "—" },
+                ...(locations?.map((l: any) => ({ value: String(l.id), label: l.name })) ?? []),
+              ]}
+            />
           </div>
         )}
         <div className="field">

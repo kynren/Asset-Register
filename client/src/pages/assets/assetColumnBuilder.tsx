@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { NavigateFunction } from "react-router-dom";
 import { UseMutationResult } from "@tanstack/react-query";
 import { Icon } from "../../components/Icon";
+import { ChipSelect } from "../../components/ChipSelect";
 import { StatusBadge } from "../../components/StatusBadge";
 import { ExpiryCell } from "../../components/ExpiryCell";
 import { PermissionGate } from "../../auth/PermissionGate";
@@ -95,15 +96,14 @@ function buildGenericColumn(key: GenericColumnKey, ctx: AssetColumnBuilderContex
         header,
         cell: ({ row }) =>
           canEdit ? (
-            <select
-              className="select"
-              style={{ fontSize: 12, padding: "4px 6px" }}
-              value={row.original.status}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => quickPatchMutation.mutate({ id: row.original.id, data: { status: e.target.value } })}
-            >
-              {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
-            </select>
+            <span onClick={(e) => e.stopPropagation()}>
+              <ChipSelect
+                style={{ fontSize: 12, padding: "4px 6px" }}
+                value={row.original.status}
+                onChange={(v) => quickPatchMutation.mutate({ id: row.original.id, data: { status: v } })}
+                options={STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace("_", " ") }))}
+              />
+            </span>
           ) : (
             <StatusBadge status={row.original.status} />
           ),
@@ -145,16 +145,18 @@ function buildGenericColumn(key: GenericColumnKey, ctx: AssetColumnBuilderContex
         header,
         cell: ({ row }) =>
           canEdit ? (
-            <select
-              className="select"
-              style={{ fontSize: 12, padding: "4px 6px" }}
-              value={row.original.assignedToId ?? ""}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => quickPatchMutation.mutate({ id: row.original.id, data: { assignedToId: e.target.value ? Number(e.target.value) : null } })}
-            >
-              <option value="">Unassigned</option>
-              {users?.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-            </select>
+            <span onClick={(e) => e.stopPropagation()}>
+              <ChipSelect
+                style={{ fontSize: 12, padding: "4px 6px" }}
+                value={String(row.original.assignedToId ?? "")}
+                onChange={(v) => quickPatchMutation.mutate({ id: row.original.id, data: { assignedToId: v ? Number(v) : null } })}
+                placeholder="Unassigned"
+                options={[
+                  { value: "", label: "Unassigned" },
+                  ...(users ?? []).map((u: any) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` })),
+                ]}
+              />
+            </span>
           ) : (
             <span>{row.original.assignedTo ? `${row.original.assignedTo.firstName} ${row.original.assignedTo.lastName}` : "Unassigned"}</span>
           ),

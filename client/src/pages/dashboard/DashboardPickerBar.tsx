@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Icon } from "../../components/Icon";
+import { ChipSelect } from "../../components/ChipSelect";
 
 export interface DashboardSummary {
   id: number;
@@ -46,15 +47,15 @@ export function DashboardPickerBar({
 
   return (
     <div className="row gap-2 flex-wrap" style={{ alignItems: "center" }}>
-      <select className="select" style={{ width: "auto", minWidth: 200 }} value={activeId ?? ""} onChange={(e) => onSelect(Number(e.target.value))}>
-        {dashboards.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}
-            {d.isDefault ? " ★" : ""}
-            {!d.isOwner ? ` — shared by ${d.ownerName}` : ""}
-          </option>
-        ))}
-      </select>
+      <ChipSelect
+        style={{ width: "auto", minWidth: 200 }}
+        value={activeId != null ? String(activeId) : ""}
+        onChange={(v) => onSelect(Number(v))}
+        options={dashboards.map((d) => ({
+          value: String(d.id),
+          label: `${d.name}${d.isDefault ? " ★" : ""}${!d.isOwner ? ` — shared by ${d.ownerName}` : ""}`,
+        }))}
+      />
 
       {renaming ? (
         <>

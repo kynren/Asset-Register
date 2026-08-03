@@ -7,6 +7,7 @@ import { FormModal } from "../../components/FormModal";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface DoorRight {
   doorId: number;
@@ -196,10 +197,15 @@ function AddCredentialModal({ device, onClose, onCreated }: { device: Device; on
       {mutation.isError && <div className="alert alert-danger">{(mutation.error as any)?.response?.data?.error ?? "Could not provision this credential on the controller."}</div>}
       <div className="field">
         <label>Person *</label>
-        <select className="select" value={personId} onChange={(e) => setPersonId(e.target.value ? Number(e.target.value) : "")}>
-          <option value="">Select a person...</option>
-          {availablePersons?.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.personId})</option>)}
-        </select>
+        <ChipSelect
+          value={personId === "" ? "" : String(personId)}
+          onChange={(v) => setPersonId(v ? Number(v) : "")}
+          placeholder="Select a person..."
+          options={[
+            { value: "", label: "Select a person..." },
+            ...(availablePersons ?? []).map((p) => ({ value: String(p.id), label: `${p.name} (${p.personId})` })),
+          ]}
+        />
         {persons?.length === 0 && <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>No persons in the directory yet — add one under "Persons" first.</p>}
       </div>
       <div className="field"><label>Card Number</label><input className="input" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="Optional — scan or enter the card's number" /></div>

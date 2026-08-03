@@ -5,6 +5,7 @@ import { FormModal } from "../../components/FormModal";
 import { QuickAddSelect } from "../../components/QuickAddSelect";
 import { Icon } from "../../components/Icon";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { ChipSelect } from "../../components/ChipSelect";
 
 export interface AssetFormValues {
   assetTag: string;
@@ -193,9 +194,11 @@ export function AssetFormModal({
         <QuickAddSelect label="Category" value={values.categoryId} onChange={(id) => update("categoryId", id)} options={visibleCategories} createUrl="/asset-categories" queryKey="asset-categories" />
         <div className="field">
           <label>Status</label>
-          <select className="select" value={values.status} onChange={(e) => update("status", e.target.value)}>
-            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
-          </select>
+          <ChipSelect
+            value={values.status}
+            onChange={(v) => update("status", v)}
+            options={STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace("_", " ") }))}
+          />
         </div>
         <QuickAddSelect label="Location" value={values.locationId} onChange={(id) => update("locationId", id)} options={locations} createUrl="/locations" queryKey="locations" />
 
@@ -209,10 +212,15 @@ export function AssetFormModal({
         </div>
         <div className="field">
           <label>Assigned To</label>
-          <select className="select" value={values.assignedToId ?? ""} onChange={(e) => update("assignedToId", e.target.value ? Number(e.target.value) : null)}>
-            <option value="">Unassigned</option>
-            {users?.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-          </select>
+          <ChipSelect
+            value={String(values.assignedToId ?? "")}
+            onChange={(v) => update("assignedToId", v ? Number(v) : null)}
+            placeholder="Unassigned"
+            options={[
+              { value: "", label: "Unassigned" },
+              ...(users ?? []).map((u: any) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` })),
+            ]}
+          />
         </div>
 
         <div className="field">
@@ -242,10 +250,15 @@ export function AssetFormModal({
                     required={f.required}
                   />
                 ) : f.fieldType === "SELECT" ? (
-                  <select className="select" value={customFieldInputs[f.id] ?? ""} onChange={(e) => updateCustomField(f.id, e.target.value)} required={f.required}>
-                    <option value="">Select...</option>
-                    {f.options?.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
+                  <ChipSelect
+                    value={customFieldInputs[f.id] ?? ""}
+                    onChange={(v) => updateCustomField(f.id, v)}
+                    placeholder="Select..."
+                    options={[
+                      { value: "", label: "Select..." },
+                      ...(f.options ?? []).map((o) => ({ value: o, label: o })),
+                    ]}
+                  />
                 ) : f.fieldType === "CHECKBOX" ? (
                   <label className="row gap-2" style={{ cursor: "pointer" }}>
                     <input

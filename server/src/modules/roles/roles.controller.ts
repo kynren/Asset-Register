@@ -24,6 +24,7 @@ function padPermissions<T extends { permissions: { module: string }[] }>(role: T
     canEdit: false,
     canDelete: false,
     canExport: false,
+    scopeAssignedOnly: false,
   }));
   return { ...role, permissions: [...role.permissions, ...missing] };
 }
@@ -85,7 +86,15 @@ export async function update(req: Request, res: Response) {
   res.json(role);
 }
 
-export type RolePermissionInput = { module: string; canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean };
+export type RolePermissionInput = {
+  module: string;
+  canView: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canExport: boolean;
+  scopeAssignedOnly?: boolean;
+};
 
 // Shared by the direct-save route below AND the App Settings "Change Management" scheduler/publish
 // path (see modules/scheduledChanges) — a scheduled permission change re-runs this exact function

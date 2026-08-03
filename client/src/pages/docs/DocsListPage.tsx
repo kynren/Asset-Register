@@ -14,6 +14,7 @@ import { DocBookCard } from "./DocBookCard";
 import { CollectionsManageModal, DocCollectionItem } from "./CollectionsManageModal";
 import { ModuleDashboardTab } from "../dashboard/ModuleDashboardTab";
 import { DOCS_WIDGET_CATALOG, DEFAULT_DOCS_DASHBOARD_LAYOUT } from "./docsDashboardWidgets";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface DocListItem {
   id: number;
@@ -109,18 +110,27 @@ export function DocsListPage() {
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
         />
-        <select className="select" style={{ maxWidth: 240 }} value={docType} onChange={(e) => { setDocType(e.target.value as DocType | ""); setPage(1); }}>
-          <option value="">All Types</option>
-          {DOC_TYPES.map((t) => <option key={t} value={t}>{DOC_TYPE_LABELS[t]}</option>)}
-        </select>
-        <select className="select" style={{ maxWidth: 220 }} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}>
-          <option value="">All Categories</option>
-          {DOC_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select className="select" style={{ maxWidth: 220 }} value={collectionId} onChange={(e) => { setCollectionId(e.target.value); setPage(1); }}>
-          <option value="">All Collections</option>
-          {(collections ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <ChipSelect
+          style={{ maxWidth: 240 }}
+          value={docType}
+          onChange={(v) => { setDocType(v as DocType | ""); setPage(1); }}
+          placeholder="All Types"
+          options={[{ value: "", label: "All Types" }, ...DOC_TYPES.map((t) => ({ value: t, label: DOC_TYPE_LABELS[t] }))]}
+        />
+        <ChipSelect
+          style={{ maxWidth: 220 }}
+          value={category}
+          onChange={(v) => { setCategory(v); setPage(1); }}
+          placeholder="All Categories"
+          options={[{ value: "", label: "All Categories" }, ...DOC_CATEGORIES.map((c) => ({ value: c, label: c }))]}
+        />
+        <ChipSelect
+          style={{ maxWidth: 220 }}
+          value={collectionId}
+          onChange={(v) => { setCollectionId(v); setPage(1); }}
+          placeholder="All Collections"
+          options={[{ value: "", label: "All Collections" }, ...(collections ?? []).map((c) => ({ value: String(c.id), label: c.name }))]}
+        />
         <button className="btn btn-secondary btn-sm" onClick={() => setShowManageCollections(true)}>
           <Icon name="layers" size={13} /> Collections
         </button>

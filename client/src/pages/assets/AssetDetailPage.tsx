@@ -21,7 +21,9 @@ import { NetworkSettingsCard } from "./detail/NetworkSettingsCard";
 import { FileResourceTab } from "./detail/FileResourceTab";
 import { ReportTab } from "./detail/ReportTab";
 import { ActivityLogTab } from "./detail/ActivityLogTab";
+import { AssetFinancialTab } from "./detail/AssetFinancialTab";
 import { Skeleton, SkeletonText } from "../../components/Skeleton";
+import { hasCapacity } from "./assetCapacities";
 
 // Mirrors the exact format the agent writes in agent/kynren_agent.py get_disk_info():
 // "C:\\ 512.0GB total, 200.0GB free; D:\\ 1024.0GB total, 400.0GB free"
@@ -40,20 +42,23 @@ function parseDiskInfo(diskInfo: string | null | undefined): { label: string; to
 type TabKey =
   | "profile" | "impact" | "location" | "os" | "components" | "volumes" | "software"
   | "connections" | "networkPorts" | "sockets" | "remoteManagement" | "management"
-  | "contracts" | "documents" | "virtualization" | "antivirus" | "reports" | "logs";
+  | "contracts" | "documents" | "financialInfo" | "virtualization" | "antivirus" | "reports" | "logs";
 
-// Nav is assembled as: LEAD_ITEMS + (COMPUTER_NAV_ITEMS_EARLY if computer/network category) +
-// MID_ITEMS + (COMPUTER_NAV_ITEMS_LATE if computer/network category) + TAIL_ITEMS, preserving
-// the original ordering while letting non-computer categories skip every IT-specific tab.
+// Nav is assembled by buildNavItems() below. The IT-specific tabs (Operating Systems, Volumes,
+// Software, Connections, Network Ports, Sockets, Remote Management, Virtualization, Antiviruses)
+// still follow the category's isComputerAsset flag. Components/Contracts/Documents/Financial Info
+// are independently toggled per-category via AssetCategory.capacities (see assetCapacities.ts) —
+// `null` capacities falls back to the pre-Capacities behavior (Components follows isComputerAsset,
+// the other three always show), so existing categories are unaffected until an admin opts in.
 const LEAD_ITEMS: { key: TabKey; label: string; icon: string }[] = [
   { key: "profile", label: "Asset Profile", icon: "profile" },
   { key: "impact", label: "Impact Analysis", icon: "activity" },
   { key: "location", label: "Location History & Map", icon: "mapPin" },
 ];
 
-const COMPUTER_NAV_ITEMS_EARLY: { key: TabKey; label: string; icon: string }[] = [
-  { key: "os", label: "Operating systems", icon: "layers" },
-  { key: "components", label: "Components", icon: "cpu" },
+const OS_ITEM: { key: TabKey; label: string; icon: string } = { key: "os", label: "Operating systems", icon: "layers" };
+const COMPONENTS_ITEM: { key: TabKey; label: string; icon: string } = { key: "components", label: "Components", icon: "cpu" };
+const COMPUTER_NAV_ITEMS_MID: { key: TabKey; label: string; icon: string }[] = [
   { key: "volumes", label: "Volumes", icon: "hardDrive" },
   { key: "software", label: "Software", icon: "code" },
   { key: "connections", label: "Connections", icon: "link" },
@@ -62,11 +67,10 @@ const COMPUTER_NAV_ITEMS_EARLY: { key: TabKey; label: string; icon: string }[] =
   { key: "remoteManagement", label: "Remote management", icon: "terminal" },
 ];
 
-const MID_ITEMS: { key: TabKey; label: string; icon: string }[] = [
-  { key: "management", label: "Management", icon: "briefcase" },
-  { key: "contracts", label: "Contracts", icon: "fileText" },
-  { key: "documents", label: "Documents", icon: "file" },
-];
+const MANAGEMENT_ITEM: { key: TabKey; label: string; icon: string } = { key: "management", label: "Management", icon: "briefcase" };
+const CONTRACTS_ITEM: { key: TabKey; label: string; icon: string } = { key: "contracts", label: "Contracts", icon: "fileText" };
+const DOCUMENTS_ITEM: { key: TabKey; label: string; icon: string } = { key: "documents", label: "Documents", icon: "file" };
+const FINANCIAL_ITEM: { key: TabKey; label: string; icon: string } = { key: "financialInfo", label: "Financial & Admin Info", icon: "creditCard" };
 
 const COMPUTER_NAV_ITEMS_LATE: { key: TabKey; label: string; icon: string }[] = [
   { key: "virtualization", label: "Virtualization", icon: "cloud" },
@@ -78,11 +82,17 @@ const TAIL_ITEMS: { key: TabKey; label: string; icon: string }[] = [
   { key: "logs", label: "Logs", icon: "clock" },
 ];
 
-function buildNavItems(isComputerAsset: boolean) {
+function buildNavItems(category: { isComputerAsset: boolean; capacities?: unknown } | null | undefined) {
+  const isComputerAsset = category?.isComputerAsset ?? false;
   return [
     ...LEAD_ITEMS,
-    ...(isComputerAsset ? COMPUTER_NAV_ITEMS_EARLY : []),
-    ...MID_ITEMS,
+    ...(isComputerAsset ? [OS_ITEM] : []),
+    ...(hasCapacity(category, "components") ? [COMPONENTS_ITEM] : []),
+    ...(isComputerAsset ? COMPUTER_NAV_ITEMS_MID : []),
+    MANAGEMENT_ITEM,
+    ...(hasCapacity(category, "contracts") ? [CONTRACTS_ITEM] : []),
+    ...(hasCapacity(category, "documents") ? [DOCUMENTS_ITEM] : []),
+    ...(hasCapacity(category, "financialInfo") ? [FINANCIAL_ITEM] : []),
     ...(isComputerAsset ? COMPUTER_NAV_ITEMS_LATE : []),
     ...TAIL_ITEMS,
   ];
@@ -137,7 +147,7 @@ export function AssetDetailPage() {
 
   const isOnline = asset.device ? Date.now() - new Date(asset.device.lastSeen).getTime() < 15 * 60 * 1000 : null;
   const isActive = isOnline ?? asset.status === "IN_USE";
-  const navItems = buildNavItems(asset.category?.isComputerAsset ?? false);
+  const navItems = buildNavItems(asset.category);
 
   return (
     <div className="ad-shell">
@@ -323,6 +333,7 @@ export function AssetDetailPage() {
               primaryField="name"
             />
           )}
+          {tab === "financialInfo" && <AssetFinancialTab asset={asset} onUpdated={invalidate} />}
           {tab === "virtualization" && <VirtualizationTab asset={asset} onUpdated={invalidate} />}
           {tab === "antivirus" && <AntivirusTab asset={asset} onUpdated={invalidate} />}
           {tab === "reports" && <ReportTab asset={asset} />}
