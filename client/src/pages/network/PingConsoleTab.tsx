@@ -8,10 +8,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useClientInfo } from "../../hooks/useClientInfo";
 import { PermissionGate } from "../../auth/PermissionGate";
 
-interface GraphNodeOption {
+interface AssetDeviceOption {
   id: number;
-  label: string;
-  ipAddress: string | null;
+  name: string;
+  assetTag: string;
+  staticIpAddress: string | null;
 }
 
 interface ConsoleLine {
@@ -48,9 +49,9 @@ export function PingConsoleTab() {
     defaultHostSet.current = true;
   }, [clientInfo]);
 
-  const { data: graph } = useQuery({
-    queryKey: ["network-graph"],
-    queryFn: async () => (await axiosClient.get("/network/graph")).data as { nodes: GraphNodeOption[]; edges: unknown[] },
+  const { data: assetDevices } = useQuery({
+    queryKey: ["network-asset-devices"],
+    queryFn: async () => (await axiosClient.get("/network/asset-devices")).data as AssetDeviceOption[],
   });
 
   const addNodeMutation = useMutation({
@@ -58,7 +59,7 @@ export function PingConsoleTab() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["network-graph"] }); setShowAddDevice(false); },
   });
 
-  const deviceOptions = (graph?.nodes ?? []).filter((n) => n.ipAddress);
+  const deviceOptions = (assetDevices ?? []).map((a) => ({ id: a.id, label: `${a.name} — ${a.assetTag}`, ipAddress: a.staticIpAddress }));
 
   useEffect(() => {
     consoleEndRef.current?.scrollIntoView({ behavior: "smooth" });

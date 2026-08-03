@@ -56,6 +56,20 @@ router.get("/graph", requirePermission("network", "view"), async (_req, res) => 
   res.json({ nodes: shapedNodes, edges });
 });
 
+// Real, known network endpoints for the ICMP Pinger's Quick Device Select — assets with an
+// actual recorded IP (entered manually or auto-filled by the scanner/monitor via
+// fillAssetIpFromHostname), not the manually-plotted topology nodes /graph returns. This is the
+// inventory an admin actually recognizes by name, so picking one here targets exactly the device
+// they mean instead of an arbitrary graph node that may be stale or never linked to an asset.
+router.get("/asset-devices", requirePermission("network", "view"), async (_req, res) => {
+  const assets = await prisma.asset.findMany({
+    where: { staticIpAddress: { not: null } },
+    select: { id: true, name: true, assetTag: true, staticIpAddress: true },
+    orderBy: { name: "asc" },
+  });
+  res.json(assets);
+});
+
 router.post("/nodes", requirePermission("network", "create"), validateBody(createNodeSchema), async (req, res) => {
   const node = await prisma.networkNode.create({ data: req.body });
   await logAudit({ userId: req.user!.id, action: "networkNode.create", entityType: "NetworkNode", entityId: node.id });
