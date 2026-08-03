@@ -16,6 +16,7 @@ import {
 const router = Router();
 
 router.post("/login", validateBody(loginSchema), controller.login);
+router.get("/pin-available", controller.pinAvailable);
 router.post("/refresh", controller.refresh);
 router.post("/logout", verifyJwt, controller.logout);
 router.get("/me", verifyJwt, controller.me);

@@ -1,5 +1,7 @@
 import nodemailer, { Transporter } from "nodemailer";
+import { EmailEventType } from "@prisma/client";
 import { env } from "../config/env";
+import { prisma } from "../config/prisma";
 
 export interface EmailMessage {
   to: string;
@@ -7,6 +9,7 @@ export interface EmailMessage {
   text: string;
   html?: string;
   attachments?: { filename: string; path: string }[];
+  eventType?: EmailEventType;
 }
 
 let transporter: Transporter | null | undefined;
@@ -36,24 +39,45 @@ function getTransporter(): Transporter | null {
  */
 export async function sendEmail(message: EmailMessage): Promise<{ delivered: boolean }> {
   const client = getTransporter();
+  let delivered: boolean;
 
   if (!client) {
     // eslint-disable-next-line no-console
     console.log(
       `\n[EMAIL NOT SENT — SMTP not configured]\nTo: ${message.to}\nSubject: ${message.subject}\n---\n${message.text}\n---\n`
     );
-    return { delivered: false };
+    delivered = false;
+  } else {
+    await client.sendMail({
+      from: env.SMTP_FROM,
+      to: message.to,
+      subject: message.subject,
+      text: message.text,
+      html: message.html,
+      attachments: message.attachments,
+    });
+    delivered = true;
   }
 
-  await client.sendMail({
-    from: env.SMTP_FROM,
-    to: message.to,
-    subject: message.subject,
-    text: message.text,
-    html: message.html,
-    attachments: message.attachments,
-  });
-  return { delivered: true };
+  // Logged so the recipient can review it later in Notifications > Emails (see notifications
+  // module) even when SMTP isn't configured — a logging failure must never break the send itself.
+  try {
+    await prisma.emailLog.create({
+      data: {
+        to: message.to,
+        subject: message.subject,
+        text: message.text,
+        html: message.html,
+        eventType: message.eventType,
+        delivered,
+      },
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("Failed to write EmailLog row:", err);
+  }
+
+  return { delivered };
 }
 
 // Used by the System Status health check (see lib/systemStatusMonitor.ts) — distinguishes "SMTP

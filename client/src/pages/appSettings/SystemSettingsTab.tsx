@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import dayjs from "dayjs";
@@ -9,48 +9,6 @@ import { useToast } from "../../components/toast/ToastProvider";
 import { PublishOrScheduleModal } from "./PublishOrScheduleModal";
 import { ScheduledChangeRow } from "./scheduledChangeTypes";
 import { PermissionGate } from "../../auth/PermissionGate";
-
-function BrandingUploader({ type, label, currentUrl }: { type: "appIcon" | "favicon"; label: string; currentUrl: string | null }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const queryClient = useQueryClient();
-
-  const uploadMutation = useMutation({
-    mutationFn: (file: File) => {
-      const formData = new FormData();
-      formData.append("type", type);
-      formData.append("file", file);
-      return axiosClient.post("/settings/branding", formData, { headers: { "Content-Type": "multipart/form-data" } });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["system-settings"] });
-      queryClient.invalidateQueries({ queryKey: ["branding-public"] });
-    },
-  });
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) uploadMutation.mutate(file);
-    if (inputRef.current) inputRef.current.value = "";
-  }
-
-  return (
-    <div className="row gap-3" style={{ alignItems: "center" }}>
-      <div style={{ width: 48, height: 48, borderRadius: 8, background: "var(--color-bg)", border: "1px solid var(--color-border)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-        {currentUrl ? <img src={currentUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <Icon name="admin" size={20} />}
-      </div>
-      <div className="flex-1">
-        <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
-        <div className="muted" style={{ fontSize: 11 }}>PNG, JPEG, or SVG, up to 2MB</div>
-      </div>
-      <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleChange} />
-      <PermissionGate module="app-settings" action="edit">
-        <button className="btn btn-secondary btn-sm" onClick={() => inputRef.current?.click()} disabled={uploadMutation.isPending}>
-          {uploadMutation.isPending ? "Uploading..." : "Upload"}
-        </button>
-      </PermissionGate>
-    </div>
-  );
-}
 
 export function SystemSettingsTab({
   editingScheduledChange,
@@ -148,48 +106,41 @@ export function SystemSettingsTab({
         </div>
       )}
 
-      <div className="card" style={{ maxWidth: 480 }}>
-        <h3 className="mt-0">General Settings</h3>
-        {saved && <div className="alert alert-success">Settings saved.</div>}
-        <div className="field"><label>Company Name</label><input className="input" value={values.companyName ?? ""} onChange={(e) => setValues((v) => ({ ...v, companyName: e.target.value }))} /></div>
-        <div className="field"><label>Minimum Password Length</label><input className="input" type="number" value={values.passwordMinLength ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordMinLength: e.target.value }))} /></div>
-        <div className="field"><label>Device Offline Threshold (minutes)</label><input className="input" type="number" value={values.deviceOfflineThresholdMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, deviceOfflineThresholdMinutes: e.target.value }))} /></div>
-        <div className="field"><label>Camera Recording Retention (days)</label><input className="input" type="number" value={values.cameraRetentionDays ?? ""} onChange={(e) => setValues((v) => ({ ...v, cameraRetentionDays: e.target.value }))} /></div>
-        <PermissionGate module="app-settings" action="edit">
-          <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
-            {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
-          </button>
-        </PermissionGate>
-      </div>
-
-      <div className="card" style={{ maxWidth: 480 }}>
-        <h3 className="mt-0">Password &amp; Login Security Policy</h3>
-        <div className="field">
-          <label className="row gap-2" style={{ cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={values.passwordRequireComplexity === "true"}
-              onChange={(e) => setValues((v) => ({ ...v, passwordRequireComplexity: e.target.checked ? "true" : "false" }))}
-            />
-            Require uppercase, lowercase, number &amp; symbol
-          </label>
+      <div className="row gap-3 flex-wrap" style={{ alignItems: "flex-start" }}>
+        <div className="card" style={{ maxWidth: 480, flex: "1 1 380px" }}>
+          <h3 className="mt-0">General Settings</h3>
+          {saved && <div className="alert alert-success">Settings saved.</div>}
+          <div className="field"><label>Minimum Password Length</label><input className="input" type="number" value={values.passwordMinLength ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordMinLength: e.target.value }))} /></div>
+          <div className="field"><label>Device Offline Threshold (minutes)</label><input className="input" type="number" value={values.deviceOfflineThresholdMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, deviceOfflineThresholdMinutes: e.target.value }))} /></div>
+          <div className="field"><label>Camera Recording Retention (days)</label><input className="input" type="number" value={values.cameraRetentionDays ?? ""} onChange={(e) => setValues((v) => ({ ...v, cameraRetentionDays: e.target.value }))} /></div>
+          <PermissionGate module="app-settings" action="edit">
+            <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
+              {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
+            </button>
+          </PermissionGate>
         </div>
-        <div className="field"><label>Password Expiry (days, blank = never)</label><input className="input" type="number" value={values.passwordMaxAgeDays ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordMaxAgeDays: e.target.value }))} /></div>
-        <div className="field"><label>Prevent Reuse of Last N Passwords</label><input className="input" type="number" value={values.passwordHistoryCount ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordHistoryCount: e.target.value }))} /></div>
-        <div className="field"><label>Max Failed Login Attempts</label><input className="input" type="number" value={values.maxFailedLoginAttempts ?? ""} onChange={(e) => setValues((v) => ({ ...v, maxFailedLoginAttempts: e.target.value }))} /></div>
-        <div className="field"><label>Lockout Duration (minutes)</label><input className="input" type="number" value={values.lockoutDurationMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, lockoutDurationMinutes: e.target.value }))} /></div>
-        <PermissionGate module="app-settings" action="edit">
-          <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
-            {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
-          </button>
-        </PermissionGate>
-      </div>
 
-      <div className="card" style={{ maxWidth: 480 }}>
-        <h3 className="mt-0">Branding</h3>
-        <div className="stack gap-3">
-          <BrandingUploader type="appIcon" label="App Icon (sidebar logo)" currentUrl={values.appIconUrl ?? null} />
-          <BrandingUploader type="favicon" label="Browser Favicon" currentUrl={values.faviconUrl ?? null} />
+        <div className="card" style={{ maxWidth: 480, flex: "1 1 380px" }}>
+          <h3 className="mt-0">Password &amp; Login Security Policy</h3>
+          <div className="field">
+            <label className="row gap-2" style={{ cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={values.passwordRequireComplexity === "true"}
+                onChange={(e) => setValues((v) => ({ ...v, passwordRequireComplexity: e.target.checked ? "true" : "false" }))}
+              />
+              Require uppercase, lowercase, number &amp; symbol
+            </label>
+          </div>
+          <div className="field"><label>Password Expiry (days, blank = never)</label><input className="input" type="number" value={values.passwordMaxAgeDays ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordMaxAgeDays: e.target.value }))} /></div>
+          <div className="field"><label>Prevent Reuse of Last N Passwords</label><input className="input" type="number" value={values.passwordHistoryCount ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordHistoryCount: e.target.value }))} /></div>
+          <div className="field"><label>Max Failed Login Attempts</label><input className="input" type="number" value={values.maxFailedLoginAttempts ?? ""} onChange={(e) => setValues((v) => ({ ...v, maxFailedLoginAttempts: e.target.value }))} /></div>
+          <div className="field"><label>Lockout Duration (minutes)</label><input className="input" type="number" value={values.lockoutDurationMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, lockoutDurationMinutes: e.target.value }))} /></div>
+          <PermissionGate module="app-settings" action="edit">
+            <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
+              {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
+            </button>
+          </PermissionGate>
         </div>
       </div>
 

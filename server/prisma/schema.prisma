@@ -77,6 +77,8 @@ model User {
   dashboardSharesReceived DashboardShare[] @relation("DashboardShareUser")
   savedViewsOwned         SavedView[]      @relation("SavedViewOwner")
   savedViewSharesReceived SavedViewShare[] @relation("SavedViewShareUser")
+  reportsOwned            Report[]         @relation("ReportOwner")
+  reportSharesReceived    ReportShare[]    @relation("ReportShareUser")
   approvalSubstituteDelegations TicketApprovalSubstitute[] @relation("ApprovalSubstituteDelegator")
   approvalSubstituteAssignments TicketApprovalSubstitute[] @relation("ApprovalSubstituteDelegate")
   contactEmails           UserContactEmail[]
@@ -101,6 +103,7 @@ model User {
   licenseAssignments            LicenseAssignment[]
   purchaseOrdersCreated         PurchaseOrder[]
   emailTemplatesCreated         EmailTemplate[]
+  loginPageDesignsUpdated       LoginPageDesign[]
   documentsCreated              Document[]
   networkMonitorSettingsUpdates NetworkMonitorSettings[]
   backupSettingsUpdates         BackupSettings[]
@@ -271,6 +274,48 @@ model SavedViewShare {
 
   @@unique([savedViewId, sharedWithUserId])
   @@unique([savedViewId, sharedWithTeamId])
+}
+
+// A saved Report Builder configuration (data source + filters + columns + visualization) — reuses
+// the same dataExplorer SOURCES/runQuery engine that powers dashboard Custom Query widgets, and
+// mirrors Dashboard/SavedView's owner+share shape exactly. `filters`/`columns` are opaque JSON
+// blobs whose shape is owned by the reports module (dataExplorer.FilterSpec / string[] of column
+// keys) — null `columns` means "use the source's default columns".
+model Report {
+  id            Int      @id @default(autoincrement())
+  name          String
+  description   String?
+  source        String
+  filters       Json?
+  columns       Json?
+  groupBy       String?
+  visualization String   @default("table")
+  sortBy        String?
+  sortDir       String   @default("asc")
+  ownerId       Int
+  owner         User     @relation("ReportOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  shares ReportShare[]
+
+  @@index([ownerId])
+}
+
+model ReportShare {
+  id               Int      @id @default(autoincrement())
+  reportId         Int
+  report           Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  sharedWithUserId Int?
+  sharedWithUser   User?    @relation("ReportShareUser", fields: [sharedWithUserId], references: [id], onDelete: Cascade)
+  sharedWithTeamId Int?
+  sharedWithTeam   Team?    @relation(fields: [sharedWithTeamId], references: [id], onDelete: Cascade)
+  canEdit          Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  @@unique([reportId, sharedWithUserId])
+  @@unique([reportId, sharedWithTeamId])
 }
 
 // Additional contact email addresses beyond the login/primary email — GLPI's UserEmail concept.
@@ -896,6 +941,35 @@ model RelayDeviceJob {
   @@index([status, priority, createdAt])
 }
 
+enum RelayVideoJobKind {
+  LIVE
+  RECORDING
+}
+
+enum RelayVideoJobStatus {
+  PENDING
+  RUNNING
+  STOPPING
+  STOPPED
+  FAILED
+}
+
+// Long-running counterpart to RelayDeviceJob (PING/HTTP are one-shot request/response; a video
+// job runs for minutes-to-hours). id is the SAME id used as the streamRelay.ts session id / the
+// recording's own id, so no separate mapping table is needed to connect a job back to where its
+// uploaded segments/file should land on disk.
+model RelayVideoJob {
+  id           String              @id
+  kind         RelayVideoJobKind
+  streamUrl    String
+  status       RelayVideoJobStatus @default(PENDING)
+  errorMessage String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([status])
+}
+
 model NetworkDeviceStatusEvent {
   id         Int                    @id @default(autoincrement())
   deviceId   Int
@@ -1105,6 +1179,7 @@ model Team {
   ticketApprovals   TicketApproval[]
   dashboardShares   DashboardShare[]
   savedViewShares   SavedViewShare[]
+  reportShares      ReportShare[]
   createdAt         DateTime             @default(now())
 }
 
@@ -1752,6 +1827,7 @@ model LightingDevice {
   createdAt            DateTime                   @default(now())
   sceneActions         LightingSceneAction[]
   automationActions    LightingAutomationAction[]
+  siteMapPlacements    LightingSiteMapDevice[]
 }
 
 // A user-defined grouping of lighting devices, shown as a card on the Lighting Dashboard —
@@ -1960,6 +2036,52 @@ model LightingScanResult {
   discoveredAt DateTime         @default(now())
 }
 
+// A floor-plan/site image with lighting devices pinned to specific (x,y) positions on it — a
+// visual alternative to the Dashboard's card-grid view. x/y and shape geometry are stored as
+// percentages of the image's own dimensions (not pixels) so a map renders correctly at any
+// viewport width without persisting the image's pixel size separately.
+model LightingSiteMap {
+  id        Int                     @id @default(autoincrement())
+  name      String
+  imageUrl  String
+  sortOrder Int                     @default(0)
+  createdAt DateTime                @default(now())
+  devices   LightingSiteMapDevice[]
+}
+
+enum LightingSiteMapShapeType {
+  NONE
+  CIRCLE
+  POLYGON
+  PATH
+}
+
+// One device's placement on one site map: position, optional coverage shape, and the
+// icon/color pair shown for its on/off state (independent of the device's own `icon` field,
+// which is used elsewhere e.g. the Dashboard tile). zoneOffColor is deliberately not a separate
+// field — the coverage shape is simply dimmed (reduced opacity) when the device is off.
+model LightingSiteMapDevice {
+  id          Int                      @id @default(autoincrement())
+  siteMapId   Int
+  siteMap     LightingSiteMap          @relation(fields: [siteMapId], references: [id], onDelete: Cascade)
+  deviceId    Int
+  device      LightingDevice           @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  x           Float
+  y           Float
+  shapeType   LightingSiteMapShapeType @default(NONE)
+  // CIRCLE: { radius: number }; POLYGON/PATH: { points: { x: number; y: number }[] } — all
+  // percentages of image dimensions, same coordinate space as x/y above.
+  shapeData   Json?
+  onIcon      String?
+  offIcon     String?
+  onColor     String?
+  offColor    String?
+  zoneOnColor String?
+  createdAt   DateTime                 @default(now())
+
+  @@unique([siteMapId, deviceId])
+}
+
 model AccessEvent {
   id         Int                 @id @default(autoincrement())
   deviceId   Int
@@ -2053,9 +2175,49 @@ model EmailTemplate {
   @@index([eventType])
 }
 
+// A record of every outbound email attempt, written from the single choke point (sendEmail() in
+// server/src/lib/email.ts) regardless of whether SMTP is configured — delivered=false rows are
+// the "logged fallback" case, still visible to the recipient in their Notifications > Emails tab.
+model EmailLog {
+  id        Int             @id @default(autoincrement())
+  to        String
+  subject   String
+  text      String
+  html      String?
+  eventType EmailEventType?
+  delivered Boolean
+  createdAt DateTime        @default(now())
+
+  @@index([to, createdAt])
+}
+
 model SystemSetting {
   key   String @id
   value String
+}
+
+enum LoginBackgroundType {
+  COLOR
+  GRADIENT
+  IMAGE
+  VIDEO
+}
+
+enum LoginLayoutPreset {
+  CENTERED
+  SPLIT_VERTICAL
+  SPLIT_HORIZONTAL
+}
+
+// Singleton per tenant schema (fixed id = 1 — always upsert/read on id:1, see loginDesign.routes.ts).
+// config holds the structured background/layout/blocks payload as a single Json column (like
+// EmailTemplate.blocks) so the shape can evolve without new migrations.
+model LoginPageDesign {
+  id          Int      @id @default(1)
+  config      Json
+  updatedById Int?
+  updatedBy   User?    @relation(fields: [updatedById], references: [id])
+  updatedAt   DateTime @updatedAt
 }
 
 model AgentApiKey {

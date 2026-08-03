@@ -4,12 +4,14 @@ import { DashboardTab } from "./DashboardTab";
 import { DevicesTab } from "./DevicesTab";
 import { ScenesTab } from "./ScenesTab";
 import { AutomationsTab } from "./AutomationsTab";
+import { SiteMapTab } from "./SiteMapTab";
 
 const TABS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "devices", label: "Devices" },
   { key: "scenes", label: "Scenes" },
   { key: "automations", label: "Automations" },
+  { key: "sitemap", label: "Site Map" },
   { key: "zigbee", label: "ZigBee" },
 ] as const;
 
@@ -41,6 +43,7 @@ export function LightingPage() {
       {tab === "devices" && <DevicesTab />}
       {tab === "scenes" && <ScenesTab />}
       {tab === "automations" && <AutomationsTab />}
+      {tab === "sitemap" && <SiteMapTab />}
       {tab === "zigbee" && <ZigbeeScaffoldTab apiBase="/lighting" module="lighting" />}
     </div>
   );

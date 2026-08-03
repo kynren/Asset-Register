@@ -4,6 +4,7 @@ import { setAccessToken, setUnauthorizedHandler } from "../api/tokenStore";
 import { getViewingOrgId, setViewingOrgId } from "../api/viewingOrgStore";
 import { applyAccentColor } from "../lib/color";
 import { queryClient } from "../lib/queryClient";
+import { useBranding } from "../theme/BrandingContext";
 import { ActionName, ModulePermission, ModuleName, PermissionMap } from "../lib/permissions";
 
 export interface AuthUser {
@@ -53,6 +54,7 @@ const actionKey: Record<ActionName, keyof ModulePermission> = {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const branding = useBranding();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [permissions, setPermissions] = useState<PermissionMap>({});
   const [organization, setOrganization] = useState<ViewingOrganization | null>(null);
@@ -97,8 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    applyAccentColor(user?.accentColor ?? null);
-  }, [user?.accentColor]);
+    // A user's personal accent color wins when set; otherwise fall back to the org-wide brand
+    // primary color set in Branding, rather than clearing the CSS var entirely.
+    applyAccentColor(user?.accentColor ?? branding.brandPrimaryColor ?? null);
+  }, [user?.accentColor, branding.brandPrimaryColor]);
 
   async function login(email: string, credential: { password: string } | { pin: string }, mfaToken?: string) {
     const res = await axiosClient.post("/auth/login", { email, ...credential, mfaToken });

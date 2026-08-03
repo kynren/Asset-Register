@@ -5,6 +5,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
 import { AvatarGallery } from "./AvatarGallery";
 import { ColorPaletteCard } from "./ColorPaletteCard";
+import { CurrentDeviceCard } from "./CurrentDeviceCard";
 import { PasswordInput } from "../../components/PasswordInput";
 import { McpConnectionCard } from "./McpConnectionCard";
 import { MfaCard } from "../password/MfaCard";
@@ -129,15 +130,18 @@ export function ProfilePage() {
       </div>
 
       {tab === "general" && (
-        <div className="grid grid-cols-2">
-          <div className="card">
-            <h3 className="mt-0">Profile Photo</h3>
-            <AvatarGallery currentAvatarUrl={user.avatarUrl} onSelect={(url) => updateMutation.mutate({ avatarUrl: url })} />
+        <div className="stack gap-3">
+          <div className="grid grid-cols-2">
+            <div className="card">
+              <h3 className="mt-0">Profile Photo</h3>
+              <AvatarGallery currentAvatarUrl={user.avatarUrl} onSelect={(url) => updateMutation.mutate({ avatarUrl: url })} />
+            </div>
+            <div className="card">
+              <h3 className="mt-0">Accent Color</h3>
+              <ColorPaletteCard selected={user.accentColor} onSelect={(color) => updateMutation.mutate({ accentColor: color })} />
+            </div>
           </div>
-          <div className="card">
-            <h3 className="mt-0">Accent Color</h3>
-            <ColorPaletteCard selected={user.accentColor} onSelect={(color) => updateMutation.mutate({ accentColor: color })} />
-          </div>
+          <CurrentDeviceCard />
         </div>
       )}
 
@@ -161,12 +165,16 @@ export function ProfilePage() {
 
       {tab === "settings" && (
         <div className="stack gap-3">
-          <PasswordChangeCard />
-
-          <div className="grid grid-cols-2">
-            <PinCard />
-            <MfaCard />
+          <div className="row gap-3 flex-wrap" style={{ alignItems: "flex-start" }}>
+            <div style={{ flex: "1 1 380px" }}>
+              <PasswordChangeCard />
+            </div>
+            <div style={{ flex: "1 1 380px" }}>
+              <PinCard />
+            </div>
           </div>
+
+          <MfaCard />
 
           <SessionsCard />
 

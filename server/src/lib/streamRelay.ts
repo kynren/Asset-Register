@@ -3,6 +3,8 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { Readable } from "stream";
+import { isNetworkRelayEnabled } from "../modules/network/scan.service";
+import { enqueueVideoJob, requestStop } from "./relayVideoJobs";
 
 export const SESSION_ROOT = path.join(__dirname, "..", "..", "uploads", "stream-sessions");
 fs.mkdirSync(SESSION_ROOT, { recursive: true });
@@ -19,6 +21,11 @@ interface StreamSession {
   stderrTail: string;
   lastAccessedAt: number;
   createdAt: number;
+  // True when an on-prem relay agent (not this process) owns the ffmpeg process and is uploading
+  // HLS segments into `dir` over HTTP — see relay.routes.ts's /video-jobs/:id/segment. Everything
+  // that reads from `dir` (getSessionStatus/getSessionFilePath) is unaffected either way; only
+  // startup and teardown differ.
+  relayBacked: boolean;
 }
 
 const sessions = new Map<string, StreamSession>();
@@ -42,15 +49,18 @@ function sweepIdleSessions() {
 setInterval(sweepIdleSessions, 30_000).unref();
 
 /**
- * Spawns ffmpeg to transcode an RTSP stream to HLS for browser playback. If ffmpeg isn't
- * installed, the session is marked "failed" with a clear message rather than pretending to
- * produce video — this is real infrastructure, wired up correctly, that starts working the
- * moment ffmpeg + a reachable camera stream are both present.
+ * Starts an HLS relay session for browser playback of an RTSP stream. If the on-prem Network
+ * Relay Agent is enabled, the actual ffmpeg process runs on the agent's machine (the one that can
+ * actually reach the camera's LAN) and uploads segments here; otherwise ffmpeg is spawned locally
+ * exactly as before, and if ffmpeg isn't installed the session is marked "failed" with a clear
+ * message rather than pretending to produce video.
  */
-export function startStreamSession(streamUrl: string): string {
+export async function startStreamSession(streamUrl: string): Promise<string> {
   const id = crypto.randomUUID();
   const dir = path.join(SESSION_ROOT, id);
   fs.mkdirSync(dir, { recursive: true });
+
+  const relayBacked = await isNetworkRelayEnabled();
 
   const session: StreamSession = {
     id,
@@ -62,8 +72,14 @@ export function startStreamSession(streamUrl: string): string {
     stderrTail: "",
     lastAccessedAt: Date.now(),
     createdAt: Date.now(),
+    relayBacked,
   };
   sessions.set(id, session);
+
+  if (relayBacked) {
+    await enqueueVideoJob(id, "LIVE", streamUrl);
+    return id;
+  }
 
   const playlistPath = path.join(dir, "playlist.m3u8");
   const args = [
@@ -137,6 +153,10 @@ export function stopSession(id: string): void {
   const session = sessions.get(id);
   if (!session) return;
   sessions.delete(id);
-  session.process?.kill("SIGKILL");
+  if (session.relayBacked) {
+    requestStop(id).catch(() => undefined);
+  } else {
+    session.process?.kill("SIGKILL");
+  }
   fs.rm(session.dir, { recursive: true, force: true }, () => undefined);
 }

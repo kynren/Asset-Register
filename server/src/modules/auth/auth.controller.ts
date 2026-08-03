@@ -184,6 +184,24 @@ export async function changePassword(req: Request, res: Response) {
 
 // ───────────────────────── Login PIN ─────────────────────────
 
+// Public, unauthenticated lookup the login page polls (debounced, as the user types their email)
+// to decide whether to offer a "Log in with PIN instead" option — showing that toggle unconditionally
+// would be misleading for the (typical) majority of accounts that never set one up. Unlike
+// forgotPassword's deliberately account-existence-agnostic response, this endpoint's whole purpose
+// requires revealing a yes/no — kept to that single boolean, nothing else about the account.
+export async function pinAvailable(req: Request, res: Response) {
+  const email = String(req.query.email ?? "").trim().toLowerCase();
+  if (!email) return res.json({ pinAvailable: false });
+
+  const schemaName = await resolveAccountSchema(email);
+  if (!schemaName) return res.json({ pinAvailable: false });
+
+  await runWithTenant(schemaName, async () => {
+    const user = await prisma.user.findUnique({ where: { email }, select: { isActive: true, pinEnabled: true } });
+    res.json({ pinAvailable: Boolean(user?.isActive && user.pinEnabled) });
+  });
+}
+
 export async function setPin(req: Request, res: Response) {
   const { currentPassword, pin } = req.body;
   await runWithTenant(homeSchemaFor(req), async () => {

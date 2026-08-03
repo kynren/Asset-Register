@@ -15,6 +15,7 @@ import { startScheduledChangeScheduler } from "./lib/scheduledChangeScheduler";
 import { startEmailIngestScheduler } from "./lib/emailIngestScheduler";
 import { startAssetHeartbeatScheduler } from "./lib/assetHeartbeat";
 import { startRelayDeviceJobCleanupScheduler } from "./lib/relayDeviceJobs";
+import { startRelayVideoJobCleanupScheduler } from "./lib/relayVideoJobs";
 import { startAgentLogPruneScheduler } from "./lib/agentLogPruner";
 import { startTicketRecurrenceScheduler } from "./lib/ticketRecurrenceScheduler";
 import { startTicketSurveyScheduler } from "./lib/ticketSurveyScheduler";
@@ -40,6 +41,7 @@ bootstrapControlPlane()
       startEmailIngestScheduler();
       startAssetHeartbeatScheduler();
       startRelayDeviceJobCleanupScheduler();
+      startRelayVideoJobCleanupScheduler();
       startAgentLogPruneScheduler();
       startTicketRecurrenceScheduler();
       startTicketSurveyScheduler();

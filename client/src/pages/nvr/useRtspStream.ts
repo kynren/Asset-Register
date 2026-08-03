@@ -86,8 +86,8 @@ export function useRtspStream(streamUrl: string, videoRef: RefObject<HTMLVideoEl
       timeoutRef.current = window.setTimeout(() => {
         clearTimers();
         setStatus("failed");
-        setError("Live feed did not become ready within 20 seconds.");
-      }, 20000);
+        setError("Live feed did not become ready within 35 seconds.");
+      }, 35000);
 
       pollRef.current = window.setInterval(async () => {
         try {

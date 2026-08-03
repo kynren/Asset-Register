@@ -119,6 +119,13 @@ export function NotificationBell() {
               </div>
             ))}
           </div>
+          <button
+            className="btn btn-secondary btn-sm"
+            style={{ width: "100%", borderRadius: 0, borderTop: "1px solid var(--color-border)" }}
+            onClick={() => { setOpen(false); navigate("/notifications"); }}
+          >
+            View All
+          </button>
         </div>
       )}
     </div>

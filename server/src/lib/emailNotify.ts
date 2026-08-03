@@ -19,10 +19,10 @@ export async function sendEventEmail({ eventType, to, variables, fallbackSubject
   const template = await prisma.emailTemplate.findFirst({ where: { eventType, isActive: true } });
 
   if (!template) {
-    await sendEmail({ to, subject: fallbackSubject, text: fallbackText });
+    await sendEmail({ to, subject: fallbackSubject, text: fallbackText, eventType });
     return;
   }
 
   const { subject, html } = renderEmailTemplate(template.subject, template.blocks as unknown as EmailBlock[], variables);
-  await sendEmail({ to, subject, text: fallbackText, html });
+  await sendEmail({ to, subject, text: fallbackText, html, eventType });
 }

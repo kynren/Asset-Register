@@ -5,6 +5,7 @@ import { SystemSettingsTab } from "./SystemSettingsTab";
 import { SystemStatusTab } from "./SystemStatusTab";
 import { ChangeManagementTab } from "./ChangeManagementTab";
 import { AgentLogTab } from "./AgentLogTab";
+import { BrandingTab } from "./BrandingTab";
 import { RolesTab } from "../admin/RolesTab";
 import { UsersTab } from "../admin/UsersTab";
 import { Icon } from "../../components/Icon";
@@ -17,6 +18,7 @@ const TABS = [
   { key: "roles", label: "Roles & Permissions" },
   { key: "backups", label: "Backups" },
   { key: "settings", label: "System Settings" },
+  { key: "branding", label: "Branding" },
   { key: "status", label: "System Status" },
   { key: "changeManagement", label: "Change Management" },
   { key: "agentLog", label: "Agent Log" },
@@ -130,6 +132,7 @@ export function AppSettingsPage() {
           onDoneEditingScheduledChange={() => setEditingChange(null)}
         />
       )}
+      {activeTab === "branding" && <BrandingTab />}
       {activeTab === "status" && <SystemStatusTab />}
       {activeTab === "changeManagement" && <ChangeManagementTab onEdit={handleEditScheduledChange} />}
       {activeTab === "agentLog" && <AgentLogTab />}

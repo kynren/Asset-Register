@@ -20,6 +20,8 @@ import { AccessControlPage } from "./pages/accessControl/AccessControlPage";
 import { LightingPage } from "./pages/lighting/LightingPage";
 import { DocsListPage } from "./pages/docs/DocsListPage";
 import { DocumentDetailPage } from "./pages/docs/DocumentDetailPage";
+import { ReportsPage } from "./pages/reports/ReportsPage";
+import { ReportViewPage } from "./pages/reports/ReportViewPage";
 import { OperationalContextPage } from "./pages/operational/OperationalContextPage";
 import { AssistantPage } from "./pages/assistant/AssistantPage";
 import { ProfilePage } from "./pages/profile/ProfilePage";
@@ -27,6 +29,7 @@ import { AdminPage } from "./pages/admin/AdminPage";
 import { UserDetailPage } from "./pages/admin/UserDetailPage";
 import { AppSettingsPage } from "./pages/appSettings/AppSettingsPage";
 import { PasswordManagementPage } from "./pages/password/PasswordManagementPage";
+import { NotificationsPage } from "./pages/notifications/NotificationsPage";
 
 function App() {
   return (
@@ -61,11 +64,15 @@ function App() {
           <Route path="/docs" element={<PermissionGate module="docs" redirect><DocsListPage /></PermissionGate>} />
           <Route path="/docs/:id" element={<PermissionGate module="docs" redirect><DocumentDetailPage /></PermissionGate>} />
 
+          <Route path="/reports" element={<PermissionGate module="reports" redirect><ReportsPage /></PermissionGate>} />
+          <Route path="/reports/:id" element={<PermissionGate module="reports" redirect><ReportViewPage /></PermissionGate>} />
+
           <Route path="/operational-context" element={<PermissionGate module="operational-context" redirect><OperationalContextPage /></PermissionGate>} />
 
           <Route path="/assistant" element={<PermissionGate module="virtual-assistant" redirect><AssistantPage /></PermissionGate>} />
 
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/password" element={<PermissionGate module="password" redirect><PasswordManagementPage /></PermissionGate>} />
           <Route path="/admin" element={<PermissionGate module="admin" redirect><AdminPage /></PermissionGate>} />
           <Route path="/admin/users/:id" element={<PermissionGate module="admin" redirect><UserDetailPage /></PermissionGate>} />

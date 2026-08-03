@@ -749,11 +749,14 @@
   #qr-label-print,
   #qr-label-print *,
   #inventory-print-area,
-  #inventory-print-area * {
+  #inventory-print-area *,
+  #report-print-area,
+  #report-print-area * {
     visibility: visible;
   }
   #qr-label-print,
-  #inventory-print-area {
+  #inventory-print-area,
+  #report-print-area {
     position: absolute;
     left: 0;
     top: 0;

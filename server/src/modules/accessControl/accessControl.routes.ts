@@ -397,7 +397,12 @@ router.post("/doors/:doorId/refresh-status", requirePermission("access-control",
     await prisma.door.update({ where: { id: doorId }, data: { lastCheckedAt: new Date() } });
   }
   const updated = await prisma.door.findUnique({ where: { id: doorId } });
-  res.json({ ok: result.ok, message: result.message, door: updated });
+  // A non-ok result that's neither unreachable, an auth failure, nor a 404 means the device
+  // answered but this specific status resource isn't implemented by its firmware (see the doc
+  // comment on getDoorStatus) — that's a known, permanent capability gap on some controllers, not
+  // something the user can act on, so the client renders it calmly rather than as an alarm.
+  const statusUnsupported = !result.ok && !result.unreachable && !result.authFailed && !result.notFound;
+  res.json({ ok: result.ok, message: result.message, statusUnsupported, door: updated });
 });
 
 router.delete("/doors/:doorId", requirePermission("access-control", "delete"), async (req, res) => {

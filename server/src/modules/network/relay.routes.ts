@@ -1,3 +1,6 @@
+import fs from "fs";
+import path from "path";
+import multer from "multer";
 import { Router } from "express";
 import { prisma } from "../../config/prisma";
 import { verifyAgentKey } from "../../middleware/agentAuth";
@@ -8,7 +11,16 @@ import { ipToLong } from "../../lib/ipRange";
 import { applyRelayResults } from "./scan.service";
 import { processCompletedMonitorScan } from "../../lib/networkMonitor";
 import { resolveTopologyForDevices } from "../../lib/topologyEngine";
-import { relayCompleteSchema, relayDeviceJobCompleteSchema, relayDiscoverySchema, relayLogSchema, relayProgressSchema } from "./network.schema";
+import { SESSION_ROOT } from "../../lib/streamRelay";
+import { RECORDING_ROOT } from "../../lib/recording";
+import {
+  relayCompleteSchema,
+  relayDeviceJobCompleteSchema,
+  relayDiscoverySchema,
+  relayLogSchema,
+  relayProgressSchema,
+  relayVideoJobCompleteSchema,
+} from "./network.schema";
 
 // On-prem relay agent protocol (agent/kynren_network_relay.py). A cloud-hosted server has no
 // route into a private office LAN — no code running on it can ping/ARP/SNMP-poll local devices,
@@ -203,6 +215,113 @@ router.post("/device-jobs/:id/complete", validateBody(relayDeviceJobCompleteSche
       completedAt: new Date(),
     },
   });
+  res.json({ ok: true });
+});
+
+// ───────────────────────── Video job (live view / recording) ─────────────────────────
+//
+// The counterpart to /next-device-job above, but long-running: a claimed video job keeps the
+// agent's own local ffmpeg process alive for minutes-to-hours instead of one request/response.
+// The claiming agent uploads its ffmpeg output as it goes (HLS playlist/segments for LIVE, the
+// finished .mp4 once for RECORDING) via /video-jobs/:id/segment, writing directly into the same
+// SESSION_ROOT/RECORDING_ROOT directories streamRelay.ts/recording.ts already read from — no
+// separate ingestion/merge step needed on the server side.
+
+router.get("/next-video-job", async (_req, res) => {
+  const pending = await prisma.relayVideoJob.findFirst({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" } });
+  if (!pending) {
+    res.status(204).end();
+    return;
+  }
+
+  const claimed = await prisma.relayVideoJob.updateMany({ where: { id: pending.id, status: "PENDING" }, data: { status: "RUNNING" } });
+  if (claimed.count === 0) {
+    res.status(204).end();
+    return;
+  }
+
+  res.json({ id: pending.id, kind: pending.kind, streamUrl: pending.streamUrl });
+});
+
+// Polled by the agent (every ~2s) while its local ffmpeg is running, so it can learn the server
+// wants it to stop — the agent has no other way to be told, since it's the one polling, not the
+// server pushing to it.
+router.get("/video-jobs/:id/status", async (req, res) => {
+  const job = await prisma.relayVideoJob.findUnique({ where: { id: req.params.id } });
+  if (!job) throw new ApiError(404, "Video job not found");
+  res.json({ status: job.status });
+});
+
+router.post("/video-jobs/:id/complete", validateBody(relayVideoJobCompleteSchema), async (req, res) => {
+  await prisma.relayVideoJob.updateMany({
+    where: { id: req.params.id, status: { in: ["RUNNING", "STOPPING"] } },
+    data: { status: req.body.status, errorMessage: req.body.errorMessage ?? null },
+  });
+  res.json({ ok: true });
+});
+
+// Resolves each upload's destination directory purely from the job's own kind + id (LIVE ->
+// SESSION_ROOT/<id>/, RECORDING -> RECORDING_ROOT/<cameraId>/, filename matched to the
+// CameraRecording row already created by recording.ts) — cached on the request the first time a
+// callback needs it so the two multer callbacks (destination, filename) don't each re-query.
+async function resolveVideoJobForUpload(req: any): Promise<{ kind: "LIVE" | "RECORDING"; cameraDir?: string; recordingFileName?: string } | null> {
+  if (req.__relayVideoJobUpload !== undefined) return req.__relayVideoJobUpload;
+
+  const job = await prisma.relayVideoJob.findUnique({ where: { id: req.params.id } });
+  if (!job) {
+    req.__relayVideoJobUpload = null;
+    return null;
+  }
+
+  if (job.kind === "LIVE") {
+    req.__relayVideoJobUpload = { kind: "LIVE" as const };
+    return req.__relayVideoJobUpload;
+  }
+
+  const recording = await prisma.cameraRecording.findUnique({ where: { id: Number(req.params.id) } });
+  if (!recording) {
+    req.__relayVideoJobUpload = null;
+    return null;
+  }
+
+  req.__relayVideoJobUpload = {
+    kind: "RECORDING" as const,
+    cameraDir: path.join(RECORDING_ROOT, String(recording.cameraId)),
+    recordingFileName: path.basename(recording.filePath),
+  };
+  return req.__relayVideoJobUpload;
+}
+
+const videoSegmentUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, _file, cb) => {
+      resolveVideoJobForUpload(req)
+        .then((resolved) => {
+          if (!resolved) return cb(new Error("Video job not found"), "");
+          const dir = resolved.kind === "LIVE" ? path.join(SESSION_ROOT, req.params.id) : resolved.cameraDir!;
+          fs.mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        })
+        .catch((err) => cb(err as Error, ""));
+    },
+    filename: (req, file, cb) => {
+      resolveVideoJobForUpload(req)
+        .then((resolved) => {
+          if (!resolved) return cb(new Error("Video job not found"), file.originalname);
+          if (resolved.kind === "RECORDING") return cb(null, resolved.recordingFileName!);
+          const requested = typeof req.query.filename === "string" ? req.query.filename : file.originalname;
+          cb(null, path.basename(requested));
+        })
+        .catch((err) => cb(err as Error, file.originalname));
+    },
+  }),
+  // HLS segments at -hls_time 2 run a few hundred KB; a whole relayed recording upload is the
+  // one case that can be much larger, hence the generous ceiling relative to other upload routes.
+  limits: { fileSize: 500 * 1024 * 1024 },
+});
+
+router.post("/video-jobs/:id/segment", videoSegmentUpload.single("file"), async (req, res) => {
+  if (!req.file) throw new ApiError(400, "No file uploaded.");
   res.json({ ok: true });
 });
 
