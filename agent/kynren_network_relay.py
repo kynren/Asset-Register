@@ -34,6 +34,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -49,6 +50,8 @@ LOG_PATH = SCRIPT_DIR / "network_relay.log"
 
 IS_WINDOWS = platform.system() == "Windows"
 
+LOG_UPLOAD_INTERVAL_SECONDS = 30    # how often buffered log lines are shipped to the server
+LOG_BUFFER_MAX_LINES = 500          # bounds memory if the server is unreachable for a while
 POLL_INTERVAL_SECONDS = 3          # how often to ask "any scans queued?" while idle
 DEVICE_JOB_WORKERS = 20             # matches server's assetHeartbeat.ts PING_CONCURRENCY so this
                                     # agent can actually keep pace with a full asset-sweep burst
@@ -66,7 +69,36 @@ COMMON_PORTS = [21, 22, 23, 25, 80, 443, 554, 3389, 8080, 8443]
 _dns_executor = ThreadPoolExecutor(max_workers=16)
 
 
-def setup_logging() -> logging.Logger:
+class DequeLogHandler(logging.Handler):
+    """Bounded in-memory buffer of recently-formatted log lines, drained periodically by
+    log_upload_loop() and shipped to POST /api/network-relay/log for the App Settings ->
+    Agent Log tab. Separate from the rotating file handler above — this is what "recent lines to
+    upload" means, not a replacement for the on-disk log."""
+
+    def __init__(self, maxlen: int = LOG_BUFFER_MAX_LINES):
+        super().__init__()
+        self._buffer: deque[str] = deque(maxlen=maxlen)
+        self._lock = threading.Lock()
+
+    def emit(self, record: logging.LogRecord) -> None:
+        with self._lock:
+            self._buffer.append(self.format(record))
+
+    def drain(self) -> list[str]:
+        with self._lock:
+            lines = list(self._buffer)
+            self._buffer.clear()
+            return lines
+
+    def restore(self, lines: list[str]) -> None:
+        """Puts undelivered lines back after a failed upload so they aren't lost, without
+        blocking newer lines logged in the meantime from being appended."""
+        with self._lock:
+            for line in reversed(lines):
+                self._buffer.appendleft(line)
+
+
+def setup_logging() -> tuple[logging.Logger, DequeLogHandler]:
     logger = logging.getLogger("kynren_network_relay")
     logger.setLevel(logging.INFO)
 
@@ -78,7 +110,11 @@ def setup_logging() -> logging.Logger:
     console_handler.setFormatter(logging.Formatter("%(message)s"))
     logger.addHandler(console_handler)
 
-    return logger
+    deque_handler = DequeLogHandler()
+    deque_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    logger.addHandler(deque_handler)
+
+    return logger, deque_handler
 
 
 # ───────────────────────── IP range expansion ─────────────────────────
@@ -819,6 +855,40 @@ def submit_results(api_base_url: str, api_key: str, job_id: int, results: list[d
         return False
 
 
+def upload_logs(api_base_url: str, api_key: str, lines: list[str], logger: logging.Logger) -> bool:
+    """POSTs a batch of buffered log lines to the server for App Settings -> Agent Log. Returns
+    True on success so the caller (log_upload_loop) knows not to restore the lines back onto the
+    buffer for retry."""
+    url = f"{api_base_url.rstrip('/')}/api/network-relay/log"
+    try:
+        response = requests.post(
+            url,
+            headers={"X-Agent-Key": api_key, "Content-Type": "application/json"},
+            data=json.dumps({"lines": lines}),
+            timeout=10,
+        )
+        if response.status_code == 200:
+            return True
+        logger.warning(f"log upload responded {response.status_code} — {response.text[:200]}")
+        return False
+    except requests.RequestException as exc:
+        logger.warning(f"log upload failed: {exc}")
+        return False
+
+
+def log_upload_loop(api_base_url: str, api_key: str, logger: logging.Logger, log_buffer: DequeLogHandler, stop_event=None) -> None:
+    """Background thread: every LOG_UPLOAD_INTERVAL_SECONDS, drains whatever's been logged since
+    the last cycle and ships it to the server. Runs independently of the main scan-job loop so a
+    slow scan never delays log visibility in App Settings -> Agent Log."""
+    while stop_event is None or not stop_event.is_set():
+        (stop_event.wait if stop_event else time.sleep)(LOG_UPLOAD_INTERVAL_SECONDS)
+        lines = log_buffer.drain()
+        if not lines:
+            continue
+        if not upload_logs(api_base_url, api_key, lines, logger):
+            log_buffer.restore(lines)
+
+
 def report_discovery(api_base_url: str, api_key: str, subnets: list[dict], logger: logging.Logger) -> None:
     """Reports this relay's locally-discovered subnets (see discover_local_subnets()) to the
     server so admins can pick real, present ranges in Network Monitor settings instead of typing
@@ -1004,7 +1074,7 @@ def load_config(args: argparse.Namespace) -> tuple[str, str]:
     return api_base_url, api_key
 
 
-def run_loop(api_base_url: str, api_key: str, logger: logging.Logger, stop_event=None) -> None:
+def run_loop(api_base_url: str, api_key: str, logger: logging.Logger, stop_event=None, log_buffer: "DequeLogHandler | None" = None) -> None:
     """The actual poll/scan loop, factored out of main() so the Windows service wrapper
     (kynren_network_relay_service.py) can run it in a background thread and request a clean stop
     between cycles via `stop_event` (a threading.Event) instead of relying on KeyboardInterrupt,
@@ -1029,6 +1099,13 @@ def run_loop(api_base_url: str, api_key: str, logger: logging.Logger, stop_event
         threading.Thread(
             target=device_job_worker_loop,
             args=(worker_id, api_base_url, api_key, logger, stop_event),
+            daemon=True,
+        ).start()
+
+    if log_buffer is not None:
+        threading.Thread(
+            target=log_upload_loop,
+            args=(api_base_url, api_key, logger, log_buffer, stop_event),
             daemon=True,
         ).start()
 
@@ -1064,7 +1141,7 @@ def main() -> int:
         diagnose_vlans()
         return 0
 
-    logger = setup_logging()
+    logger, log_buffer = setup_logging()
 
     try:
         api_base_url, api_key = load_config(args)
@@ -1073,7 +1150,7 @@ def main() -> int:
         return 1
 
     logger.info(f"Kynren Network Relay Agent v{AGENT_VERSION} — polling {api_base_url} every {POLL_INTERVAL_SECONDS}s")
-    run_loop(api_base_url, api_key, logger)
+    run_loop(api_base_url, api_key, logger, log_buffer=log_buffer)
     return 0
 
 

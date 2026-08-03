@@ -16,6 +16,7 @@ const schema = z.object({
   isComputerAsset: z.boolean().optional(),
   isShowAsset: z.boolean().optional(),
   isSwitchingDevice: z.boolean().optional(),
+  collectionId: z.number().int().nullable().optional(),
 });
 
 const categorySelect = {
@@ -26,6 +27,8 @@ const categorySelect = {
   isSwitchingDevice: true,
   formTemplateId: true,
   formTemplate: { select: { id: true, name: true } },
+  collectionId: true,
+  collection: { select: { id: true, name: true } },
 };
 
 router.get("/", requirePermission("assets", "view"), async (_req, res) => {
@@ -81,6 +84,7 @@ router.post("/:id/duplicate", requirePermission("admin", "create"), async (req, 
       isComputerAsset: source.isComputerAsset,
       isShowAsset: source.isShowAsset,
       isSwitchingDevice: source.isSwitchingDevice,
+      collectionId: source.collectionId,
     },
     select: categorySelect,
   });

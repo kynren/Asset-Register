@@ -10,6 +10,11 @@ interface CategoryTabBarProps {
   categories: CategoryTab[];
   active: string;
   onSelect: (category: string) => void;
+  /** Overrides the synthetic "All" tab's count, which otherwise defaults to summing every
+   * child's count (e.g. total documents/assets across categories). Pass this when "All" should
+   * instead read as a count of the categories themselves (e.g. Asset Inventory's Collections bar
+   * showing "3" for three collections, not the sum of assets inside them). */
+  allCount?: number;
 }
 
 const MORE_BUTTON_WIDTH = 92;
@@ -20,8 +25,8 @@ const TAB_GAP = 6;
 // as a single row no matter how many categories a tenant has accumulated. Widths are measured
 // from an off-screen mirror row (rendered once, always fully populated) since the visible row's
 // own tab count is exactly what we're trying to compute — measuring it directly would be circular.
-export function CategoryTabBar({ categories, active, onSelect }: CategoryTabBarProps) {
-  const allTabs: CategoryTab[] = [{ name: "", count: categories.reduce((sum, c) => sum + c.count, 0) }, ...categories];
+export function CategoryTabBar({ categories, active, onSelect, allCount }: CategoryTabBarProps) {
+  const allTabs: CategoryTab[] = [{ name: "", count: allCount ?? categories.reduce((sum, c) => sum + c.count, 0) }, ...categories];
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const measureRefs = useRef<Map<string, HTMLButtonElement>>(new Map());

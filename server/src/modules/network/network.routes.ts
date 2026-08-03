@@ -7,12 +7,12 @@ import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { isOnline } from "../../lib/network";
-import { pingHost } from "../../lib/ping";
 import { streamPing } from "../../lib/pingStream";
+import { relayAwarePing } from "../../lib/relayTransport";
 import { encryptSecret } from "../../lib/crypto";
 import { runNetworkMonitorCycle } from "../../lib/networkMonitor";
 import { createEdgeSchema, createNodeSchema, updateMonitorSettingsSchema, updateNodeSchema, updateSnmpConfigSchema } from "./network.schema";
-import { startScan } from "./scan.service";
+import { isNetworkRelayEnabled, startScan } from "./scan.service";
 
 const router = Router();
 router.use(verifyJwt);
@@ -29,7 +29,7 @@ router.get("/graph", requirePermission("network", "view"), async (_req, res) => 
     nodes.map(async (n) => {
       const ip = n.ipAddress ?? n.device?.ipAddresses?.[0] ?? null;
       if (!ip) return { latencyMs: null as number | null, status: null as "ONLINE" | "DEGRADED" | "OFFLINE" | null };
-      const { alive, responseTimeMs } = await pingHost(ip, 800);
+      const { alive, responseTimeMs } = await relayAwarePing(ip, 800);
       if (!alive) return { latencyMs: null, status: "OFFLINE" as const };
       return { latencyMs: responseTimeMs, status: (responseTimeMs !== null && responseTimeMs > 50 ? "DEGRADED" : "ONLINE") as "DEGRADED" | "ONLINE" };
     })
@@ -89,11 +89,11 @@ router.delete("/edges/:id", requirePermission("network", "delete"), async (req, 
 // ───────────────────────── Ping / IP range scanner ─────────────────────────
 
 router.post("/ping", requirePermission("network", "view"), validateBody(z.object({ ipAddress: z.string().min(1) })), async (req, res) => {
-  const result = await pingHost(req.body.ipAddress);
+  const result = await relayAwarePing(req.body.ipAddress);
   res.json(result);
 });
 
-router.get("/ping-stream", requirePermission("network", "view"), (req, res) => {
+router.get("/ping-stream", requirePermission("network", "view"), async (req, res) => {
   const host = String(req.query.host ?? "");
   if (!host || host.length > 253 || !/^[a-zA-Z0-9.:_-]+$/.test(host)) {
     res.status(400).json({ error: "Invalid host" });
@@ -106,6 +106,34 @@ router.get("/ping-stream", requirePermission("network", "view"), (req, res) => {
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
+
+  // A cloud-hosted server has no route into a private office LAN, so a locally-spawned `ping`
+  // process (streamPing below) can never reach a device that only the on-prem relay agent can
+  // see. When relay mode is on, simulate the same live per-packet feel by looping real one-shot
+  // pings through the relay job queue (relayAwarePing already resolves to the agent's machine)
+  // and streaming each result back over the same SSE wire format the client already parses.
+  if (await isNetworkRelayEnabled()) {
+    let stopped = false;
+    req.on("close", () => { stopped = true; });
+
+    function send(event: Record<string, unknown>) {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    }
+
+    let seq = 0;
+    const total = count === "continuous" ? Infinity : count;
+    while (!stopped && seq < total) {
+      seq += 1;
+      const result = await relayAwarePing(host, 1500);
+      if (stopped) break;
+      if (result.alive) send({ type: "reply", seq, host, timeMs: result.responseTimeMs });
+      else send({ type: "timeout", seq });
+      if (!stopped && seq < total) await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    if (!stopped) send({ type: "done" });
+    res.end();
+    return;
+  }
 
   const proc = streamPing(host, count, res, () => res.end());
   req.on("close", () => proc.kill());

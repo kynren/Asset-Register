@@ -13,6 +13,11 @@ interface FormTemplateRef {
   name: string;
 }
 
+interface CollectionRef {
+  id: number;
+  name: string;
+}
+
 interface AssetCategory {
   id: number;
   name: string;
@@ -21,6 +26,8 @@ interface AssetCategory {
   isSwitchingDevice: boolean;
   formTemplateId: number | null;
   formTemplate: FormTemplateRef | null;
+  collectionId: number | null;
+  collection: CollectionRef | null;
 }
 
 export function AssetCategoriesTable() {
@@ -37,6 +44,10 @@ export function AssetCategoriesTable() {
     queryKey: ["asset-form-templates"],
     queryFn: async () => (await axiosClient.get("/asset-form-templates")).data,
   });
+  const { data: collections } = useQuery({
+    queryKey: ["asset-collections"],
+    queryFn: async () => (await axiosClient.get("/asset-collections")).data as CollectionRef[],
+  });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/asset-categories/${id}`),
@@ -50,6 +61,11 @@ export function AssetCategoriesTable() {
 
   const columns: ColumnDef<AssetCategory, any>[] = [
     { header: "Name", accessorKey: "name" },
+    {
+      header: "Collection",
+      accessorFn: (r) => r.collection?.name ?? "",
+      cell: ({ row }) => row.original.collection ? <span className="badge badge-neutral">{row.original.collection.name}</span> : <span className="muted">—</span>,
+    },
     {
       header: "Type",
       accessorFn: (r) => (r.isComputerAsset ? "Computer / Network" : "Generic"),
@@ -121,12 +137,14 @@ export function AssetCategoriesTable() {
       {showForm && (
         <CategoryFormModal
           templates={templates ?? []}
+          collections={collections ?? []}
           onClose={() => setShowForm(false)}
         />
       )}
       {editing && (
         <CategoryFormModal
           templates={templates ?? []}
+          collections={collections ?? []}
           initial={editing}
           onClose={() => setEditing(null)}
         />
@@ -148,15 +166,19 @@ export function AssetCategoriesTable() {
 
 function CategoryFormModal({
   templates,
+  collections,
   initial,
   onClose,
 }: {
   templates: FormTemplateRef[];
+  collections: CollectionRef[];
   initial?: AssetCategory;
   onClose: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [formTemplateId, setFormTemplateId] = useState<string>(initial?.formTemplateId ? String(initial.formTemplateId) : "");
+  const defaultCollectionId = collections.find((c) => c.name === "IT Assets")?.id ?? collections[0]?.id;
+  const [collectionId, setCollectionId] = useState<string>(initial ? String(initial.collectionId ?? "") : String(defaultCollectionId ?? ""));
   const [isComputerAsset, setIsComputerAsset] = useState(initial?.isComputerAsset ?? false);
   const [isShowAsset, setIsShowAsset] = useState(initial?.isShowAsset ?? false);
   const [isSwitchingDevice, setIsSwitchingDevice] = useState(initial?.isSwitchingDevice ?? false);
@@ -164,12 +186,13 @@ function CategoryFormModal({
 
   const mutation = useMutation({
     mutationFn: () => {
-      const payload = { name, formTemplateId: formTemplateId ? Number(formTemplateId) : null, isComputerAsset, isShowAsset, isSwitchingDevice };
+      const payload = { name, formTemplateId: formTemplateId ? Number(formTemplateId) : null, collectionId: collectionId ? Number(collectionId) : null, isComputerAsset, isShowAsset, isSwitchingDevice };
       return initial ? axiosClient.patch(`/asset-categories/${initial.id}`, payload) : axiosClient.post("/asset-categories", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["asset-categories"] });
       queryClient.invalidateQueries({ queryKey: ["asset-form-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-collections"] });
       onClose();
     },
   });
@@ -230,6 +253,15 @@ function CategoryFormModal({
           <input type="checkbox" checked={isSwitchingDevice} onChange={(e) => setIsSwitchingDevice(e.target.checked)} />
           <span className="form-toggle-switch-track" />
         </label>
+      </div>
+      <div className="field">
+        <label>Collection</label>
+        <select className="select" value={collectionId} onChange={(e) => setCollectionId(e.target.value)}>
+          <option value="">None</option>
+          {collections.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
       </div>
       <div className="field">
         <label>Linked Form Template</label>

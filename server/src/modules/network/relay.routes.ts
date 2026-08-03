@@ -8,7 +8,7 @@ import { ipToLong } from "../../lib/ipRange";
 import { applyRelayResults } from "./scan.service";
 import { processCompletedMonitorScan } from "../../lib/networkMonitor";
 import { resolveTopologyForDevices } from "../../lib/topologyEngine";
-import { relayCompleteSchema, relayDeviceJobCompleteSchema, relayDiscoverySchema, relayProgressSchema } from "./network.schema";
+import { relayCompleteSchema, relayDeviceJobCompleteSchema, relayDiscoverySchema, relayLogSchema, relayProgressSchema } from "./network.schema";
 
 // On-prem relay agent protocol (agent/kynren_network_relay.py). A cloud-hosted server has no
 // route into a private office LAN — no code running on it can ping/ARP/SNMP-poll local devices,
@@ -135,6 +135,17 @@ router.post("/discovery", validateBody(relayDiscoverySchema), async (req, res) =
         create: { cidr: s.cidr, label: s.label ?? undefined },
       })
       .catch(() => undefined);
+  }
+  res.json({ ok: true });
+});
+
+// Best-effort log-line upload from the relay's own rotating/in-memory log buffer (see
+// upload_logs() in the Python agent) — feeds the App Settings → Agent Log tab. Fire-and-forget
+// per line, same convention as /discovery above: never let one bad row fail the whole batch.
+router.post("/log", validateBody(relayLogSchema), async (req, res) => {
+  const { lines } = req.body as { lines: string[] };
+  if (lines.length > 0) {
+    await prisma.agentLogEntry.createMany({ data: lines.map((message) => ({ message })) }).catch(() => undefined);
   }
   res.json({ ok: true });
 });

@@ -6,7 +6,7 @@ import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { decryptSecret, encryptSecret } from "../../lib/crypto";
-import { pingHost } from "../../lib/ping";
+import { relayAwarePing } from "../../lib/relayTransport";
 import { attemptConnect, getCoordinator, listDevices, updateCoordinatorConfig } from "../../lib/zigbeeCoordinator";
 import {
   captureCardId,
@@ -330,7 +330,7 @@ router.post("/devices/:id/check-status", requirePermission("access-control", "ed
   const device = await loadDeviceWithSecret(Number(req.params.id));
   if (!device.ipAddress) throw new ApiError(400, "This device has no IP address set");
 
-  const { alive } = await pingHost(device.ipAddress);
+  const { alive } = await relayAwarePing(device.ipAddress);
   const newStatus = alive ? "ONLINE" : "OFFLINE";
   const updated = await prisma.accessControlDevice.update({
     where: { id: device.id },

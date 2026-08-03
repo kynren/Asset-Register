@@ -201,7 +201,17 @@ model AssetCategory {
   isSwitchingDevice Boolean            @default(false)
   formTemplateId    Int?
   formTemplate      AssetFormTemplate? @relation(fields: [formTemplateId], references: [id])
+  collectionId      Int?
+  collection        AssetCollection?   @relation(fields: [collectionId], references: [id])
   assets            Asset[]
+}
+
+model AssetCollection {
+  id          Int             @id @default(autoincrement())
+  name        String          @unique
+  description String?
+  createdAt   DateTime        @default(now())
+  categories  AssetCategory[]
 }
 
 model AssetFormTemplate {
@@ -1664,6 +1674,15 @@ model AgentApiKey {
   isActive   Boolean   @default(true)
   createdAt  DateTime  @default(now())
   lastUsedAt DateTime?
+}
+
+model AgentLogEntry {
+  id        Int      @id @default(autoincrement())
+  source    String   @default("network_relay")
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 // Bearer key for external MCP clients (Claude Desktop, Claude Code, etc.) connecting to this

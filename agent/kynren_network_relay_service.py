@@ -57,7 +57,7 @@ class KynrenNetworkRelayService(win32serviceutil.ServiceFramework):
 
     def SvcDoRun(self):
         servicemanager.LogMsg(servicemanager.EVENTLOG_INFORMATION_TYPE, servicemanager.PYS_SERVICE_STARTED, (self._svc_name_, ""))
-        logger = relay.setup_logging()
+        logger, log_buffer = relay.setup_logging()
 
         class _Args:
             api_base_url = None
@@ -71,7 +71,12 @@ class KynrenNetworkRelayService(win32serviceutil.ServiceFramework):
             return
 
         logger.info(f"Kynren Network Relay Agent v{relay.AGENT_VERSION} (Windows Service) — polling {api_base_url} every {relay.POLL_INTERVAL_SECONDS}s")
-        self.worker = threading.Thread(target=relay.run_loop, args=(api_base_url, api_key, logger, self.stop_flag), daemon=True)
+        self.worker = threading.Thread(
+            target=relay.run_loop,
+            args=(api_base_url, api_key, logger, self.stop_flag),
+            kwargs={"log_buffer": log_buffer},
+            daemon=True,
+        )
         self.worker.start()
 
         win32event.WaitForSingleObject(self.hWaitStop, win32event.INFINITE)

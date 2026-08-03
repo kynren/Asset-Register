@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../config/prisma";
 import { isOnline } from "../lib/network";
-import { pingHost } from "../lib/ping";
+import { relayAwarePing } from "../lib/relayTransport";
 import { computeDueAt } from "../modules/tickets/sla";
 
 export interface ToolResult {
@@ -110,9 +110,9 @@ export const tools: ToolDef[] = [
     description: "Ping an asset live on the network by its asset tag (used as its hostname) and report whether it's reachable and its latency.",
     inputSchema: { assetTag: z.string() },
     handler: async (args) => {
-      const asset = await prisma.asset.findUnique({ where: { assetTag: args.assetTag }, select: { assetTag: true } });
+      const asset = await prisma.asset.findUnique({ where: { assetTag: args.assetTag }, select: { assetTag: true, staticIpAddress: true } });
       if (!asset) return { answer: `No asset found with tag "${args.assetTag}".` };
-      const result = await pingHost(asset.assetTag);
+      const result = await relayAwarePing(asset.staticIpAddress || asset.assetTag);
       return {
         answer: result.alive ? `${args.assetTag} is reachable (${result.responseTimeMs}ms).` : `${args.assetTag} did not respond to a ping.`,
         data: result,
