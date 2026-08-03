@@ -9,6 +9,7 @@ import { Icon } from "../../components/Icon";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { useUserPreference } from "../../hooks/useUserPreference";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface Organization {
   id: number;
@@ -337,10 +338,15 @@ function EditPersonModal({
             </div>
             <div className="field">
               <label>Organization</label>
-              <select className="select" value={organizationId} onChange={(e) => setOrganizationId(e.target.value ? Number(e.target.value) : "")}>
-                <option value="">Unassigned</option>
-                {organizations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
+              <ChipSelect
+                value={organizationId === "" ? "" : String(organizationId)}
+                onChange={(v) => setOrganizationId(v ? Number(v) : "")}
+                placeholder="Unassigned"
+                options={[
+                  { value: "", label: "Unassigned" },
+                  ...organizations.map((o) => ({ value: String(o.id), label: o.name })),
+                ]}
+              />
             </div>
             <div className="field"><label>Email</label><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             <div className="field"><label>Tel.</label><input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
@@ -528,9 +534,11 @@ function AddCardModal({ personId, onClose, onSaved }: { personId: number; onClos
 
         <div className="field">
           <label>Card Type</label>
-          <select className="select" value={cardType} onChange={(e) => setCardType(e.target.value)}>
-            {CARD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <ChipSelect
+            value={cardType}
+            onChange={setCardType}
+            options={CARD_TYPES.map((t) => ({ value: t, label: t }))}
+          />
         </div>
 
         <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
@@ -605,10 +613,15 @@ function ReaderSettingsModal({
         ) : (
           <div className="field">
             <label>Card Enrollment Station</label>
-            <select className="select" value={draft.deviceId ?? ""} onChange={(e) => setDraft((d) => ({ ...d, deviceId: e.target.value ? Number(e.target.value) : null }))}>
-              <option value="">Select a device...</option>
-              {devices.map((dev) => <option key={dev.id} value={dev.id}>{dev.name} ({dev.ipAddress})</option>)}
-            </select>
+            <ChipSelect
+              value={draft.deviceId != null ? String(draft.deviceId) : ""}
+              onChange={(v) => setDraft((d) => ({ ...d, deviceId: v ? Number(v) : null }))}
+              placeholder="Select a device..."
+              options={[
+                { value: "", label: "Select a device..." },
+                ...devices.map((dev) => ({ value: String(dev.id), label: `${dev.name} (${dev.ipAddress})` })),
+              ]}
+            />
             {devices.length === 0 && (
               <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>
                 No access control device with an IP address is registered yet — add one under Devices &amp; Doors first.
@@ -619,9 +632,11 @@ function ReaderSettingsModal({
 
         <div className="field">
           <label>Card Type</label>
-          <select className="select" value={draft.cardType} onChange={(e) => setDraft((d) => ({ ...d, cardType: e.target.value }))}>
-            {READER_CARD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <ChipSelect
+            value={draft.cardType}
+            onChange={(v) => setDraft((d) => ({ ...d, cardType: v }))}
+            options={READER_CARD_TYPES.map((t) => ({ value: t, label: t }))}
+          />
         </div>
 
         <label className="row gap-1" style={{ fontSize: 13, cursor: "pointer", margin: "12px 0" }}>
@@ -630,9 +645,11 @@ function ReaderSettingsModal({
 
         <div className="field">
           <label>Card No. Type</label>
-          <select className="select" value={draft.cardNoType} onChange={(e) => setDraft((d) => ({ ...d, cardNoType: e.target.value }))}>
-            {CARD_NO_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <ChipSelect
+            value={draft.cardNoType}
+            onChange={(v) => setDraft((d) => ({ ...d, cardNoType: v }))}
+            options={CARD_NO_TYPES.map((t) => ({ value: t, label: t }))}
+          />
         </div>
 
         <label className="row gap-2" style={{ fontSize: 13, cursor: "pointer", marginTop: 12, justifyContent: "space-between" }}>

@@ -11,6 +11,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
 import { LightingDevice } from "./LightingDeviceCard";
 import { DeviceActionPicker, DraftAction, actionsToDrafts, draftsToActions } from "./DeviceActionPicker";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface AutomationRun {
   id: number;
@@ -345,10 +346,14 @@ function AutomationFormModal({
         <div className="field"><label>Time *</label><input className="input" type="time" value={timeOfDay} onChange={(e) => setTimeOfDay(e.target.value)} /></div>
         <div className="field">
           <label>Action</label>
-          <select className="select" value={actionType} onChange={(e) => setActionType(e.target.value as "DEVICE" | "SCENE")}>
-            <option value="DEVICE">Turn a device on/off</option>
-            <option value="SCENE">Activate a scene</option>
-          </select>
+          <ChipSelect
+            value={actionType}
+            onChange={(v) => setActionType(v as "DEVICE" | "SCENE")}
+            options={[
+              { value: "DEVICE", label: "Turn a device on/off" },
+              { value: "SCENE", label: "Activate a scene" },
+            ]}
+          />
         </div>
       </div>
 
@@ -372,10 +377,12 @@ function AutomationFormModal({
       ) : (
         <div className="field">
           <label>Scene *</label>
-          <select className="select" value={targetSceneId} onChange={(e) => setTargetSceneId(e.target.value ? Number(e.target.value) : "")}>
-            <option value="">Select scene...</option>
-            {scenes.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+          <ChipSelect
+            value={String(targetSceneId)}
+            onChange={(v) => setTargetSceneId(v ? Number(v) : "")}
+            placeholder="Select scene..."
+            options={[{ value: "", label: "Select scene..." }, ...scenes.map((s) => ({ value: String(s.id), label: s.name }))]}
+          />
           {scenes.length === 0 && <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>No scenes yet — add one under the Scenes tab first.</p>}
         </div>
       )}

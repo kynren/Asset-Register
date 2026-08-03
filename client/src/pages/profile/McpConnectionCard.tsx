@@ -13,9 +13,15 @@ interface McpKey {
   createdAt: string;
 }
 
+function maskKey(key: string): string {
+  if (key.length <= 8) return "•".repeat(key.length);
+  return `${"•".repeat(key.length - 6)}${key.slice(-6)}`;
+}
+
 export function McpConnectionCard() {
   const queryClient = useQueryClient();
   const [justCreatedKey, setJustCreatedKey] = useState<string | null>(null);
+  const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
 
   const { data: keys } = useQuery({
     queryKey: ["mcp-keys"],
@@ -34,6 +40,32 @@ export function McpConnectionCard() {
     mutationFn: (params: { id: number; isActive: boolean }) => axiosClient.patch(`/mcp-keys/${params.id}`, { isActive: params.isActive }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mcp-keys"] }),
   });
+
+  // Revoke the old key and mint a fresh one in a single click — the common "my key may have leaked,
+  // give me a clean one" action, instead of making the user do Revoke then Generate separately.
+  const regenerateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await axiosClient.patch(`/mcp-keys/${id}`, { isActive: false });
+      return axiosClient.post("/mcp-keys", { label: "My MCP Key" });
+    },
+    onSuccess: (res) => {
+      setJustCreatedKey(res.data.key);
+      queryClient.invalidateQueries({ queryKey: ["mcp-keys"] });
+    },
+  });
+
+  function toggleReveal(id: number) {
+    setRevealedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function copyKey(key: string) {
+    navigator.clipboard?.writeText(key).catch(() => undefined);
+  }
 
   const mcpUrl = `${window.location.origin}/api/mcp`;
 
@@ -60,12 +92,25 @@ export function McpConnectionCard() {
       <div className="stack gap-1" style={{ marginBottom: 12 }}>
         {(keys ?? []).map((k) => (
           <div key={k.id} className="row gap-2" style={{ justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderBottom: "1px solid var(--color-border)" }}>
-            <span style={{ fontFamily: "monospace" }}>{k.key}</span>
+            <span style={{ fontFamily: "monospace" }}>{revealedIds.has(k.id) ? k.key : maskKey(k.key)}</span>
             <span className="muted">{k.lastUsedAt ? `Last used ${dayjs(k.lastUsedAt).format("DD MMM, HH:mm")}` : "Never used"}</span>
             <span className={`badge ${k.isActive ? "badge-success" : "badge-neutral"}`}>{k.isActive ? "Active" : "Revoked"}</span>
-            <button className="btn btn-secondary btn-sm" onClick={() => toggleMutation.mutate({ id: k.id, isActive: !k.isActive })}>
-              {k.isActive ? "Revoke" : "Reactivate"}
-            </button>
+            <div className="row gap-1">
+              <button className="btn btn-secondary btn-sm btn-icon" title={revealedIds.has(k.id) ? "Hide" : "Reveal"} onClick={() => toggleReveal(k.id)}>
+                <Icon name={revealedIds.has(k.id) ? "eyeOff" : "eye"} size={13} />
+              </button>
+              <button className="btn btn-secondary btn-sm btn-icon" title="Copy" onClick={() => copyKey(k.key)}>
+                <Icon name="paperclip" size={13} />
+              </button>
+              {k.isActive && (
+                <button className="btn btn-secondary btn-sm" title="Revoke this key and generate a new one" disabled={regenerateMutation.isPending} onClick={() => regenerateMutation.mutate(k.id)}>
+                  Regenerate
+                </button>
+              )}
+              <button className="btn btn-secondary btn-sm" onClick={() => toggleMutation.mutate({ id: k.id, isActive: !k.isActive })}>
+                {k.isActive ? "Revoke" : "Reactivate"}
+              </button>
+            </div>
           </div>
         ))}
         {!keys?.length && <div className="muted" style={{ fontSize: 12 }}>No MCP keys yet.</div>}

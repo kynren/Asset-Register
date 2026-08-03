@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
+import { ChipSelect } from "../../components/ChipSelect";
 import { FieldDef, FieldOption } from "./dataExplorerConfig";
 
 function useFieldOptions(field: FieldDef) {
@@ -34,20 +35,25 @@ function FilterField({ field, value, onChange }: { field: FieldDef; value: strin
   let input: JSX.Element;
   if (field.type === "boolean") {
     input = (
-      <select className="select" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Any</option>
-        <option value="true">Yes</option>
-        <option value="false">No</option>
-      </select>
+      <ChipSelect
+        value={value}
+        onChange={onChange}
+        placeholder="Any"
+        options={[
+          { value: "", label: "Any" },
+          { value: "true", label: "Yes" },
+          { value: "false", label: "No" },
+        ]}
+      />
     );
   } else if (field.type === "enum") {
     input = (
-      <select className="select" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Any</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
+      <ChipSelect
+        value={value}
+        onChange={onChange}
+        placeholder="Any"
+        options={[{ value: "", label: "Any" }, ...options.map((o) => ({ value: o.value, label: o.label }))]}
+      />
     );
   } else if (field.type === "date") {
     input = <input className="input" type="date" value={value} onChange={(e) => onChange(e.target.value)} />;

@@ -38,6 +38,19 @@ async function teamMemberIds(teamId: number): Promise<number[]> {
   return members.map((m) => m.userId);
 }
 
+// Users who have currently-active "Authorized Substitute" delegations naming `substituteUserId` as
+// their stand-in (see TicketApprovalSubstitute / Profile page) — their pending approvals should be
+// answerable by the substitute during the delegated date range, mirroring GLPI's Authorized
+// Substitutes feature.
+async function getActiveDelegatorIds(substituteUserId: number): Promise<number[]> {
+  const now = new Date();
+  const rows = await prisma.ticketApprovalSubstitute.findMany({
+    where: { substituteId: substituteUserId, startDate: { lte: now }, endDate: { gte: now } },
+    select: { userId: true },
+  });
+  return rows.map((r) => r.userId);
+}
+
 // Replaces a ticket's assignee/team-assignment join rows with the given arrays (delete-all-then-
 // recreate, same convention teams.routes.ts uses for TeamMember) and returns only the ids that
 // are newly added — so re-saving unrelated ticket fields doesn't re-notify people already
@@ -134,14 +147,31 @@ export async function list(req: Request, res: Response) {
     where.dueAt = { lt: new Date() };
     where.status = { in: ["OPEN", "IN_PROGRESS"] };
   }
+
+  const andConditions: Record<string, unknown>[] = [];
   if (search) {
-    where.OR = [
-      { ticketNumber: { contains: search, mode: "insensitive" } },
-      { title: { contains: search, mode: "insensitive" } },
-      { requester: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { lastName: { contains: search, mode: "insensitive" } }] } },
-      { assignees: { some: { user: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { lastName: { contains: search, mode: "insensitive" } }] } } } },
-    ];
+    andConditions.push({
+      OR: [
+        { ticketNumber: { contains: search, mode: "insensitive" } },
+        { title: { contains: search, mode: "insensitive" } },
+        { requester: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { lastName: { contains: search, mode: "insensitive" } }] } },
+        { assignees: { some: { user: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { lastName: { contains: search, mode: "insensitive" } }] } } } },
+      ],
+    });
   }
+
+  // Roles with scopeAssignedOnly on the helpdesk module (see RolesTab.tsx) only ever see tickets
+  // they're assigned to, regardless of any other filter above — System Admin is exempt, same as
+  // every other permission check in this app (see rbac.ts's by-name bypass).
+  if (req.user!.roleName !== "System Admin") {
+    const helpdeskPermission = await prisma.rolePermission.findUnique({
+      where: { roleId_module: { roleId: req.user!.roleId, module: "helpdesk" } },
+    });
+    if (helpdeskPermission?.scopeAssignedOnly) {
+      andConditions.push({ assignees: { some: { userId: req.user!.id } } });
+    }
+  }
+  if (andConditions.length) where.AND = andConditions;
 
   const [items, total] = await Promise.all([
     prisma.ticket.findMany({ where, include, skip, take, orderBy: { createdAt: "desc" } }),
@@ -587,7 +617,8 @@ export async function answerApproval(req: Request, res: Response) {
   const userId = req.user!.id;
   const isTargetUser = approval.targetUserId === userId;
   const isTargetTeamMember = approval.targetTeamId ? (await teamMemberIds(approval.targetTeamId)).includes(userId) : false;
-  if (!isTargetUser && !isTargetTeamMember) throw new ApiError(403, "You are not the target of this approval request");
+  const isActingAsSubstitute = approval.targetUserId ? (await getActiveDelegatorIds(userId)).includes(approval.targetUserId) : false;
+  if (!isTargetUser && !isTargetTeamMember && !isActingAsSubstitute) throw new ApiError(403, "You are not the target of this approval request");
 
   const { accept, comment } = req.body as { accept: boolean; comment?: string };
   const updated = await prisma.ticketApproval.update({
@@ -629,12 +660,17 @@ export async function listMyApprovals(req: Request, res: Response) {
   const userId = req.user!.id;
   const myTeams = await prisma.teamMember.findMany({ where: { userId }, select: { teamId: true } });
   const myTeamIds = myTeams.map((t) => t.teamId);
+  const delegatorIds = await getActiveDelegatorIds(userId);
 
   const [needsApproval, sentByMe] = await Promise.all([
     prisma.ticketApproval.findMany({
       where: {
         status: "WAITING",
-        OR: [{ targetUserId: userId }, ...(myTeamIds.length ? [{ targetTeamId: { in: myTeamIds } }] : [])],
+        OR: [
+          { targetUserId: userId },
+          ...(myTeamIds.length ? [{ targetTeamId: { in: myTeamIds } }] : []),
+          ...(delegatorIds.length ? [{ targetUserId: { in: delegatorIds } }] : []),
+        ],
       },
       include: approvalInclude,
       orderBy: { createdAt: "desc" },

@@ -10,6 +10,7 @@ import { Skeleton } from "../../components/Skeleton";
 import { FormModal } from "../../components/FormModal";
 import { DeviceFormModal, DeviceFormValues } from "./DeviceFormModal";
 import { DoorFormModal, DoorFormValues } from "./DoorFormModal";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface Door {
   id: number;
@@ -243,21 +244,20 @@ export function DevicesDoorsTab() {
                             >
                               Close
                             </button>
-                            <select
-                              className="select"
+                            <ChipSelect
                               style={{ width: "auto", fontSize: 12, padding: "4px 8px" }}
                               value=""
                               disabled={controlDoorMutation.isPending}
-                              title="Always-unlock / always-lock override, or resume the door's own schedule"
-                              onChange={(e) => {
-                                if (!e.target.value) return;
-                                controlDoorMutation.mutate({ doorId: door.id, action: e.target.value as DoorAction });
-                                e.target.value = "";
+                              placeholder="More..."
+                              onChange={(v) => {
+                                if (!v) return;
+                                controlDoorMutation.mutate({ doorId: door.id, action: v as DoorAction });
                               }}
-                            >
-                              <option value="">More...</option>
-                              {MORE_DOOR_ACTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-                            </select>
+                              options={[
+                                { value: "", label: "More..." },
+                                ...MORE_DOOR_ACTIONS.map((a) => ({ value: a.value, label: a.label })),
+                              ]}
+                            />
                             <button
                               className="btn btn-secondary btn-sm btn-icon"
                               disabled={refreshDoorStatusMutation.isPending}

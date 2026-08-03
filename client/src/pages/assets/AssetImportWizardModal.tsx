@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface TargetField {
   key: keyof Mapping;
@@ -176,16 +177,15 @@ export function AssetImportWizardModal({ onClose, onImported }: { onClose: () =>
                     <label style={{ fontSize: 12 }}>
                       {f.label} {f.required && <span style={{ color: "var(--color-danger)" }}>*</span>}
                     </label>
-                    <select
-                      className="select"
+                    <ChipSelect
                       value={mapping[f.key] ?? ""}
-                      onChange={(e) => setMapping((m) => ({ ...m, [f.key]: e.target.value || undefined }))}
-                    >
-                      <option value="">-- Not mapped --</option>
-                      {headerRow.map((h, i) => (
-                        <option key={i} value={h}>{h || `Column ${i + 1}`}</option>
-                      ))}
-                    </select>
+                      onChange={(v) => setMapping((m) => ({ ...m, [f.key]: v || undefined }))}
+                      placeholder="-- Not mapped --"
+                      options={[
+                        { value: "", label: "-- Not mapped --" },
+                        ...headerRow.map((h, i) => ({ value: h, label: h || `Column ${i + 1}` })),
+                      ]}
+                    />
                   </div>
                 ))}
               </div>

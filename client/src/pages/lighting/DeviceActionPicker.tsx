@@ -1,4 +1,5 @@
 import { LightingDevice } from "./LightingDeviceCard";
+import { ChipSelect } from "../../components/ChipSelect";
 
 export interface DraftAction {
   turnOn: boolean;
@@ -59,10 +60,15 @@ export function DeviceActionPicker({
               </label>
               {included && (
                 <div className="row gap-2" style={{ marginLeft: 24, alignItems: "center" }}>
-                  <select className="select" style={{ width: "auto", fontSize: 12 }} value={draft!.turnOn ? "on" : "off"} onChange={(e) => updateAction(d.id, { turnOn: e.target.value === "on" })}>
-                    <option value="on">Turn On</option>
-                    <option value="off">Turn Off</option>
-                  </select>
+                  <ChipSelect
+                    style={{ width: "auto", fontSize: 12 }}
+                    value={draft!.turnOn ? "on" : "off"}
+                    onChange={(v) => updateAction(d.id, { turnOn: v === "on" })}
+                    options={[
+                      { value: "on", label: "Turn On" },
+                      { value: "off", label: "Turn Off" },
+                    ]}
+                  />
                   {d.kind === "LIGHT" && draft!.turnOn && (
                     <>
                       <input

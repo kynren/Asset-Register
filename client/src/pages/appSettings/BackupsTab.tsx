@@ -8,6 +8,7 @@ import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
 import { PasswordInput } from "../../components/PasswordInput";
 import { PermissionGate } from "../../auth/PermissionGate";
+import { ChipSelect } from "../../components/ChipSelect";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Skeleton } from "../../components/Skeleton";
 import { useToast } from "../../components/toast/ToastProvider";
@@ -378,10 +379,15 @@ function DestinationFormModal({ destination, onClose, onSaved }: { destination: 
 
       <div className="field">
         <label>Type</label>
-        <select className="select" value={type} onChange={(e) => setType(e.target.value as "EMAIL" | "S3")} disabled={!!destination}>
-          <option value="EMAIL">Email</option>
-          <option value="S3">Online Drive (S3-compatible: AWS S3, MinIO, Backblaze B2, DigitalOcean Spaces, Cloudflare R2, Wasabi)</option>
-        </select>
+        <ChipSelect
+          value={type}
+          onChange={(v) => setType(v as "EMAIL" | "S3")}
+          disabled={!!destination}
+          options={[
+            { value: "EMAIL", label: "Email" },
+            { value: "S3", label: "Online Drive (S3-compatible: AWS S3, MinIO, Backblaze B2, DigitalOcean Spaces, Cloudflare R2, Wasabi)" },
+          ]}
+        />
       </div>
 
       <label className="row gap-2" style={{ cursor: "pointer", alignItems: "center" }}>

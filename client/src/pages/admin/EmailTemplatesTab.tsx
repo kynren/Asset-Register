@@ -10,6 +10,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { EmailTemplateBuilderModal } from "./EmailTemplateBuilderModal";
 import { EmailEventType, EVENT_DESCRIPTIONS, EVENT_LABELS, EVENT_TYPES } from "./emailTemplateConstants";
 import { PermissionGate } from "../../auth/PermissionGate";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface EmailTemplate {
   id: number;
@@ -124,12 +125,13 @@ export function EmailTemplatesTab() {
       </div>
 
       <div className="row gap-2" style={{ marginBottom: 12 }}>
-        <select className="select" style={{ maxWidth: 220 }} value={eventFilter} onChange={(e) => setEventFilter(e.target.value as EmailEventType | "")}>
-          <option value="">All Events</option>
-          {EVENT_TYPES.map((e) => (
-            <option key={e} value={e}>{EVENT_LABELS[e]}</option>
-          ))}
-        </select>
+        <ChipSelect
+          style={{ maxWidth: 220 }}
+          value={eventFilter}
+          onChange={(v) => setEventFilter(v as EmailEventType | "")}
+          placeholder="All Events"
+          options={[{ value: "", label: "All Events" }, ...EVENT_TYPES.map((e) => ({ value: e, label: EVENT_LABELS[e] }))]}
+        />
       </div>
 
       <DataTable
@@ -192,11 +194,11 @@ function CreateTemplateModal({ onClose, onCreated }: { onClose: () => void; onCr
       </div>
       <div className="field">
         <label>Event</label>
-        <select className="select" value={eventType} onChange={(e) => setEventType(e.target.value as EmailEventType)}>
-          {EVENT_TYPES.map((e) => (
-            <option key={e} value={e}>{EVENT_LABELS[e]}</option>
-          ))}
-        </select>
+        <ChipSelect
+          value={eventType}
+          onChange={(v) => setEventType(v as EmailEventType)}
+          options={EVENT_TYPES.map((e) => ({ value: e, label: EVENT_LABELS[e] }))}
+        />
         <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>{EVENT_DESCRIPTIONS[eventType]}</p>
       </div>
       <div className="field">

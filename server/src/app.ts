@@ -34,6 +34,7 @@ import accessControlRoutes from "./modules/accessControl/accessControl.routes";
 import lightingRoutes from "./modules/lighting/lighting.routes";
 import assistantRoutes from "./modules/assistant/assistant.routes";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes";
+import savedViewsRoutes from "./modules/savedViews/savedViews.routes";
 import preferencesRoutes from "./modules/preferences/preferences.routes";
 import profileRoutes from "./modules/profile/profile.routes";
 import auditRoutes from "./modules/audit/audit.routes";
@@ -103,6 +104,7 @@ export function createApp() {
   app.use("/api/lighting", lightingRoutes);
   app.use("/api/assistant", assistantRoutes);
   app.use("/api/dashboard", dashboardRoutes);
+  app.use("/api/saved-views", savedViewsRoutes);
   app.use("/api/preferences", preferencesRoutes);
   app.use("/api/profile", profileRoutes);
   app.use("/api/audit", auditRoutes);

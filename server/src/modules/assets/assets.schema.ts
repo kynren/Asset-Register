@@ -16,6 +16,8 @@ export const createAssetSchema = z.object({
   purchaseCost: z.number().optional().nullable(),
   warrantyExpiresAt: z.string().datetime().optional().nullable(),
   nextServiceDate: z.string().datetime().optional().nullable(),
+  supplier: z.string().optional().nullable(),
+  invoiceNumber: z.string().optional().nullable(),
   notes: z.string().optional(),
   deviceId: z.number().int().nullable().optional(),
   signOffStatus: z.enum(["PENDING", "CONFIRMED"]).optional(),

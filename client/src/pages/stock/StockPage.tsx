@@ -13,6 +13,7 @@ import { QrCodeModal } from "../../components/QrCodeModal";
 import { ProcurementTab } from "./ProcurementTab";
 import { ModuleDashboardTab } from "../dashboard/ModuleDashboardTab";
 import { STOCK_WIDGET_CATALOG, DEFAULT_STOCK_DASHBOARD_LAYOUT } from "./stockDashboardWidgets";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface StockItem {
   id: number;
@@ -243,34 +244,53 @@ function StockLevelsModal({ item, onClose }: { item: StockItem; onClose: () => v
         <div className="grid grid-cols-2">
           <div className="field">
             <label>Type</label>
-            <select className="select" value={type} onChange={(e) => setType(e.target.value as "IN" | "OUT")}>
-              <option value="IN">Stock In</option>
-              <option value="OUT">Stock Out</option>
-            </select>
+            <ChipSelect
+              value={type}
+              onChange={(v) => setType(v as "IN" | "OUT")}
+              options={[
+                { value: "IN", label: "Stock In" },
+                { value: "OUT", label: "Stock Out" },
+              ]}
+            />
           </div>
           <div className="field">
             <label>Location</label>
-            <select className="select" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-              <option value="">Select location...</option>
-              {locations?.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
+            <ChipSelect
+              value={locationId}
+              onChange={setLocationId}
+              placeholder="Select location..."
+              options={[
+                { value: "", label: "Select location..." },
+                ...(locations ?? []).map((l: any) => ({ value: String(l.id), label: l.name })),
+              ]}
+            />
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-2">
           <div className="field">
             <label>From Location</label>
-            <select className="select" value={fromLocationId} onChange={(e) => setFromLocationId(e.target.value)}>
-              <option value="">Select location...</option>
-              {locations?.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
+            <ChipSelect
+              value={fromLocationId}
+              onChange={setFromLocationId}
+              placeholder="Select location..."
+              options={[
+                { value: "", label: "Select location..." },
+                ...(locations ?? []).map((l: any) => ({ value: String(l.id), label: l.name })),
+              ]}
+            />
           </div>
           <div className="field">
             <label>To Location</label>
-            <select className="select" value={toLocationId} onChange={(e) => setToLocationId(e.target.value)}>
-              <option value="">Select location...</option>
-              {locations?.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
+            <ChipSelect
+              value={toLocationId}
+              onChange={setToLocationId}
+              placeholder="Select location..."
+              options={[
+                { value: "", label: "Select location..." },
+                ...(locations ?? []).map((l: any) => ({ value: String(l.id), label: l.name })),
+              ]}
+            />
           </div>
         </div>
       )}

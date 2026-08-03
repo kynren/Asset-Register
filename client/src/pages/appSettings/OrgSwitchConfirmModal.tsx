@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FormModal } from "../../components/FormModal";
 import { PasswordInput } from "../../components/PasswordInput";
 import { useAuth } from "../../auth/AuthContext";
+import { ChipSelect } from "../../components/ChipSelect";
 
 const REMEMBER_OPTIONS: { label: string; minutes: number | null }[] = [
   { label: "1 hour", minutes: 60 },
@@ -87,15 +88,11 @@ export function OrgSwitchConfirmModal({
 
       <div className="field" style={{ marginTop: 12 }}>
         <label>Stay switched for</label>
-        <select
-          className="select"
+        <ChipSelect
           value={rememberMinutes === null ? "logout" : String(rememberMinutes)}
-          onChange={(e) => setRememberMinutes(e.target.value === "logout" ? null : Number(e.target.value))}
-        >
-          {REMEMBER_OPTIONS.map((opt) => (
-            <option key={opt.label} value={opt.minutes === null ? "logout" : opt.minutes}>{opt.label}</option>
-          ))}
-        </select>
+          onChange={(v) => setRememberMinutes(v === "logout" ? null : Number(v))}
+          options={REMEMBER_OPTIONS.map((opt) => ({ value: opt.minutes === null ? "logout" : String(opt.minutes), label: opt.label }))}
+        />
       </div>
     </FormModal>
   );

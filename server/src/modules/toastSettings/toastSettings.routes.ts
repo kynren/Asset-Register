@@ -20,7 +20,7 @@ router.get("/", requirePermission("admin", "view"), async (_req, res) => {
   const settings = await prisma.toastSetting.findMany();
   const byType = new Map(settings.map((s) => [s.type, s]));
   const merged = NOTIFICATION_TYPE_SLUGS.map(
-    (type) => byType.get(type) ?? { id: null, type, isEnabled: null, variant: null, title: null }
+    (type) => byType.get(type) ?? { id: null, type, isEnabled: null, variant: null, title: null, message: null }
   );
   res.json(merged);
 });

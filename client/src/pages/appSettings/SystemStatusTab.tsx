@@ -5,6 +5,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { Skeleton } from "../../components/Skeleton";
 import { useAuth } from "../../auth/AuthContext";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface StatusSettings {
   checkIntervalMinutes: number;
@@ -145,19 +146,13 @@ export function SystemStatusTab() {
           <span className="muted" style={{ fontSize: 11.5 }}>How often each component is automatically re-checked. Default: 1 hour.</span>
         </div>
         <div className="row gap-2" style={{ alignItems: "center" }}>
-          <select
-            className="select"
+          <ChipSelect
             style={{ minWidth: 140 }}
-            value={intervalDraft ?? ""}
+            value={intervalDraft != null ? String(intervalDraft) : ""}
             disabled={!canEdit || !settings}
-            onChange={(e) => setIntervalDraft(Number(e.target.value))}
-          >
-            {INTERVAL_PRESETS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setIntervalDraft(Number(v))}
+            options={INTERVAL_PRESETS.map((p) => ({ value: String(p.value), label: p.label }))}
+          />
           {canEdit && (
             <button
               className="btn btn-sm btn-primary"

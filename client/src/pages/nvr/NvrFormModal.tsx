@@ -6,6 +6,7 @@ import { QuickAddSelect } from "../../components/QuickAddSelect";
 import { TestConnectionButton } from "./TestConnectionButton";
 import { DiscoverCamerasPanel } from "./DiscoverCamerasPanel";
 import { PasswordInput } from "../../components/PasswordInput";
+import { ChipSelect } from "../../components/ChipSelect";
 
 export interface NvrFormValues {
   name: string;
@@ -68,9 +69,7 @@ export function NvrFormModal({
         <div className="field"><label>Port</label><input className="input" type="number" value={values.port ?? ""} onChange={(e) => update("port", e.target.value ? Number(e.target.value) : null)} /></div>
         <div className="field">
           <label>Protocol</label>
-          <select className="select" value={values.protocol} onChange={(e) => update("protocol", e.target.value)}>
-            {PROTOCOLS.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
+          <ChipSelect value={values.protocol} onChange={(v) => update("protocol", v)} options={PROTOCOLS.map((p) => ({ value: p, label: p }))} />
         </div>
         <div className="field"><label>Username</label><input className="input" value={values.username} onChange={(e) => update("username", e.target.value)} autoComplete="off" /></div>
         <div className="field" style={{ gridColumn: "span 2" }}>

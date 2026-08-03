@@ -21,6 +21,8 @@ import { Asset } from "./assetTypes";
 import { buildAssetColumnDefs, STATUS_OPTIONS } from "./assetColumnBuilder";
 import { ModuleDashboardTab } from "../dashboard/ModuleDashboardTab";
 import { ASSETS_WIDGET_CATALOG, DEFAULT_ASSETS_DASHBOARD_LAYOUT } from "./assetsDashboardWidgets";
+import { SavedViewBar } from "../../components/savedViews/SavedViewBar";
+import { ChipSelect } from "../../components/ChipSelect";
 
 export type { Asset };
 
@@ -249,14 +251,22 @@ export function AssetListPage() {
           <span style={{ position: "absolute", left: 10, top: 9, color: "var(--color-text-muted)" }}><Icon name="search" size={14} /></span>
           <input className="input" style={{ paddingLeft: 30, minWidth: 220 }} placeholder="Search by tag, name, or serial..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All statuses</option>
-          {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
-        </select>
-        <select className="select" value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)}>
-          <option value="">Custody: All</option>
-          {users?.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-        </select>
+        <ChipSelect
+          value={status}
+          onChange={setStatus}
+          placeholder="All statuses"
+          options={[{ value: "", label: "All statuses" }, ...STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace("_", " ") }))]}
+        />
+        <ChipSelect
+          value={assignedToId}
+          onChange={setAssignedToId}
+          placeholder="Custody: All"
+          searchPlaceholder="Search users..."
+          options={[
+            { value: "", label: "Custody: All" },
+            ...(users ?? []).map((u: any) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` })),
+          ]}
+        />
         <input className="input" type="date" style={{ width: "auto" }} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title="From date" />
         <input className="input" type="date" style={{ width: "auto" }} value={dateTo} onChange={(e) => setDateTo(e.target.value)} title="To date" />
         <div className="flex-1" />
@@ -279,6 +289,21 @@ export function AssetListPage() {
         </PermissionGate>
       </div>
 
+      <div style={{ marginBottom: 14 }}>
+        <SavedViewBar
+          tableId="assets.inventory"
+          currentFilters={{ search, status, categoryId, assignedToId, dateFrom, dateTo }}
+          onApply={(saved) => {
+            setSearch(typeof saved.search === "string" ? saved.search : "");
+            setStatus(typeof saved.status === "string" ? saved.status : "");
+            setCategoryId(typeof saved.categoryId === "number" ? saved.categoryId : null);
+            setAssignedToId(typeof saved.assignedToId === "string" ? saved.assignedToId : "");
+            setDateFrom(typeof saved.dateFrom === "string" ? saved.dateFrom : "");
+            setDateTo(typeof saved.dateTo === "string" ? saved.dateTo : "");
+          }}
+        />
+      </div>
+
       {showImportWizard && (
         <AssetImportWizardModal onClose={() => setShowImportWizard(false)} onImported={invalidateAll} />
       )}
@@ -286,9 +311,12 @@ export function AssetListPage() {
       {canEdit && selectedIds.length > 0 && (
         <div className="alert alert-primary row gap-2" style={{ alignItems: "center", background: "var(--color-primary-soft)" }}>
           <strong>{selectedIds.length} selected</strong>
-          <select className="select" style={{ width: "auto" }} value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
-            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
-          </select>
+          <ChipSelect
+            style={{ width: "auto" }}
+            value={bulkStatus}
+            onChange={setBulkStatus}
+            options={STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace("_", " ") }))}
+          />
           <button className="btn btn-primary btn-sm" disabled={bulkMutation.isPending} onClick={() => bulkMutation.mutate()}>Apply Status</button>
           <button className="btn btn-secondary btn-sm" onClick={() => setSelectedIds([])}>Clear</button>
         </div>

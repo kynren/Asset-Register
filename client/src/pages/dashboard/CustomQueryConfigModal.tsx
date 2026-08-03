@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
+import { ChipSelect } from "../../components/ChipSelect";
 import { useAuth } from "../../auth/AuthContext";
 import { ModuleName } from "../../lib/permissions";
 import { DATA_EXPLORER_SOURCES, FieldDef, FieldOption, OPERATOR_LABELS, SourceDef, getSource } from "./dataExplorerConfig";
@@ -68,20 +69,24 @@ function ValueInput({ field, operator, value, onChange }: { field: FieldDef; ope
   const strValue = typeof value === "string" ? value : "";
   if (field.type === "boolean") {
     return (
-      <select className="select" value={strValue || "true"} onChange={(e) => onChange(e.target.value)}>
-        <option value="true">Yes</option>
-        <option value="false">No</option>
-      </select>
+      <ChipSelect
+        value={strValue || "true"}
+        onChange={onChange}
+        options={[
+          { value: "true", label: "Yes" },
+          { value: "false", label: "No" },
+        ]}
+      />
     );
   }
   if (field.type === "enum" && options.length) {
     return (
-      <select className="select" value={strValue} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Select...</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
+      <ChipSelect
+        value={strValue}
+        onChange={onChange}
+        placeholder="Select..."
+        options={[{ value: "", label: "Select..." }, ...options.map((o) => ({ value: o.value, label: o.label }))]}
+      />
     );
   }
   if (field.type === "date") {
@@ -108,29 +113,21 @@ function ConditionRow({
 
   return (
     <div className="row gap-2" style={{ alignItems: "center", marginBottom: 8 }}>
-      <select
-        className="select"
+      <ChipSelect
         style={{ width: "auto" }}
         value={field.key}
-        onChange={(e) => {
-          const nextField = source.fields.find((f) => f.key === e.target.value)!;
+        onChange={(v) => {
+          const nextField = source.fields.find((f) => f.key === v)!;
           onChange({ field: nextField.key, operator: nextField.operators[0], value: "" });
         }}
-      >
-        {source.fields.map((f) => (
-          <option key={f.key} value={f.key}>{f.label}</option>
-        ))}
-      </select>
-      <select
-        className="select"
+        options={source.fields.map((f) => ({ value: f.key, label: f.label }))}
+      />
+      <ChipSelect
         style={{ width: "auto" }}
         value={condition.operator}
-        onChange={(e) => onChange({ ...condition, operator: e.target.value, value: e.target.value === "in" ? [] : "" })}
-      >
-        {field.operators.map((op) => (
-          <option key={op} value={op}>{OPERATOR_LABELS[op] ?? op}</option>
-        ))}
-      </select>
+        onChange={(v) => onChange({ ...condition, operator: v, value: v === "in" ? [] : "" })}
+        options={field.operators.map((op) => ({ value: op, label: OPERATOR_LABELS[op] ?? op }))}
+      />
       <ValueInput field={field} operator={condition.operator} value={condition.value} onChange={(v) => onChange({ ...condition, value: v })} />
       <button type="button" className="btn btn-secondary btn-sm btn-icon" onClick={onRemove} title="Remove condition">
         <Icon name="close" size={12} />
@@ -199,11 +196,11 @@ export function CustomQueryConfigModal({
 
       <div className="field">
         <label>Data Source</label>
-        <select className="select" value={sourceId} onChange={(e) => changeSource(e.target.value)}>
-          {availableSources.map((s) => (
-            <option key={s.id} value={s.id}>{s.label}</option>
-          ))}
-        </select>
+        <ChipSelect
+          value={sourceId}
+          onChange={changeSource}
+          options={availableSources.map((s) => ({ value: s.id, label: s.label }))}
+        />
       </div>
 
       {source && (
@@ -236,23 +233,27 @@ export function CustomQueryConfigModal({
 
           <div className="field">
             <label>Visualization</label>
-            <select className="select" value={visualization} onChange={(e) => setVisualization(e.target.value as CustomQueryConfig["visualization"])}>
-              <option value="kpi">KPI Count</option>
-              <option value="table">Table</option>
-              <option value="bar">Bar Chart</option>
-              <option value="pie">Pie Chart</option>
-              <option value="line">Line Chart</option>
-            </select>
+            <ChipSelect
+              value={visualization}
+              onChange={(v) => setVisualization(v as CustomQueryConfig["visualization"])}
+              options={[
+                { value: "kpi", label: "KPI Count" },
+                { value: "table", label: "Table" },
+                { value: "bar", label: "Bar Chart" },
+                { value: "pie", label: "Pie Chart" },
+                { value: "line", label: "Line Chart" },
+              ]}
+            />
           </div>
 
           {["bar", "pie", "line"].includes(visualization) && (
             <div className="field">
               <label>Group By</label>
-              <select className="select" value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
-                {source.groupableFields.map((key) => (
-                  <option key={key} value={key}>{source.fields.find((f) => f.key === key)?.label ?? key}</option>
-                ))}
-              </select>
+              <ChipSelect
+                value={groupBy}
+                onChange={setGroupBy}
+                options={source.groupableFields.map((key) => ({ value: key, label: source.fields.find((f) => f.key === key)?.label ?? key }))}
+              />
             </div>
           )}
         </>

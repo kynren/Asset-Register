@@ -101,4 +101,74 @@ router.delete("/images/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
+// ───────────────────────── Authorized Substitutes ─────────────────────────
+// Mirrors GLPI's "Authorized Substitutes" preference — a user can name a stand-in who can answer
+// their pending ticket approvals for a bounded date range (e.g. while they're on leave). See
+// tickets.controller.ts's getActiveDelegatorIds()/listMyApprovals()/answerApproval() for where the
+// delegation is actually consulted.
+const substituteSchema = z
+  .object({
+    substituteId: z.number().int(),
+    startDate: z.string().datetime(),
+    endDate: z.string().datetime(),
+  })
+  .refine((v) => new Date(v.endDate) > new Date(v.startDate), { message: "End date must be after start date" });
+
+router.get("/substitutes", async (req, res) => {
+  const rows = await prisma.ticketApprovalSubstitute.findMany({
+    where: { userId: req.user!.id },
+    include: { substitute: { select: { id: true, firstName: true, lastName: true, email: true } } },
+    orderBy: { startDate: "desc" },
+  });
+  res.json(rows);
+});
+
+router.post("/substitutes", validateBody(substituteSchema), async (req, res) => {
+  if (req.body.substituteId === req.user!.id) throw new ApiError(400, "You can't name yourself as your own substitute");
+  const row = await prisma.ticketApprovalSubstitute.create({
+    data: {
+      userId: req.user!.id,
+      substituteId: req.body.substituteId,
+      startDate: new Date(req.body.startDate),
+      endDate: new Date(req.body.endDate),
+    },
+    include: { substitute: { select: { id: true, firstName: true, lastName: true, email: true } } },
+  });
+  await logAudit({ userId: req.user!.id, action: "profile.substitute_add", entityType: "User", entityId: req.user!.id, metadata: { substituteId: row.substituteId } });
+  res.status(201).json(row);
+});
+
+router.delete("/substitutes/:id", async (req, res) => {
+  const row = await prisma.ticketApprovalSubstitute.findUnique({ where: { id: Number(req.params.id) } });
+  if (!row || row.userId !== req.user!.id) throw new ApiError(404, "Substitute delegation not found");
+  await prisma.ticketApprovalSubstitute.delete({ where: { id: row.id } });
+  await logAudit({ userId: req.user!.id, action: "profile.substitute_remove", entityType: "User", entityId: req.user!.id });
+  res.json({ ok: true });
+});
+
+// ───────────────────────── Additional contact emails ─────────────────────────
+const contactEmailSchema = z.object({
+  email: z.string().email(),
+  label: z.string().optional(),
+});
+
+router.get("/contact-emails", async (req, res) => {
+  const rows = await prisma.userContactEmail.findMany({ where: { userId: req.user!.id }, orderBy: { createdAt: "asc" } });
+  res.json(rows);
+});
+
+router.post("/contact-emails", validateBody(contactEmailSchema), async (req, res) => {
+  const row = await prisma.userContactEmail.create({ data: { userId: req.user!.id, email: req.body.email, label: req.body.label } });
+  await logAudit({ userId: req.user!.id, action: "profile.contact_email_add", entityType: "User", entityId: req.user!.id });
+  res.status(201).json(row);
+});
+
+router.delete("/contact-emails/:id", async (req, res) => {
+  const row = await prisma.userContactEmail.findUnique({ where: { id: Number(req.params.id) } });
+  if (!row || row.userId !== req.user!.id) throw new ApiError(404, "Contact email not found");
+  await prisma.userContactEmail.delete({ where: { id: row.id } });
+  await logAudit({ userId: req.user!.id, action: "profile.contact_email_remove", entityType: "User", entityId: req.user!.id });
+  res.json({ ok: true });
+});
+
 export default router;

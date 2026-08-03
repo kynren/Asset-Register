@@ -12,6 +12,7 @@ import { TicketFormModal, TicketFormValues } from "./TicketFormModal";
 import { TicketApprovalsModal } from "./TicketApprovalsModal";
 import { ModuleDashboardTab } from "../dashboard/ModuleDashboardTab";
 import { HELPDESK_WIDGET_CATALOG, DEFAULT_HELPDESK_DASHBOARD_LAYOUT } from "./helpdeskDashboardWidgets";
+import { ChipSelect } from "../../components/ChipSelect";
 import dayjs from "dayjs";
 
 const STATUS_OPTIONS = ["", "OPEN", "IN_PROGRESS", "PENDING", "RESOLVED", "CLOSED"];
@@ -131,15 +132,24 @@ export function TicketListPage() {
       ) : (
       <>
       <FilterBar>
-        <select className="select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-          {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s ? s.replace("_", " ") : "All statuses"}</option>)}
-        </select>
-        <select className="select" value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}>
-          {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t ? (t === "ACTION" ? "Action" : "Information") : "All types"}</option>)}
-        </select>
-        <select className="select" value={itilType} onChange={(e) => { setItilType(e.target.value); setPage(1); }}>
-          {ITIL_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t || "All ITIL types"}</option>)}
-        </select>
+        <ChipSelect
+          value={status}
+          onChange={(v) => { setStatus(v); setPage(1); }}
+          placeholder="All statuses"
+          options={STATUS_OPTIONS.map((s) => ({ value: s, label: s ? s.replace("_", " ") : "All statuses" }))}
+        />
+        <ChipSelect
+          value={type}
+          onChange={(v) => { setType(v); setPage(1); }}
+          placeholder="All types"
+          options={TYPE_OPTIONS.map((t) => ({ value: t, label: t ? (t === "ACTION" ? "Action" : "Information") : "All types" }))}
+        />
+        <ChipSelect
+          value={itilType}
+          onChange={(v) => { setItilType(v); setPage(1); }}
+          placeholder="All ITIL types"
+          options={ITIL_TYPE_OPTIONS.map((t) => ({ value: t, label: t || "All ITIL types" }))}
+        />
         <label className="row gap-1" style={{ fontSize: 13, cursor: "pointer" }}>
           <input type="checkbox" checked={assignedToMe} onChange={(e) => { setAssignedToMe(e.target.checked); setPage(1); }} />
           Assigned to me

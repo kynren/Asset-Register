@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface ConnectedAssetRef {
   id: number;
@@ -68,7 +69,7 @@ export function SwitchPortsPanel({ asset, onClose }: { asset: { id: number; asse
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 860, width: "95%" }} onClick={(e) => e.stopPropagation()}>
-        <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+        <div className="modal-header" style={{ alignItems: "flex-start" }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>Port Map — {asset.name}</div>
             <div className="muted" style={{ fontSize: 12 }}>{asset.assetTag}</div>
@@ -191,11 +192,15 @@ function PortEditForm({
         </div>
         <div className="field">
           <label>Status</label>
-          <select className="select" value={status} onChange={(e) => setStatus(e.target.value as Port["status"])}>
-            <option value="UP">Up / Connected</option>
-            <option value="DOWN">Down / Unused</option>
-            <option value="DISABLED">Administratively Disabled</option>
-          </select>
+          <ChipSelect
+            value={status}
+            onChange={(v) => setStatus(v as Port["status"])}
+            options={[
+              { value: "UP", label: "Up / Connected" },
+              { value: "DOWN", label: "Down / Unused" },
+              { value: "DISABLED", label: "Administratively Disabled" },
+            ]}
+          />
         </div>
         <div className="field">
           <label>VLAN</label>
@@ -203,12 +208,15 @@ function PortEditForm({
         </div>
         <div className="field">
           <label>Connected Asset</label>
-          <select className="select" value={connectedAssetId} onChange={(e) => setConnectedAssetId(e.target.value)}>
-            <option value="">-- None --</option>
-            {assetOptions.map((a) => (
-              <option key={a.id} value={a.id}>{a.assetTag} — {a.name}</option>
-            ))}
-          </select>
+          <ChipSelect
+            value={connectedAssetId}
+            onChange={setConnectedAssetId}
+            placeholder="-- None --"
+            options={[
+              { value: "", label: "-- None --" },
+              ...assetOptions.map((a) => ({ value: String(a.id), label: `${a.assetTag} — ${a.name}` })),
+            ]}
+          />
         </div>
         <div className="field">
           <label>Notes</label>

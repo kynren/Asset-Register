@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface ShareRow {
   id: number;
@@ -48,16 +49,26 @@ export function ShareDashboardModal({ dashboardId, dashboardName, onClose }: { d
       <div className="field">
         <label>Share With</label>
         <div className="row gap-2" style={{ marginBottom: 8 }}>
-          <select className="select" style={{ width: "auto" }} value={targetType} onChange={(e) => { setTargetType(e.target.value as "user" | "team"); setTargetId(""); }}>
-            <option value="user">A User</option>
-            <option value="team">A Team</option>
-          </select>
-          <select className="select" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-            <option value="">Select...</option>
-            {targetType === "user"
-              ? (users ?? []).map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)
-              : (teams ?? []).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          <ChipSelect
+            style={{ width: "auto" }}
+            value={targetType}
+            onChange={(v) => { setTargetType(v as "user" | "team"); setTargetId(""); }}
+            options={[
+              { value: "user", label: "A User" },
+              { value: "team", label: "A Team" },
+            ]}
+          />
+          <ChipSelect
+            value={targetId}
+            onChange={setTargetId}
+            placeholder="Select..."
+            options={[
+              { value: "", label: "Select..." },
+              ...(targetType === "user"
+                ? (users ?? []).map((u: any) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` }))
+                : (teams ?? []).map((t: any) => ({ value: String(t.id), label: t.name }))),
+            ]}
+          />
         </div>
         <label className="row gap-1" style={{ fontSize: 13, cursor: "pointer", marginBottom: 8 }}>
           <input type="checkbox" checked={canEdit} onChange={(e) => setCanEdit(e.target.checked)} />

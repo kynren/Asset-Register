@@ -7,6 +7,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { Icon } from "../../components/Icon";
 import { EVENT_LABELS, EVENT_VARIABLES, EmailBlock, EmailEventType, SAMPLE_VARIABLES, interpolatePreview } from "./emailTemplateConstants";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface EmailTemplateFull {
   id: number;
@@ -322,11 +323,15 @@ function BlockEditor({
           </div>
           <div className="field">
             <label>Alignment</label>
-            <select className="select" value={block.align ?? "left"} onChange={(e) => onChange({ align: e.target.value } as Partial<EmailBlock>)}>
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-            </select>
+            <ChipSelect
+              value={block.align ?? "left"}
+              onChange={(v) => onChange({ align: v } as Partial<EmailBlock>)}
+              options={[
+                { value: "left", label: "Left" },
+                { value: "center", label: "Center" },
+                { value: "right", label: "Right" },
+              ]}
+            />
           </div>
         </>
       )}

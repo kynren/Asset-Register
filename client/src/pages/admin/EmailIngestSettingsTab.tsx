@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { PasswordInput } from "../../components/PasswordInput";
 import { PermissionGate } from "../../auth/PermissionGate";
+import { ChipSelect } from "../../components/ChipSelect";
 
 interface EmailIngestSettings {
   id: number;
@@ -89,17 +90,21 @@ export function EmailIngestSettingsTab() {
         <div className="field"><label>Mailbox</label><input className="input" value={values.mailbox ?? "INBOX"} onChange={(e) => update("mailbox", e.target.value)} /></div>
         <div className="field">
           <label>Fallback Requester <span className="muted">(unrecognized senders)</span></label>
-          <select className="select" value={values.fallbackRequesterId ?? ""} onChange={(e) => update("fallbackRequesterId", e.target.value ? Number(e.target.value) : null)}>
-            <option value="">None — skip unrecognized senders</option>
-            {users?.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-          </select>
+          <ChipSelect
+            value={String(values.fallbackRequesterId ?? "")}
+            onChange={(v) => update("fallbackRequesterId", v ? Number(v) : null)}
+            placeholder="None — skip unrecognized senders"
+            options={[{ value: "", label: "None — skip unrecognized senders" }, ...(users ?? []).map((u: any) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` }))]}
+          />
         </div>
         <div className="field">
           <label>Default Category</label>
-          <select className="select" value={values.defaultCategoryId ?? ""} onChange={(e) => update("defaultCategoryId", e.target.value ? Number(e.target.value) : null)}>
-            <option value="">—</option>
-            {categories?.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <ChipSelect
+            value={String(values.defaultCategoryId ?? "")}
+            onChange={(v) => update("defaultCategoryId", v ? Number(v) : null)}
+            placeholder="—"
+            options={[{ value: "", label: "—" }, ...(categories ?? []).map((c: any) => ({ value: String(c.id), label: c.name }))]}
+          />
         </div>
       </div>
 

@@ -7,6 +7,7 @@ import { FormModal } from "../../../components/FormModal";
 import { PermissionGate } from "../../../auth/PermissionGate";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { Skeleton } from "../../../components/Skeleton";
+import { ChipSelect } from "../../../components/ChipSelect";
 
 interface ProjectCard {
   id: number;
@@ -156,10 +157,15 @@ export function ProjectsTab() {
           <div className="field"><label>Description</label><textarea className="input" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
           <div className="field">
             <label>Assignee</label>
-            <select className="select" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
-              <option value="">Unassigned</option>
-              {users?.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-            </select>
+            <ChipSelect
+              value={assigneeId}
+              onChange={setAssigneeId}
+              placeholder="Unassigned"
+              options={[
+                { value: "", label: "Unassigned" },
+                ...(users ?? []).map((u: any) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` })),
+              ]}
+            />
           </div>
           <div className="field"><label>Due Date</label><input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
         </FormModal>

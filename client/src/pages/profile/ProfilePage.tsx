@@ -11,6 +11,8 @@ import { MfaCard } from "../password/MfaCard";
 import { PinCard } from "../password/PinCard";
 import { SessionsCard } from "../password/SessionsCard";
 import { NotificationsTab } from "./NotificationsTab";
+import { ContactEmailsCard } from "./ContactEmailsCard";
+import { AuthorizedSubstitutesCard } from "./AuthorizedSubstitutesCard";
 
 const TABS = [
   { key: "general", label: "General" },
@@ -161,13 +163,18 @@ export function ProfilePage() {
         <div className="stack gap-3">
           <PasswordChangeCard />
 
-          <PinCard />
-
-          <MfaCard />
+          <div className="grid grid-cols-2">
+            <PinCard />
+            <MfaCard />
+          </div>
 
           <SessionsCard />
 
           <McpConnectionCard />
+
+          <ContactEmailsCard />
+
+          <AuthorizedSubstitutesCard />
 
           <div className="card">
             <h3 className="mt-0">My Devices</h3>
