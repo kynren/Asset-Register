@@ -211,7 +211,10 @@ export interface WidgetDef {
   id: string;
   title: string;
   defaultCols: 1 | 2 | 4;
-  Component: React.ComponentType;
+  // Module-dashboard widgets (Assets/Helpdesk/Stock/Network/Docs) accept an optional `filters`
+  // object — narrowed key:value pairs from that module's own field set — set via each widget's
+  // "Configure filters" icon. Home-dashboard widgets ignore it since they take no props.
+  Component: React.ComponentType<{ filters?: Record<string, string> }>;
 }
 
 export const WIDGET_CATALOG: WidgetDef[] = [

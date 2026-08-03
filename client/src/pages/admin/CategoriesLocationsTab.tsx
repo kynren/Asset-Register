@@ -6,6 +6,7 @@ import { Icon } from "../../components/Icon";
 import { DataTable } from "../../components/DataTable";
 import { AssetCategoriesTable } from "./AssetCategoriesTable";
 import { FormTemplatesSection } from "./FormTemplatesSection";
+import { TicketCategoriesTab } from "./TicketCategoriesTab";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { BulkActionsBar, BulkDeleteButton } from "../../components/BulkActionsBar";
 import { PermissionGate } from "../../auth/PermissionGate";
@@ -147,10 +148,8 @@ export function CategoriesLocationsTab() {
     <div className="stack gap-3">
       <AssetCategoriesTable />
       <FormTemplatesSection />
-      <div className="grid grid-cols-2">
-        <SimpleListManager title="Locations" url="/locations" queryKey="locations" extraField="address" />
-        <SimpleListManager title="Ticket Categories" url="/ticket-categories" queryKey="ticket-categories" />
-      </div>
+      <SimpleListManager title="Locations" url="/locations" queryKey="locations" extraField="address" />
+      <TicketCategoriesTab />
     </div>
   );
 }

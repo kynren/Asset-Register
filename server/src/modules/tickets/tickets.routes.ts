@@ -8,9 +8,17 @@ import { validateBody } from "../../middleware/validate";
 import * as controller from "./tickets.controller";
 import {
   addCommentSchema,
+  answerApprovalSchema,
+  answerSolutionSchema,
+  attachKnowledgeArticleSchema,
+  createLinkSchema,
+  createSolutionSchema,
+  createTaskSchema,
   createTicketSchema,
+  requestApprovalSchema,
   satisfactionSchema,
   updateStatusSchema,
+  updateTaskSchema,
   updateTicketSchema,
 } from "./tickets.schema";
 
@@ -32,6 +40,9 @@ const router = Router();
 router.use(verifyJwt);
 
 router.get("/", requirePermission("helpdesk", "view"), controller.list);
+// Registered before "/:id" — otherwise the ":id" param route would swallow this literal segment.
+router.get("/approvals", requirePermission("helpdesk", "view"), controller.listMyApprovals);
+router.get("/stats", requirePermission("helpdesk", "view"), controller.stats);
 router.get("/:id", requirePermission("helpdesk", "view"), controller.getOne);
 router.post("/", requirePermission("helpdesk", "create"), validateBody(createTicketSchema), controller.create);
 router.patch("/:id", requirePermission("helpdesk", "edit"), validateBody(updateTicketSchema), controller.update);
@@ -42,6 +53,23 @@ router.post("/:id/satisfaction", requirePermission("helpdesk", "view"), validate
 router.post("/:id/attachments", requirePermission("helpdesk", "edit"), upload.single("file"), controller.addAttachment);
 router.get("/:id/attachments/:attachmentId", requirePermission("helpdesk", "view"), controller.downloadAttachment);
 router.delete("/:id/attachments/:attachmentId", requirePermission("helpdesk", "edit"), controller.deleteAttachment);
+
+router.post("/:id/tasks", requirePermission("helpdesk", "edit"), validateBody(createTaskSchema), controller.createTask);
+router.patch("/:id/tasks/:taskId", requirePermission("helpdesk", "edit"), validateBody(updateTaskSchema), controller.updateTask);
+router.delete("/:id/tasks/:taskId", requirePermission("helpdesk", "edit"), controller.deleteTask);
+
+router.post("/:id/solutions", requirePermission("helpdesk", "edit"), validateBody(createSolutionSchema), controller.proposeSolution);
+router.post("/:id/solutions/:solutionId/answer", requirePermission("helpdesk", "view"), validateBody(answerSolutionSchema), controller.answerSolution);
+
+router.post("/:id/approvals", requirePermission("helpdesk", "edit"), validateBody(requestApprovalSchema), controller.requestApproval);
+router.post("/:id/approvals/:approvalId/answer", requirePermission("helpdesk", "view"), validateBody(answerApprovalSchema), controller.answerApproval);
+
+router.post("/:id/links", requirePermission("helpdesk", "edit"), validateBody(createLinkSchema), controller.createLink);
+router.delete("/:id/links/:linkId", requirePermission("helpdesk", "edit"), controller.deleteLink);
+
+router.post("/:id/knowledge-articles", requirePermission("helpdesk", "edit"), validateBody(attachKnowledgeArticleSchema), controller.attachKnowledgeArticle);
+router.delete("/:id/knowledge-articles/:linkId", requirePermission("helpdesk", "edit"), controller.detachKnowledgeArticle);
+
 router.delete("/:id", requirePermission("helpdesk", "delete"), controller.remove);
 
 export default router;

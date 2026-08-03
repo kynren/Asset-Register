@@ -10,8 +10,23 @@ import { useAuth } from "../../auth/AuthContext";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { QrCodeModal } from "../../components/QrCodeModal";
 import { Skeleton, SkeletonText } from "../../components/Skeleton";
+import { TicketTasksTab } from "./TicketTasksTab";
+import { TicketSolutionTab } from "./TicketSolutionTab";
+import { TicketApprovalsTab } from "./TicketApprovalsTab";
+import { TicketLinksTab } from "./TicketLinksTab";
+import { TicketKnowledgeTab } from "./TicketKnowledgeTab";
 
 const STATUS_FLOW = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
+const TABS = ["overview", "tasks", "solution", "approvals", "links", "knowledge"] as const;
+type Tab = (typeof TABS)[number];
+const TAB_LABELS: Record<Tab, string> = {
+  overview: "Overview",
+  tasks: "Tasks",
+  solution: "Solution",
+  approvals: "Approvals",
+  links: "Links",
+  knowledge: "Knowledge Base",
+};
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -44,6 +59,7 @@ export function TicketDetailPage() {
   const [editingAssignment, setEditingAssignment] = useState(false);
   const [assigneeIds, setAssigneeIds] = useState<Set<number>>(new Set());
   const [assignedTeamIds, setAssignedTeamIds] = useState<Set<number>>(new Set());
+  const [tab, setTab] = useState<Tab>("overview");
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ["ticket", id],
@@ -192,6 +208,7 @@ export function TicketDetailPage() {
         </div>
         <div className="row gap-2">
           {isOverdue && <span className="badge badge-danger">OVERDUE</span>}
+          <StatusBadge status={ticket.itilType} />
           <StatusBadge status={ticket.type} />
           <StatusBadge status={ticket.priority} />
           <StatusBadge status={ticket.status} />
@@ -204,6 +221,16 @@ export function TicketDetailPage() {
         </div>
       </div>
 
+      <div className="row gap-1 flex-wrap">
+        {TABS.map((t) => (
+          <button key={t} className={`btn btn-sm ${tab === t ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab(t)}>
+            {TAB_LABELS[t]}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" && (
+      <>
       <div className="grid grid-cols-2">
         <div className="card">
           <h3 className="mt-0">Description</h3>
@@ -383,6 +410,28 @@ export function TicketDetailPage() {
           </form>
         </PermissionGate>
       </div>
+      </>
+      )}
+
+      {tab === "tasks" && (
+        <TicketTasksTab ticketId={ticket.id} tasks={ticket.tasks ?? []} users={users ?? []} currentUserId={user!.id} />
+      )}
+
+      {tab === "solution" && (
+        <TicketSolutionTab ticketId={ticket.id} solutions={ticket.solutions ?? []} isRequester={user?.id === ticket.requesterId} />
+      )}
+
+      {tab === "approvals" && (
+        <TicketApprovalsTab ticketId={ticket.id} approvals={ticket.approvals ?? []} users={users ?? []} teams={teams ?? []} currentUserId={user!.id} />
+      )}
+
+      {tab === "links" && (
+        <TicketLinksTab ticketId={ticket.id} linksFrom={ticket.linksFrom ?? []} linksTo={ticket.linksTo ?? []} />
+      )}
+
+      {tab === "knowledge" && (
+        <TicketKnowledgeTab ticketId={ticket.id} knowledgeArticles={ticket.knowledgeArticles ?? []} />
+      )}
 
       {deletingAttachment && (
         <ConfirmDialog

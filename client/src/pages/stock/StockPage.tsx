@@ -11,6 +11,8 @@ import { StockItemFormModal, StockItemFormValues } from "./StockItemFormModal";
 import { FormModal } from "../../components/FormModal";
 import { QrCodeModal } from "../../components/QrCodeModal";
 import { ProcurementTab } from "./ProcurementTab";
+import { ModuleDashboardTab } from "../dashboard/ModuleDashboardTab";
+import { STOCK_WIDGET_CATALOG, DEFAULT_STOCK_DASHBOARD_LAYOUT } from "./stockDashboardWidgets";
 
 interface StockItem {
   id: number;
@@ -23,7 +25,7 @@ interface StockItem {
 }
 
 export function StockPage() {
-  const [tab, setTab] = useState<"register" | "analytics" | "procurement">("register");
+  const [tab, setTab] = useState<"register" | "analytics" | "procurement" | "dashboard">("dashboard");
   const [search, setSearch] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [page, setPage] = useState(1);
@@ -94,6 +96,7 @@ export function StockPage() {
           <p className="page-subtitle">Track consumables, spare parts, and stock movement.</p>
         </div>
         <div className="row gap-2">
+          <button className={`btn btn-sm ${tab === "dashboard" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("dashboard")}>Dashboard</button>
           <button className={`btn btn-sm ${tab === "register" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("register")}>Register</button>
           <button className={`btn btn-sm ${tab === "analytics" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("analytics")}>Analytics</button>
           <button className={`btn btn-sm ${tab === "procurement" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("procurement")}>Suppliers & POs</button>
@@ -138,8 +141,16 @@ export function StockPage() {
             </div>
           </div>
         </div>
-      ) : (
+      ) : tab === "procurement" ? (
         <ProcurementTab />
+      ) : (
+        <ModuleDashboardTab
+          module="stock"
+          catalog={STOCK_WIDGET_CATALOG}
+          defaultLayout={DEFAULT_STOCK_DASHBOARD_LAYOUT}
+          title="Stock Register & Analytics"
+          showHeader={false}
+        />
       )}
 
       {showForm && <StockItemFormModal onClose={() => setShowForm(false)} onSubmit={(v) => createMutation.mutate(v)} submitting={createMutation.isPending} />}

@@ -6,8 +6,11 @@ import { DevicesTab } from "./DevicesTab";
 import { IpRangeScannerTab } from "./IpRangeScannerTab";
 import { SwitchingTab } from "./SwitchingTab";
 import { MonitoringTab } from "./MonitoringTab";
+import { ModuleDashboardTab } from "../dashboard/ModuleDashboardTab";
+import { NETWORK_WIDGET_CATALOG, DEFAULT_NETWORK_DASHBOARD_LAYOUT } from "./networkDashboardWidgets";
 
 const TABS = [
+  { key: "dashboard", label: "Dashboard", icon: "layers" },
   { key: "graph", label: "Topology Graph", icon: "network" },
   { key: "pinger", label: "ICMP Pinger", icon: "activity" },
   { key: "scanner", label: "IP Range Scanner", icon: "radar" },
@@ -19,7 +22,7 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export function NetworkMapPage() {
-  const [tab, setTab] = useState<TabKey>("graph");
+  const [tab, setTab] = useState<TabKey>("dashboard");
 
   return (
     <div className="stack gap-3">
@@ -46,6 +49,15 @@ export function NetworkMapPage() {
       {tab === "switching" && <SwitchingTab />}
       {tab === "monitoring" && <MonitoringTab />}
       {tab === "clients" && <DevicesTab />}
+      {tab === "dashboard" && (
+        <ModuleDashboardTab
+          module="network"
+          catalog={NETWORK_WIDGET_CATALOG}
+          defaultLayout={DEFAULT_NETWORK_DASHBOARD_LAYOUT}
+          title="Network Topology Map"
+          showHeader={false}
+        />
+      )}
     </div>
   );
 }

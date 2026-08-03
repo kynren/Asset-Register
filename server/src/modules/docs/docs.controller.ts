@@ -266,6 +266,27 @@ export async function categories(_req: Request, res: Response) {
   res.json(rows.map((r) => r.category));
 }
 
+export async function stats(req: Request, res: Response) {
+  const { docType, category } = req.query as Record<string, string | undefined>;
+  const where = {
+    ...(docType ? { docType: docType as any } : {}),
+    ...(category ? { category } : {}),
+  };
+  const [total, byCategory, byType, reviewOverdueCount] = await Promise.all([
+    prisma.document.count({ where }),
+    prisma.document.groupBy({ by: ["category"], where, _count: { _all: true } }),
+    prisma.document.groupBy({ by: ["docType"], where, _count: { _all: true } }),
+    prisma.document.count({ where: { ...where, reviewDueDate: { lt: new Date() } } }),
+  ]);
+
+  res.json({
+    total,
+    byCategory: byCategory.map((g) => ({ category: g.category, count: g._count._all })),
+    byType: byType.map((g) => ({ docType: g.docType, count: g._count._all })),
+    reviewOverdueCount,
+  });
+}
+
 // ───────────────────────── Collections ─────────────────────────
 // Every document belongs to exactly one collection. Unlike docType/category, collections are a
 // small managed list (create/rename/delete) rather than free text, so they get their own CRUD.

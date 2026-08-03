@@ -23,6 +23,15 @@ const TONE_MAP: Record<string, string> = {
   FAILED: "badge-danger",
   ACTION: "badge-primary",
   INFORMATION: "badge-neutral",
+  WAITING: "badge-warning",
+  ACCEPTED: "badge-success",
+  REFUSED: "badge-danger",
+  TODO: "badge-neutral",
+  DONE: "badge-success",
+  INCIDENT: "badge-danger",
+  REQUEST: "badge-primary",
+  PROBLEM: "badge-warning",
+  CHANGE: "badge-primary",
 };
 
 export function StatusBadge({ status }: { status: string }) {

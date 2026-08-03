@@ -11,6 +11,7 @@ router.use(verifyJwt);
 router.get("/", requirePermission("stock", "view"), controller.list);
 router.get("/low-stock", requirePermission("stock", "view"), controller.lowStock);
 router.get("/analytics", requirePermission("stock", "view"), controller.analytics);
+router.get("/stats", requirePermission("stock", "view"), controller.stats);
 router.get("/:id", requirePermission("stock", "view"), controller.getOne);
 router.post("/", requirePermission("stock", "create"), validateBody(createStockItemSchema), controller.create);
 router.patch("/:id", requirePermission("stock", "edit"), validateBody(updateStockItemSchema), controller.update);

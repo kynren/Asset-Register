@@ -9,30 +9,42 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { Icon } from "../../components/Icon";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { TicketFormModal, TicketFormValues } from "./TicketFormModal";
+import { TicketApprovalsModal } from "./TicketApprovalsModal";
+import { ModuleDashboardTab } from "../dashboard/ModuleDashboardTab";
+import { HELPDESK_WIDGET_CATALOG, DEFAULT_HELPDESK_DASHBOARD_LAYOUT } from "./helpdeskDashboardWidgets";
 import dayjs from "dayjs";
 
-const STATUS_OPTIONS = ["", "OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
+const STATUS_OPTIONS = ["", "OPEN", "IN_PROGRESS", "PENDING", "RESOLVED", "CLOSED"];
 const TYPE_OPTIONS = ["", "ACTION", "INFORMATION"];
+const ITIL_TYPE_OPTIONS = ["", "INCIDENT", "REQUEST", "PROBLEM", "CHANGE"];
 
 export function TicketListPage() {
+  const [view, setView] = useState<"tickets" | "dashboard">("dashboard");
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
+  const [itilType, setItilType] = useState("");
   const [assignedToMe, setAssignedToMe] = useState(false);
   const [overdue, setOverdue] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  const [showApprovals, setShowApprovals] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["tickets", { status, type, assignedToMe, overdue, search, page }],
+    queryKey: ["tickets", { status, type, itilType, assignedToMe, overdue, search, page }],
     queryFn: async () =>
       (
         await axiosClient.get("/tickets", {
-          params: { status: status || undefined, type: type || undefined, assignedToMe: assignedToMe || undefined, overdue: overdue || undefined, search: search || undefined, page, pageSize: 15 },
+          params: { status: status || undefined, type: type || undefined, itilType: itilType || undefined, assignedToMe: assignedToMe || undefined, overdue: overdue || undefined, search: search || undefined, page, pageSize: 15 },
         })
       ).data,
+  });
+
+  const { data: approvals } = useQuery({
+    queryKey: ["ticket-approvals-mine"],
+    queryFn: async () => (await axiosClient.get("/tickets/approvals")).data as { needsApproval: any[]; sentByMe: any[] },
   });
 
   const createMutation = useMutation({
@@ -47,6 +59,7 @@ export function TicketListPage() {
   const columns: ColumnDef<any, any>[] = [
     { header: "Ticket #", accessorKey: "ticketNumber" },
     { header: "Title", accessorKey: "title" },
+    { header: "ITIL Type", accessorKey: "itilType", cell: (info) => <StatusBadge status={info.getValue()} /> },
     { header: "Type", accessorKey: "type", cell: (info) => <StatusBadge status={info.getValue()} /> },
     { header: "Category", accessorFn: (row) => row.category?.name ?? "—" },
     { header: "Location", accessorFn: (row) => row.location?.name ?? "—" },
@@ -86,17 +99,46 @@ export function TicketListPage() {
           <h1 className="page-title">Helpdesk & Ticketing</h1>
           <p className="page-subtitle">Raise, assign and resolve IT support requests.</p>
         </div>
-        <PermissionGate module="helpdesk" action="create">
-          <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" size={14} /> New Ticket</button>
-        </PermissionGate>
+        <div className="row gap-2">
+          <div className="docs-view-toggle">
+            <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}>
+              <Icon name="gauge" size={13} /> Dashboard
+            </button>
+            <button className={view === "tickets" ? "active" : ""} onClick={() => setView("tickets")}>
+              <Icon name="grid" size={13} /> Tickets
+            </button>
+          </div>
+          <button className="btn btn-secondary" onClick={() => setShowApprovals(true)}>
+            <Icon name="shield" size={14} /> Approvals
+            {approvals && approvals.needsApproval.length > 0 && (
+              <span className="badge badge-danger" style={{ marginLeft: 6 }}>{approvals.needsApproval.length}</span>
+            )}
+          </button>
+          <PermissionGate module="helpdesk" action="create">
+            <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" size={14} /> New Ticket</button>
+          </PermissionGate>
+        </div>
       </div>
 
+      {view === "dashboard" ? (
+        <ModuleDashboardTab
+          module="helpdesk"
+          catalog={HELPDESK_WIDGET_CATALOG}
+          defaultLayout={DEFAULT_HELPDESK_DASHBOARD_LAYOUT}
+          title="Helpdesk & Ticketing"
+          showHeader={false}
+        />
+      ) : (
+      <>
       <FilterBar>
         <select className="select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
           {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s ? s.replace("_", " ") : "All statuses"}</option>)}
         </select>
         <select className="select" value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}>
           {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t ? (t === "ACTION" ? "Action" : "Information") : "All types"}</option>)}
+        </select>
+        <select className="select" value={itilType} onChange={(e) => { setItilType(e.target.value); setPage(1); }}>
+          {ITIL_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t || "All ITIL types"}</option>)}
         </select>
         <label className="row gap-1" style={{ fontSize: 13, cursor: "pointer" }}>
           <input type="checkbox" checked={assignedToMe} onChange={(e) => { setAssignedToMe(e.target.checked); setPage(1); }} />
@@ -124,9 +166,19 @@ export function TicketListPage() {
           searchPlaceholder="Search by ticket #, title, or person..."
         />
       </div>
+      </>
+      )}
 
       {showForm && (
         <TicketFormModal onClose={() => setShowForm(false)} onSubmit={(v) => createMutation.mutate(v)} submitting={createMutation.isPending} />
+      )}
+
+      {showApprovals && (
+        <TicketApprovalsModal
+          needsApproval={approvals?.needsApproval ?? []}
+          sentByMe={approvals?.sentByMe ?? []}
+          onClose={() => setShowApprovals(false)}
+        />
       )}
     </div>
   );

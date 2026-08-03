@@ -101,6 +101,100 @@ export async function runOverdueTaskCheck(): Promise<{ checkouts: number; ticket
   return { checkouts: overdueCheckouts.length, tickets: overdueTickets.length, kanbanTasks: overdueKanban.length };
 }
 
+// SLA escalation: unlike the generic overdue-ticket scan above (keyed off the priority-derived
+// `dueAt`), this watches the SLA-specific TTO/TTR clocks and escalates a breach to everyone
+// currently on the hook for the ticket — its individual assignees plus every member of any
+// assigned team. GLPI escalates to a *different*, higher-tier group via per-level SLA config;
+// we don't model escalation levels, so "escalate" here means "widen the notification to the
+// whole owning team" rather than routing to a separate escalation group.
+export async function runSlaBreachCheck(): Promise<{ ttoBreaches: number; ttrBreaches: number }> {
+  const now = new Date();
+
+  const [ttoBreached, ttrBreached] = await Promise.all([
+    prisma.ticket.findMany({
+      where: { ttoDueAt: { lt: now }, ttoMetAt: null, status: { notIn: ["RESOLVED", "CLOSED"] } },
+      select: {
+        id: true, ticketNumber: true, title: true, ttoDueAt: true,
+        assignees: { select: { userId: true } },
+        assignedTeams: { select: { teamId: true } },
+      },
+    }),
+    prisma.ticket.findMany({
+      where: { ttrDueAt: { lt: now }, ttrMetAt: null, status: { notIn: ["RESOLVED", "CLOSED"] } },
+      select: {
+        id: true, ticketNumber: true, title: true, ttrDueAt: true,
+        assignees: { select: { userId: true } },
+        assignedTeams: { select: { teamId: true } },
+      },
+    }),
+  ]);
+
+  async function escalationRecipients(t: { assignees: { userId: number }[]; assignedTeams: { teamId: number }[] }): Promise<number[]> {
+    const ids = new Set(t.assignees.map((a) => a.userId));
+    for (const at of t.assignedTeams) {
+      for (const id of await teamMemberIds(at.teamId)) ids.add(id);
+    }
+    return [...ids];
+  }
+
+  let ttoBreaches = 0;
+  for (const t of ttoBreached) {
+    const recipients = await escalationRecipients(t);
+    if (!recipients.length) continue;
+    const message = `SLA breach: ticket ${t.ticketNumber} "${t.title}" is past its time-to-own deadline and still unassigned.`;
+    const toNotify: number[] = [];
+    for (const userId of recipients) {
+      if (!(await alreadyNotifiedRecently(userId, message))) toNotify.push(userId);
+    }
+    if (!toNotify.length) continue;
+    await notifyUsers({
+      userIds: toNotify,
+      type: "sla_breach",
+      message,
+      linkUrl: `/helpdesk/${t.id}`,
+      email: {
+        eventType: "TASK_OVERDUE",
+        fallbackSubject: `SLA breach (TTO): ${t.ticketNumber}`,
+        fallbackText: `${message}\n\nView it here: ${env.CLIENT_ORIGIN}/helpdesk/${t.id}`,
+        variables: { taskType: "SLA — Time to Own", taskName: `${t.ticketNumber} — ${t.title}`, dueDate: formatDate(t.ttoDueAt), taskUrl: `${env.CLIENT_ORIGIN}/helpdesk/${t.id}` },
+      },
+    });
+    ttoBreaches++;
+  }
+
+  let ttrBreaches = 0;
+  for (const t of ttrBreached) {
+    const recipients = await escalationRecipients(t);
+    if (!recipients.length) continue;
+    const message = `SLA breach: ticket ${t.ticketNumber} "${t.title}" is past its resolution deadline.`;
+    const toNotify: number[] = [];
+    for (const userId of recipients) {
+      if (!(await alreadyNotifiedRecently(userId, message))) toNotify.push(userId);
+    }
+    if (!toNotify.length) continue;
+    await notifyUsers({
+      userIds: toNotify,
+      type: "sla_breach",
+      message,
+      linkUrl: `/helpdesk/${t.id}`,
+      email: {
+        eventType: "TASK_OVERDUE",
+        fallbackSubject: `SLA breach (TTR): ${t.ticketNumber}`,
+        fallbackText: `${message}\n\nView it here: ${env.CLIENT_ORIGIN}/helpdesk/${t.id}`,
+        variables: { taskType: "SLA — Time to Resolve", taskName: `${t.ticketNumber} — ${t.title}`, dueDate: formatDate(t.ttrDueAt), taskUrl: `${env.CLIENT_ORIGIN}/helpdesk/${t.id}` },
+      },
+    });
+    ttrBreaches++;
+  }
+
+  return { ttoBreaches, ttrBreaches };
+}
+
+async function teamMemberIds(teamId: number): Promise<number[]> {
+  const members = await prisma.teamMember.findMany({ where: { teamId }, select: { userId: true } });
+  return members.map((m) => m.userId);
+}
+
 let intervalHandle: NodeJS.Timeout | null = null;
 
 export function startOverdueTaskScheduler(intervalHours = 6) {
@@ -109,6 +203,10 @@ export function startOverdueTaskScheduler(intervalHours = 6) {
     runForEachOrganization(runOverdueTaskCheck).catch((err) => {
       // eslint-disable-next-line no-console
       console.error("Overdue task check failed:", err);
+    });
+    runForEachOrganization(runSlaBreachCheck).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error("SLA breach check failed:", err);
     });
   };
   run();
