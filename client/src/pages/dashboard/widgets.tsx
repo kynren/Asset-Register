@@ -140,7 +140,7 @@ export function RecentActivityWidget() {
   return (
     <>
       <h3 className="mt-0">Recent Activity</h3>
-      <DataTable columns={columns} data={data?.items ?? []} isLoading={isLoading} page={data?.page} totalPages={data?.totalPages} onPageChange={setPage} emptyMessage="No activity yet." />
+      <DataTable tableId="dashboard.activity" defaultViewMode="list" columns={columns} data={data?.items ?? []} isLoading={isLoading} page={data?.page} totalPages={data?.totalPages} onPageChange={setPage} emptyMessage="No activity yet." />
     </>
   );
 }
@@ -161,7 +161,7 @@ export function LowStockWidget() {
   return (
     <>
       <h3 className="mt-0">Low Stock Items</h3>
-      <DataTable columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={5} emptyMessage="No items are currently low on stock." searchable={false} />
+      <DataTable tableId="dashboard.lowStock" defaultViewMode="list" columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={5} emptyMessage="No items are currently low on stock." searchable={false} />
     </>
   );
 }
@@ -183,7 +183,7 @@ export function OfflineDevicesWidget() {
   return (
     <>
       <h3 className="mt-0">Offline Devices</h3>
-      <DataTable columns={columns} data={offline} isLoading={isLoading} clientPageSize={5} emptyMessage="All known devices have reported in recently." searchable={false} />
+      <DataTable tableId="dashboard.offlineDevices" defaultViewMode="list" columns={columns} data={offline} isLoading={isLoading} clientPageSize={5} emptyMessage="All known devices have reported in recently." searchable={false} />
     </>
   );
 }
@@ -202,7 +202,7 @@ export function MaintenanceDueWidget() {
   return (
     <>
       <h3 className="mt-0">Maintenance Due</h3>
-      <DataTable columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={5} emptyMessage="No assets are currently due for maintenance." searchable={false} />
+      <DataTable tableId="dashboard.maintenanceDue" defaultViewMode="list" columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={5} emptyMessage="No assets are currently due for maintenance." searchable={false} />
     </>
   );
 }

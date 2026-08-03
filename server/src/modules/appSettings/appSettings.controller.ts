@@ -1,9 +1,11 @@
 import { Request, Response } from "express";
+import { env } from "../../config/env";
+import { DEFAULT_SCHEMA, prisma, runWithTenant } from "../../config/prisma";
 import { ApiError } from "../../middleware/errorHandler";
-import { getOrganizationById, listOrganizations, renameOrganizationSchema, resolveAccountSchema, updateOrganizationName } from "../../config/controlPlane";
+import { getOrganizationById, listOrganizations, renameOrganizationSchema, resolveAccountSchema, updateOrganizationLogo, updateOrganizationName } from "../../config/controlPlane";
 import { provisionOrganization } from "../../lib/tenantProvisioning";
 import { logAudit } from "../../lib/auditLogger";
-import { getEffectivePermissionMap, issueAccessToken } from "../auth/auth.service";
+import { getEffectivePermissionMap, hashToken, issueAccessToken, verifyUserCredential } from "../auth/auth.service";
 
 export async function listOrgs(_req: Request, res: Response) {
   res.json(await listOrganizations());
@@ -41,6 +43,12 @@ export async function createOrg(req: Request, res: Response) {
 // against `public` regardless, so identity never gets confused with a real user of the org being
 // viewed. The refresh cookie/session is untouched, so the natural ~15 min access-token expiry
 // quietly reverts the view back to `public` — switch again to resume.
+//
+// Requires re-verifying the caller's own password/PIN before switching (same shared lockout as
+// login — see verifyUserCredential) and records how long the client can skip re-confirming this
+// same org on the caller's refresh session (`orgSwitchConfirmedOrgId`/`Until`) — this is purely a
+// UI convenience flag for OrgSwitchConfirmModal, not a new authorization boundary: actual data
+// access is still governed entirely by the access token's `schemaName` claim, unchanged.
 export async function switchOrganization(req: Request, res: Response) {
   if (req.user!.roleName !== "System Admin") throw new ApiError(403, "Only a System Admin can switch organizations.");
 
@@ -48,12 +56,37 @@ export async function switchOrganization(req: Request, res: Response) {
   const target = await getOrganizationById(id);
   if (!target) throw new ApiError(404, "Organization not found");
 
+  const { password, pin, rememberMinutes } = req.body as { password?: string; pin?: string; rememberMinutes: number | null };
+  const credential = pin ? { pin } : { password: password! };
+
+  const refreshCookieToken = req.cookies?.[env.REFRESH_COOKIE_NAME];
+  if (!refreshCookieToken) throw new ApiError(401, "No active session");
+  const tokenHash = hashToken(refreshCookieToken);
+
+  const orgSwitchConfirmedUntil = await runWithTenant(DEFAULT_SCHEMA, async () => {
+    const session = await prisma.refreshSession.findUnique({ where: { tokenHash } });
+    if (!session || session.revokedAt || session.expiresAt < new Date() || session.userId !== req.user!.id) {
+      throw new ApiError(401, "Invalid or expired session");
+    }
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user) throw new ApiError(404, "User not found");
+
+    await verifyUserCredential(user, credential);
+
+    const until = rememberMinutes == null ? null : new Date(Math.min(Date.now() + rememberMinutes * 60_000, session.expiresAt.getTime()));
+    await prisma.refreshSession.update({
+      where: { id: session.id },
+      data: { orgSwitchConfirmedOrgId: target.id, orgSwitchConfirmedUntil: until },
+    });
+    return until;
+  });
+
   const accessToken = issueAccessToken({ id: req.user!.id, roleId: req.user!.roleId, role: { name: req.user!.roleName } }, target.schemaName);
   const permissions = await getEffectivePermissionMap(req.user!.roleId, req.user!.roleName);
 
   await logAudit({ userId: req.user!.id, action: "appSettings.organization_switch", entityType: "Organization", entityId: target.id, metadata: { schemaName: target.schemaName } });
 
-  res.json({ accessToken, organization: target, permissions });
+  res.json({ accessToken, organization: target, permissions, orgSwitchConfirmedOrgId: target.id, orgSwitchConfirmedUntil });
 }
 
 export async function updateOrg(req: Request, res: Response) {
@@ -76,6 +109,21 @@ export async function updateOrg(req: Request, res: Response) {
   }
 
   await logAudit({ userId: req.user!.id, action: "appSettings.organization_update", entityType: "Organization", entityId: id, metadata: { name, schemaName } });
+
+  const updated = await getOrganizationById(id);
+  res.json(updated);
+}
+
+export async function uploadOrgLogo(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const target = await getOrganizationById(id);
+  if (!target) throw new ApiError(404, "Organization not found");
+  if (!req.file) throw new ApiError(400, "Missing file");
+
+  const url = `/uploads/org-logos/${req.file.filename}`;
+  await updateOrganizationLogo(id, url);
+
+  await logAudit({ userId: req.user!.id, action: "appSettings.organization_logo_update", entityType: "Organization", entityId: id, metadata: { url } });
 
   const updated = await getOrganizationById(id);
   res.json(updated);

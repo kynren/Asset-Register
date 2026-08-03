@@ -9,6 +9,7 @@ import { logAudit } from "../../lib/auditLogger";
 import { isOnline } from "../../lib/network";
 import { streamPing } from "../../lib/pingStream";
 import { relayAwarePing } from "../../lib/relayTransport";
+import { mapLimit } from "../../lib/concurrency";
 import { encryptSecret } from "../../lib/crypto";
 import { runNetworkMonitorCycle } from "../../lib/networkMonitor";
 import { createEdgeSchema, createNodeSchema, updateMonitorSettingsSchema, updateNodeSchema, updateSnmpConfigSchema } from "./network.schema";
@@ -24,16 +25,16 @@ router.get("/graph", requirePermission("network", "view"), async (_req, res) => 
   ]);
 
   // Live-classify each node's status from a real ICMP probe of its IP (falling back to the
-  // linked device's most recently reported address), not a fabricated/static value.
-  const liveStatuses = await Promise.all(
-    nodes.map(async (n) => {
-      const ip = n.ipAddress ?? n.device?.ipAddresses?.[0] ?? null;
-      if (!ip) return { latencyMs: null as number | null, status: null as "ONLINE" | "DEGRADED" | "OFFLINE" | null };
-      const { alive, responseTimeMs } = await relayAwarePing(ip, 800);
-      if (!alive) return { latencyMs: null, status: "OFFLINE" as const };
-      return { latencyMs: responseTimeMs, status: (responseTimeMs !== null && responseTimeMs > 50 ? "DEGRADED" : "ONLINE") as "DEGRADED" | "ONLINE" };
-    })
-  );
+  // linked device's most recently reported address), not a fabricated/static value. Bounded
+  // concurrency (not Promise.all) for the same reason scan.service.ts/assetHeartbeat.ts cap
+  // theirs — an unbounded burst here would flood the relay's shared device-job worker pool.
+  const liveStatuses = await mapLimit(nodes, 10, async (n) => {
+    const ip = n.ipAddress ?? n.device?.ipAddresses?.[0] ?? null;
+    if (!ip) return { latencyMs: null as number | null, status: null as "ONLINE" | "DEGRADED" | "OFFLINE" | null };
+    const { alive, responseTimeMs } = await relayAwarePing(ip, 800);
+    if (!alive) return { latencyMs: null, status: "OFFLINE" as const };
+    return { latencyMs: responseTimeMs, status: (responseTimeMs !== null && responseTimeMs > 50 ? "DEGRADED" : "ONLINE") as "DEGRADED" | "ONLINE" };
+  });
 
   const shapedNodes = nodes.map((n, i) => ({
     id: n.id,

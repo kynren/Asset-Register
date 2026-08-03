@@ -9,6 +9,7 @@ import { Icon } from "../components/Icon";
 import { NotificationBell } from "./NotificationBell";
 import { ClientInfoModal } from "./ClientInfoModal";
 import { useClientInfo } from "../hooks/useClientInfo";
+import { OrgSwitchConfirmModal } from "../pages/appSettings/OrgSwitchConfirmModal";
 
 function initials(firstName: string, lastName: string) {
   return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
@@ -98,13 +99,20 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
     enabled: isSystemAdmin && menuOpen,
   });
   const [switchingOrgId, setSwitchingOrgId] = useState<number | null>(null);
+  const [pendingSwitchOrg, setPendingSwitchOrg] = useState<OrganizationRow | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
-  async function handleSwitchOrganization(orgId: number) {
-    setSwitchingOrgId(orgId);
+  async function confirmSwitchOrganization(credential: { password: string } | { pin: string }, rememberMinutes: number | null) {
+    if (!pendingSwitchOrg) return;
+    setSwitchingOrgId(pendingSwitchOrg.id);
+    setSwitchError(null);
     try {
-      await switchOrganization(orgId);
+      await switchOrganization(pendingSwitchOrg.id, credential, rememberMinutes);
+      setPendingSwitchOrg(null);
       setMenuOpen(false);
       navigate("/");
+    } catch (err: any) {
+      setSwitchError(err.response?.data?.error ?? "Could not verify your credential.");
     } finally {
       setSwitchingOrgId(null);
     }
@@ -274,7 +282,7 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
                           key={org.id}
                           className="user-menu-item"
                           style={{ opacity: switchingOrgId !== null && !isActive ? 0.5 : 1, cursor: isActive ? "default" : "pointer" }}
-                          onClick={() => { if (!isActive && switchingOrgId === null) handleSwitchOrganization(org.id); }}
+                          onClick={() => { if (!isActive && switchingOrgId === null) { setPendingSwitchOrg(org); setMenuOpen(false); } }}
                         >
                           <Icon name={isActive ? "check" : "layers"} size={15} />
                           <span style={{ fontWeight: isActive ? 600 : 400 }}>{org.name}</span>
@@ -305,6 +313,15 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
       </div>
 
       {showClientInfo && <ClientInfoModal onClose={() => setShowClientInfo(false)} />}
+      {pendingSwitchOrg && (
+        <OrgSwitchConfirmModal
+          organizationName={pendingSwitchOrg.name}
+          submitting={switchingOrgId !== null}
+          error={switchError}
+          onCancel={() => { setPendingSwitchOrg(null); setSwitchError(null); }}
+          onConfirm={confirmSwitchOrganization}
+        />
+      )}
     </header>
   );
 }

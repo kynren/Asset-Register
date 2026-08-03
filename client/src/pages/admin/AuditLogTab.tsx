@@ -32,6 +32,8 @@ export function AuditLogTab() {
   return (
     <div className="card">
       <DataTable
+        tableId="admin.auditLog"
+        defaultViewMode="list"
         columns={columns}
         data={data?.items ?? []}
         isLoading={isLoading}

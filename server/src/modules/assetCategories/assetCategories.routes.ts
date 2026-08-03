@@ -17,6 +17,8 @@ const schema = z.object({
   isShowAsset: z.boolean().optional(),
   isSwitchingDevice: z.boolean().optional(),
   collectionId: z.number().int().nullable().optional(),
+  // null = reset to the generic default column set (see client/src/pages/assets/assetTableColumns.ts).
+  tableColumns: z.array(z.string()).nullable().optional(),
 });
 
 const categorySelect = {
@@ -29,6 +31,7 @@ const categorySelect = {
   formTemplate: { select: { id: true, name: true } },
   collectionId: true,
   collection: { select: { id: true, name: true } },
+  tableColumns: true,
 };
 
 router.get("/", requirePermission("assets", "view"), async (_req, res) => {

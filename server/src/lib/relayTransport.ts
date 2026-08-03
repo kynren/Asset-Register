@@ -18,6 +18,10 @@ export interface RelayAwareFetchInit {
   signal?: AbortSignal;
   digestAuth?: { username: string; password: string };
   timeoutMs?: number;
+  // Lower claims first on the relay's shared device-job queue — see RelayDeviceJob.priority.
+  // Leave at the default (0) for anything a user is waiting on; only background sweeps should
+  // pass a higher number so they can never starve an on-demand check of a worker.
+  priority?: number;
 }
 
 export interface RelayAwareResponse {
@@ -41,14 +45,17 @@ export async function relayAwareFetch(url: string, init: RelayAwareFetchInit = {
     });
   }
 
-  const result = await enqueueAndAwaitHttp({
-    url,
-    method: init.method ?? "GET",
-    headers: init.headers,
-    body: init.body,
-    digestAuth: init.digestAuth,
-    timeoutMs: init.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-  });
+  const result = await enqueueAndAwaitHttp(
+    {
+      url,
+      method: init.method ?? "GET",
+      headers: init.headers,
+      body: init.body,
+      digestAuth: init.digestAuth,
+      timeoutMs: init.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    },
+    init.priority ?? 0
+  );
 
   if (!result.ok) throw new Error(result.errorMessage ?? "Relay request failed.");
 
@@ -66,10 +73,13 @@ export async function relayAwareFetch(url: string, init: RelayAwareFetchInit = {
   };
 }
 
-export async function relayAwarePing(target: string, timeoutMs = 800): Promise<PingResult> {
+// priority: lower claims first on the relay's shared device-job queue (see RelayDeviceJob.priority)
+// — leave at 0 for anything a user is waiting on; pass a higher number only from a background
+// sweep so it can never starve an on-demand ping of a worker.
+export async function relayAwarePing(target: string, timeoutMs = 800, priority = 0): Promise<PingResult> {
   if (!(await isNetworkRelayEnabled())) return pingHost(target, timeoutMs);
 
-  const result = await enqueueAndAwaitPing(target, timeoutMs);
+  const result = await enqueueAndAwaitPing(target, timeoutMs, priority);
   if (!result.ok) return { alive: false, responseTimeMs: null };
   return { alive: result.alive ?? false, responseTimeMs: result.responseTimeMs ?? null };
 }

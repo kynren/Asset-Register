@@ -360,6 +360,8 @@ export function IpRangeScannerTab() {
 
       <div className="ips-table-wrap">
         <DataTable
+          tableId="network.scanResults"
+          defaultViewMode="list"
           columns={resultColumns}
           data={scan ? results : []}
           clientPageSize={15}
@@ -379,7 +381,7 @@ export function IpRangeScannerTab() {
       {history && history.length > 0 && (
         <div className="card" style={{ margin: 18, marginTop: 0 }}>
           <h3 className="mt-0">Recent Scans</h3>
-          <DataTable columns={historyColumns} data={history} clientPageSize={5} onRowClick={(s) => setActiveScanId(s.id)} />
+          <DataTable tableId="network.scanHistory" defaultViewMode="list" columns={historyColumns} data={history} clientPageSize={5} onRowClick={(s) => setActiveScanId(s.id)} />
         </div>
       )}
 

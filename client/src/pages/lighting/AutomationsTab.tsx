@@ -228,6 +228,8 @@ export function AutomationsTab() {
             One row per time the scheduler actually fired an automation's on- or off-leg, with a per-run device success/failure count.
           </p>
           <DataTable
+            tableId="lighting.automationRuns"
+            defaultViewMode="list"
             columns={runColumns}
             data={runsPage?.runs ?? []}
             isLoading={runsLoading}

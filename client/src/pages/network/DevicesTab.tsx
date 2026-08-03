@@ -53,6 +53,7 @@ export function DevicesTab() {
       <FilterBar search={search} onSearchChange={(v) => { setSearch(v); setPage(1); }} searchPlaceholder="Search by hostname or MAC..." />
       <div className="card">
         <DataTable
+          tableId="network.devices"
           columns={columns}
           data={data?.items ?? []}
           isLoading={isLoading}

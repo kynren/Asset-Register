@@ -26,25 +26,20 @@ type TabKey = (typeof TABS)[number]["key"];
 
 export function AppSettingsPage() {
   const [tab, setTab] = useState<TabKey>("organizations");
-  const { organization } = useAuth();
+  const { organization, isOrgSwitchConfirmed } = useAuth();
 
-  // Deliberately NOT persisted anywhere (localStorage, server preference, etc.) — a System Admin
-  // must re-confirm which organization they're managing every single time they navigate into App
-  // Settings, even if `organization` is already set from a previous visit. Resets to false on
-  // every mount of this component, which is exactly what "every visit" means here.
-  const [orgConfirmed, setOrgConfirmed] = useState(false);
+  // Driven by the server-confirmed org-switch state on the caller's own refresh session (see
+  // AuthContext's isOrgSwitchConfirmed + appSettings.controller.ts's switchOrganization) rather
+  // than local component state — a real password/PIN re-verification, not just "has this
+  // component been mounted before."
+  const orgConfirmed = organization ? isOrgSwitchConfirmed(organization.id) : false;
 
   // Set when "Edit" is clicked on a pending scheduled change in Change Management — routes the
   // admin to the tab the change came from, with that tab's form seeded from the change's payload
   // instead of live data, and its Save button re-targeted at PATCHing this same change.
   const [editingChange, setEditingChange] = useState<ScheduledChangeRow | null>(null);
 
-  function handleOrgSelected() {
-    setOrgConfirmed(true);
-  }
-
   function handleChangeOrganization() {
-    setOrgConfirmed(false);
     setEditingChange(null);
     setTab("organizations");
   }
@@ -102,7 +97,7 @@ export function AppSettingsPage() {
         </div>
       </div>
 
-      {activeTab === "organizations" && <OrganizationsTab onOrgSelected={handleOrgSelected} strictActiveDisable={orgConfirmed} />}
+      {activeTab === "organizations" && <OrganizationsTab strictActiveDisable={orgConfirmed} />}
       {activeTab === "users" && (
         <div className="stack gap-3">
           <p className="muted" style={{ margin: 0 }}>

@@ -16,6 +16,14 @@ export interface AssetHeartbeatResult {
 // style as scan.service.ts's SCAN_CONCURRENCY for IP range scans.
 const PING_CONCURRENCY = 20;
 
+// This sweep is the one truly continuous, high-volume consumer of the relay's shared device-job
+// worker pool (see agent/kynren_network_relay.py's DEVICE_JOB_WORKERS, sized to match this same
+// concurrency) — a burst of up to PING_CONCURRENCY jobs every TICK_MS. Marking it background
+// priority (see RelayDeviceJob.priority / relay.routes.ts's next-device-job ordering) means an
+// on-demand check a user is actually waiting on (NVR/lighting/pinger/single asset ping) always
+// jumps this queue instead of timing out behind it.
+const BACKGROUND_JOB_PRIORITY = 10;
+
 // The interval the user actually needs is "instant status changes in the UI", not literal
 // per-asset per-second pings (infeasible — see ping.ts's process-per-ping cost). A short shared
 // sweep + SSE push gets there: every asset is re-checked on this cadence and any client watching
@@ -64,7 +72,7 @@ async function tick(): Promise<void> {
   }
 
   const results = await mapLimit(assets, PING_CONCURRENCY, async (asset) => {
-    const result = await relayAwarePing(asset.staticIpAddress || asset.assetTag);
+    const result = await relayAwarePing(asset.staticIpAddress || asset.assetTag, 800, BACKGROUND_JOB_PRIORITY);
     return { id: asset.id, assetTag: asset.assetTag, alive: result.alive, responseTimeMs: result.responseTimeMs };
   });
 

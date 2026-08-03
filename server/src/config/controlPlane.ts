@@ -16,6 +16,7 @@ export interface OrganizationRow {
   name: string;
   schemaName: string;
   createdAt: Date;
+  logoUrl: string | null;
 }
 
 let bootstrapped = false;
@@ -31,6 +32,9 @@ export async function bootstrapControlPlane(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  // Added after the table's original creation — IF NOT EXISTS makes this safe to re-run against
+  // an already-bootstrapped database (same convention as the rest of this function).
+  await controlPlanePool.query(`ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS logo_url TEXT;`);
   await controlPlanePool.query(`
     CREATE TABLE IF NOT EXISTS public.account_index (
       email TEXT PRIMARY KEY,
@@ -119,23 +123,27 @@ export async function bootstrapControlPlane(): Promise<void> {
 }
 
 export async function listOrganizations(): Promise<OrganizationRow[]> {
-  const result = await controlPlanePool.query<{ id: number; name: string; schema_name: string; created_at: Date }>(
-    `SELECT id, name, schema_name, created_at FROM public.organizations ORDER BY id ASC`
+  const result = await controlPlanePool.query<{ id: number; name: string; schema_name: string; created_at: Date; logo_url: string | null }>(
+    `SELECT id, name, schema_name, created_at, logo_url FROM public.organizations ORDER BY id ASC`
   );
-  return result.rows.map((r) => ({ id: r.id, name: r.name, schemaName: r.schema_name, createdAt: r.created_at }));
+  return result.rows.map((r) => ({ id: r.id, name: r.name, schemaName: r.schema_name, createdAt: r.created_at, logoUrl: r.logo_url }));
 }
 
 export async function getOrganizationById(id: number): Promise<OrganizationRow | null> {
-  const result = await controlPlanePool.query<{ id: number; name: string; schema_name: string; created_at: Date }>(
-    `SELECT id, name, schema_name, created_at FROM public.organizations WHERE id = $1`,
+  const result = await controlPlanePool.query<{ id: number; name: string; schema_name: string; created_at: Date; logo_url: string | null }>(
+    `SELECT id, name, schema_name, created_at, logo_url FROM public.organizations WHERE id = $1`,
     [id]
   );
   const r = result.rows[0];
-  return r ? { id: r.id, name: r.name, schemaName: r.schema_name, createdAt: r.created_at } : null;
+  return r ? { id: r.id, name: r.name, schemaName: r.schema_name, createdAt: r.created_at, logoUrl: r.logo_url } : null;
 }
 
 export async function updateOrganizationName(id: number, name: string): Promise<void> {
   await controlPlanePool.query(`UPDATE public.organizations SET name = $2 WHERE id = $1`, [id, name]);
+}
+
+export async function updateOrganizationLogo(id: number, logoUrl: string): Promise<void> {
+  await controlPlanePool.query(`UPDATE public.organizations SET logo_url = $2 WHERE id = $1`, [id, logoUrl]);
 }
 
 // Physically renames the Postgres schema itself — not just the control plane's own label for it.
@@ -179,12 +187,12 @@ export async function renameOrganizationSchema(id: number, newSchemaName: string
 }
 
 export async function createOrganization(name: string, schemaName: string): Promise<OrganizationRow> {
-  const result = await controlPlanePool.query<{ id: number; name: string; schema_name: string; created_at: Date }>(
-    `INSERT INTO public.organizations (name, schema_name) VALUES ($1, $2) RETURNING id, name, schema_name, created_at`,
+  const result = await controlPlanePool.query<{ id: number; name: string; schema_name: string; created_at: Date; logo_url: string | null }>(
+    `INSERT INTO public.organizations (name, schema_name) VALUES ($1, $2) RETURNING id, name, schema_name, created_at, logo_url`,
     [name, schemaName]
   );
   const r = result.rows[0];
-  return { id: r.id, name: r.name, schemaName: r.schema_name, createdAt: r.created_at };
+  return { id: r.id, name: r.name, schemaName: r.schema_name, createdAt: r.created_at, logoUrl: r.logo_url };
 }
 
 export async function resolveAccountSchema(email: string): Promise<string | null> {

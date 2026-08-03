@@ -133,6 +133,7 @@ export function AccessGroupTab() {
         {isLoading && <Skeleton height={160} />}
         {!isLoading && (
           <DataTable
+            tableId="accessControl.groups"
             columns={columns}
             data={groups ?? []}
             clientPageSize={10}

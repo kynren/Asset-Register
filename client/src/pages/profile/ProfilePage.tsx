@@ -8,6 +8,7 @@ import { ColorPaletteCard } from "./ColorPaletteCard";
 import { PasswordInput } from "../../components/PasswordInput";
 import { McpConnectionCard } from "./McpConnectionCard";
 import { MfaCard } from "../password/MfaCard";
+import { PinCard } from "../password/PinCard";
 import { SessionsCard } from "../password/SessionsCard";
 import { NotificationsTab } from "./NotificationsTab";
 
@@ -159,6 +160,8 @@ export function ProfilePage() {
       {tab === "settings" && (
         <div className="stack gap-3">
           <PasswordChangeCard />
+
+          <PinCard />
 
           <MfaCard />
 

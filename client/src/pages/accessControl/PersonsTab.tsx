@@ -180,7 +180,7 @@ export function PersonsTab() {
         </div>
 
         <div className="card">
-          <DataTable columns={columns} data={persons ?? []} isLoading={isLoading} clientPageSize={10} onRowClick={(p) => setEditingPerson(p)} emptyMessage="No persons enrolled yet." />
+          <DataTable tableId="accessControl.persons" columns={columns} data={persons ?? []} isLoading={isLoading} clientPageSize={10} onRowClick={(p) => setEditingPerson(p)} emptyMessage="No persons enrolled yet." />
         </div>
       </div>
 

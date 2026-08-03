@@ -2,7 +2,16 @@ import { Router } from "express";
 import { verifyJwt } from "../../middleware/auth";
 import { validateBody } from "../../middleware/validate";
 import * as controller from "./auth.controller";
-import { changePasswordSchema, forgotPasswordSchema, loginSchema, magicLoginSchema, mfaVerifySchema, resetPasswordSchema } from "./auth.schema";
+import {
+  changePasswordSchema,
+  forgotPasswordSchema,
+  loginSchema,
+  magicLoginSchema,
+  mfaVerifySchema,
+  removePinSchema,
+  resetPasswordSchema,
+  setPinSchema,
+} from "./auth.schema";
 
 const router = Router();
 
@@ -11,6 +20,8 @@ router.post("/refresh", controller.refresh);
 router.post("/logout", verifyJwt, controller.logout);
 router.get("/me", verifyJwt, controller.me);
 router.post("/change-password", verifyJwt, validateBody(changePasswordSchema), controller.changePassword);
+router.post("/pin/set", verifyJwt, validateBody(setPinSchema), controller.setPin);
+router.post("/pin/remove", verifyJwt, validateBody(removePinSchema), controller.removePin);
 
 router.post("/forgot-password", validateBody(forgotPasswordSchema), controller.forgotPassword);
 router.post("/reset-password", validateBody(resetPasswordSchema), controller.resetPassword);

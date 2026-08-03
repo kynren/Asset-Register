@@ -3,6 +3,8 @@ import { Request, Response } from "express";
 import PDFDocument from "pdfkit";
 import { env } from "../../config/env";
 import { prisma, currentSchemaName } from "../../config/prisma";
+import { registerAccount } from "../../config/controlPlane";
+import { getViewingOrganization } from "../auth/auth.service";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { getPagination, paginatedResponse } from "../../lib/pagination";
@@ -715,6 +717,10 @@ export async function importCsv(req: Request, res: Response) {
   const locationMap = new Map(locations.map((l) => [l.name.toLowerCase(), l.id]));
   const emailMap = new Map(existingUsers.map((u) => [u.email.toLowerCase(), u.id]));
   const nameMap = new Map(existingUsers.map((u) => [`${u.firstName} ${u.lastName}`.toLowerCase(), u.id]));
+  // Resolved once up front (not per auto-created user) — login resolves which tenant schema an
+  // email belongs to via this cross-tenant control-plane index (see resolveAccountSchema in
+  // controlPlane.ts), so an auto-created user missing from it could never log in.
+  const importOrganization = await getViewingOrganization(currentSchemaName());
 
   const usersCreated: { id: number; email: string; firstName: string; lastName: string; tempPassword: string }[] = [];
 
@@ -737,6 +743,7 @@ export async function importCsv(req: Request, res: Response) {
       data: { email, firstName, lastName, roleId: viewerRole.id, passwordHash, mustChangePassword: true },
       select: { id: true, email: true, firstName: true, lastName: true },
     });
+    if (importOrganization) await registerAccount(user.email, currentSchemaName(), importOrganization.id);
     await logAudit({ userId: req.user!.id, action: "user.create", entityType: "User", entityId: user.id, metadata: { source: "asset.import" } });
     emailMap.set(email, user.id);
     nameMap.set(`${user.firstName} ${user.lastName}`.toLowerCase(), user.id);

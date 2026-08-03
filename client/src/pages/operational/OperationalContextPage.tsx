@@ -109,7 +109,7 @@ export function OperationalContextPage() {
       {data && data.total > 0 && (
         <div className="card" style={{ marginTop: 16 }}>
           <h3 className="mt-0 mb-2">Show Assets</h3>
-          <DataTable columns={showAssetColumns} data={data.assets} clientPageSize={10} emptyMessage="No show assets." />
+          <DataTable tableId="operational.showAssets" columns={showAssetColumns} data={data.assets} clientPageSize={10} emptyMessage="No show assets." />
         </div>
       )}
     </div>

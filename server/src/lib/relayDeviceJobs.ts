@@ -44,7 +44,7 @@ async function awaitJobCompletion(jobId: number, timeoutMs: number) {
   return null;
 }
 
-export async function enqueueAndAwaitHttp(params: RelayHttpJobParams): Promise<RelayHttpJobResult> {
+export async function enqueueAndAwaitHttp(params: RelayHttpJobParams, priority = 0): Promise<RelayHttpJobResult> {
   const parsed = new URL(params.url);
   const defaultPort = parsed.protocol === "https:" ? 443 : 80;
   const job = await prisma.relayDeviceJob.create({
@@ -60,6 +60,7 @@ export async function enqueueAndAwaitHttp(params: RelayHttpJobParams): Promise<R
       digestUsername: params.digestAuth?.username,
       digestPasswordEncrypted: params.digestAuth ? encryptSecret(params.digestAuth.password) : undefined,
       timeoutMs: params.timeoutMs,
+      priority,
     },
   });
 
@@ -76,9 +77,9 @@ export async function enqueueAndAwaitHttp(params: RelayHttpJobParams): Promise<R
   };
 }
 
-export async function enqueueAndAwaitPing(target: string, timeoutMs: number): Promise<RelayPingJobResult> {
+export async function enqueueAndAwaitPing(target: string, timeoutMs: number, priority = 0): Promise<RelayPingJobResult> {
   const job = await prisma.relayDeviceJob.create({
-    data: { kind: "PING", status: "PENDING", target, timeoutMs },
+    data: { kind: "PING", status: "PENDING", target, timeoutMs, priority },
   });
 
   const result = await awaitJobCompletion(job.id, timeoutMs);

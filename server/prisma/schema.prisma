@@ -38,6 +38,8 @@ model User {
   id                 Int       @id @default(autoincrement())
   email              String    @unique
   passwordHash       String
+  pinHash            String?
+  pinEnabled         Boolean   @default(false)
   firstName          String
   lastName           String
   avatarUrl          String?
@@ -112,6 +114,11 @@ model RefreshSession {
   createdAt DateTime  @default(now())
   expiresAt DateTime
   revokedAt DateTime?
+  // Set when a System Admin re-verifies their password/PIN to switch into a given organization —
+  // lets the client skip re-prompting for the same org until this expires (or this session ends).
+  // A non-null orgSwitchConfirmedOrgId with a null Until means "confirmed until logout" (no timer).
+  orgSwitchConfirmedOrgId  Int?
+  orgSwitchConfirmedUntil  DateTime?
 }
 
 model PasswordResetToken {
@@ -204,6 +211,10 @@ model AssetCategory {
   collectionId      Int?
   collection        AssetCollection?   @relation(fields: [collectionId], references: [id])
   assets            Asset[]
+  // null = the generic default column set (see client/src/pages/assets/assetTableColumns.ts).
+  // A JSON array of column keys — generic keys (e.g. "status") or "field:<fieldKey>" for a custom
+  // field from this category's formTemplate.
+  tableColumns      Json?
 }
 
 model AssetCollection {
@@ -759,6 +770,11 @@ model RelayDeviceJob {
   digestUsername          String?
   digestPasswordEncrypted String?
   timeoutMs               Int                   @default(8000)
+  // Lower claims first (see GET /next-device-job's orderBy). 0 = on-demand (a user waiting on a
+  // response — NVR/camera check, lighting refresh, ICMP pinger, single asset ping). 10 = background
+  // (the asset-heartbeat sweep's own bulk concurrent pings) so it can never starve an on-demand
+  // job of a worker — see assetHeartbeat.ts's BACKGROUND_JOB_PRIORITY.
+  priority                Int                   @default(0)
   responseStatus          Int?
   responseHeaders         Json?
   responseBodyBase64      String?
@@ -766,7 +782,7 @@ model RelayDeviceJob {
   createdAt               DateTime              @default(now())
   completedAt             DateTime?
 
-  @@index([status, createdAt])
+  @@index([status, priority, createdAt])
 }
 
 model NetworkDeviceStatusEvent {

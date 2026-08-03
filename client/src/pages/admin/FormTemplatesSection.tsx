@@ -106,7 +106,7 @@ export function FormTemplatesSection() {
           </button>
         </PermissionGate>
       </div>
-      <DataTable columns={columns} data={templates ?? []} isLoading={isLoading} clientPageSize={8} emptyMessage="No form templates yet." />
+      <DataTable tableId="admin.formTemplates" columns={columns} data={templates ?? []} isLoading={isLoading} clientPageSize={8} emptyMessage="No form templates yet." />
 
       {showCreate && (
         <TemplateFormModal

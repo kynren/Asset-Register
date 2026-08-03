@@ -46,12 +46,12 @@ const REFRESH_COOKIE_OPTIONS = {
 };
 
 export async function login(req: Request, res: Response) {
-  const { email, password, mfaToken } = req.body;
+  const { email, password, pin, mfaToken } = req.body;
   const schemaName = await resolveAccountSchema(email);
   if (!schemaName) throw new ApiError(401, "Invalid email or password");
 
   await runWithTenant(schemaName, async () => {
-    const user = await verifyCredentials(email, password);
+    const user = await verifyCredentials(email, pin ? { pin } : { password });
 
     if (user.mfaEnabled) {
       if (!mfaToken) {
@@ -110,7 +110,14 @@ export async function refresh(req: Request, res: Response) {
     const accessToken = issueAccessToken(user, targetSchemaName);
     const permissions = await getEffectivePermissionMap(user.roleId, user.role.name);
     const organization = await getViewingOrganization(targetSchemaName);
-    res.json({ accessToken, user: sanitizeUser(user), permissions, organization });
+    res.json({
+      accessToken,
+      user: sanitizeUser(user),
+      permissions,
+      organization,
+      orgSwitchConfirmedOrgId: session.orgSwitchConfirmedOrgId,
+      orgSwitchConfirmedUntil: session.orgSwitchConfirmedUntil,
+    });
   });
 }
 
@@ -126,11 +133,23 @@ export async function logout(req: Request, res: Response) {
 
 export async function me(req: Request, res: Response) {
   const organization = await getViewingOrganization(currentSchemaName());
+  const currentToken = req.cookies?.[env.REFRESH_COOKIE_NAME];
+  const currentHash = currentToken ? hashToken(currentToken) : null;
   await runWithTenant(homeSchemaFor(req), async () => {
     const user = await prisma.user.findUnique({ where: { id: req.user!.id }, include: { role: true } });
     if (!user) throw new ApiError(404, "User not found");
     const permissions = await getEffectivePermissionMap(user.roleId, user.role.name);
-    res.json({ user: sanitizeUser(user), permissions, organization });
+    // Only used by the org-switch "remember this org" UI convenience flag (see
+    // appSettings.controller.ts switchOrganization) — irrelevant for non-System-Admin users, whose
+    // session simply never has these fields set.
+    const session = currentHash ? await prisma.refreshSession.findUnique({ where: { tokenHash: currentHash } }) : null;
+    res.json({
+      user: sanitizeUser(user),
+      permissions,
+      organization,
+      orgSwitchConfirmedOrgId: session?.orgSwitchConfirmedOrgId ?? null,
+      orgSwitchConfirmedUntil: session?.orgSwitchConfirmedUntil ?? null,
+    });
   });
 }
 
@@ -160,6 +179,41 @@ export async function changePassword(req: Request, res: Response) {
 
     await logAudit({ userId: user.id, action: "auth.change_password", entityType: "User", entityId: user.id });
     res.json({ ok: true });
+  });
+}
+
+// ───────────────────────── Login PIN ─────────────────────────
+
+export async function setPin(req: Request, res: Response) {
+  const { currentPassword, pin } = req.body;
+  await runWithTenant(homeSchemaFor(req), async () => {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user) throw new ApiError(404, "User not found");
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) throw new ApiError(400, "Current password is incorrect");
+
+    const pinHash = await bcrypt.hash(pin, 12);
+    await prisma.user.update({ where: { id: user.id }, data: { pinHash, pinEnabled: true } });
+
+    await logAudit({ userId: user.id, action: "auth.pin_set", entityType: "User", entityId: user.id });
+    res.json({ ok: true, pinEnabled: true });
+  });
+}
+
+export async function removePin(req: Request, res: Response) {
+  const { currentPassword } = req.body;
+  await runWithTenant(homeSchemaFor(req), async () => {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user) throw new ApiError(404, "User not found");
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) throw new ApiError(400, "Current password is incorrect");
+
+    await prisma.user.update({ where: { id: user.id }, data: { pinHash: null, pinEnabled: false } });
+
+    await logAudit({ userId: user.id, action: "auth.pin_removed", entityType: "User", entityId: user.id });
+    res.json({ ok: true, pinEnabled: false });
   });
 }
 

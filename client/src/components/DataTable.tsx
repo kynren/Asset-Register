@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import { ColumnDef, ColumnSizingState, SortingState, flexRender, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
+import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ColumnDef, ColumnSizingState, Row, SortingState, flexRender, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
 import { Icon } from "./Icon";
-import { SkeletonTableRows } from "./Skeleton";
+import { SkeletonCard, SkeletonTableRows } from "./Skeleton";
+import { useUserPreference } from "../hooks/useUserPreference";
 
 interface SelectionProps<T> {
   selectedIds: Set<number>;
   onSelectedIdsChange: (ids: Set<number>) => void;
   getRowId: (row: T) => number;
 }
+
+type ViewMode = "list" | "grid";
 
 interface DataTableProps<T> {
   columns: ColumnDef<T, any>[];
@@ -34,6 +37,16 @@ interface DataTableProps<T> {
   search?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
+  /**
+   * Unique id for this table instance — becomes the persisted preference key
+   * `dataTable.viewMode.${tableId}` so each user's grid/list choice survives reload and applies
+   * per-table (not globally). Required so the toggle can always persist somewhere sensible.
+   */
+  tableId: string;
+  /** Which view mode a user sees before they've ever chosen one for this table. Defaults to "grid". */
+  defaultViewMode?: ViewMode;
+  /** Bespoke card renderer for grid mode. Omit to fall back to an auto-generated card built from `columns`. */
+  renderCard?: (row: T, index: number) => ReactNode;
 }
 
 function getColumnRawValue<T>(row: T, col: ColumnDef<T, any>): unknown {
@@ -79,6 +92,9 @@ export function DataTable<T>({
   search: controlledSearch,
   onSearchChange,
   searchPlaceholder = "Search...",
+  tableId,
+  defaultViewMode = "grid",
+  renderCard,
 }: DataTableProps<T>) {
   const [clientPage, setClientPage] = useState(1);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -86,6 +102,7 @@ export function DataTable<T>({
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [showColumnFilters, setShowColumnFilters] = useState(false);
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+  const { value: viewMode, setValue: setViewMode } = useUserPreference<ViewMode>(`dataTable.viewMode.${tableId}`, defaultViewMode);
 
   const isServerPaginated = page !== undefined && totalPages !== undefined;
   // Every table paginates client-side at 10 rows by default unless the caller opts into
@@ -165,34 +182,54 @@ export function DataTable<T>({
 
   return (
     <div>
-      {(showSearch || showColumnFilterToggle) && (
-        <div className="row gap-2" style={{ marginBottom: 10, alignItems: "center" }}>
-          {showSearch && (
-            <div style={{ position: "relative", maxWidth: 280, flex: "0 1 280px" }}>
-              <span style={{ position: "absolute", left: 10, top: 9, color: "var(--color-text-muted)" }}>
-                <Icon name="search" size={14} />
-              </span>
-              <input
-                className="input"
-                style={{ paddingLeft: 30 }}
-                placeholder={searchPlaceholder}
-                value={searchValue}
-                onChange={(e) => handleSearchChange(e.target.value)}
-              />
-            </div>
-          )}
-          {showColumnFilterToggle && (
-            <button
-              type="button"
-              className={`btn btn-sm ${showColumnFilters ? "btn-primary" : "btn-secondary"}`}
-              onClick={() => setShowColumnFilters((v) => !v)}
-              title="Filter by column"
-            >
-              <Icon name="filter" size={13} /> Filters
-            </button>
-          )}
+      <div className="row gap-2" style={{ marginBottom: 10, alignItems: "center" }}>
+        {showSearch && (
+          <div style={{ position: "relative", maxWidth: 280, flex: "0 1 280px" }}>
+            <span style={{ position: "absolute", left: 10, top: 9, color: "var(--color-text-muted)" }}>
+              <Icon name="search" size={14} />
+            </span>
+            <input
+              className="input"
+              style={{ paddingLeft: 30 }}
+              placeholder={searchPlaceholder}
+              value={searchValue}
+              onChange={(e) => handleSearchChange(e.target.value)}
+            />
+          </div>
+        )}
+        {showColumnFilterToggle && (
+          <button
+            type="button"
+            className={`btn btn-sm ${showColumnFilters ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setShowColumnFilters((v) => !v)}
+            title="Filter by column"
+          >
+            <Icon name="filter" size={13} /> Filters
+          </button>
+        )}
+        <div className="flex-1" />
+        <div className="row gap-1">
+          <button
+            type="button"
+            className={`btn btn-sm btn-icon ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setViewMode("list")}
+            title="List view"
+          >
+            <Icon name="menu" size={13} />
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm btn-icon ${viewMode === "grid" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setViewMode("grid")}
+            title="Grid view"
+          >
+            <Icon name="grid" size={13} />
+          </button>
         </div>
-      )}
+      </div>
+      {viewMode === "grid" ? (
+        <GridView table={table} isLoading={isLoading} pagedData={pagedData} data={data} columns={columns} emptyMessage={emptyMessage} onRowClick={onRowClick} renderCard={renderCard} />
+      ) : (
       <div style={{ overflowX: "auto" }}>
         <table className="data-table">
           <thead>
@@ -316,6 +353,7 @@ export function DataTable<T>({
           </tbody>
         </table>
       </div>
+      )}
 
       {(isServerPaginated || isClientPaginated) && displayTotalPages > 1 && (
         <div className="pagination">
@@ -361,5 +399,87 @@ function PageJump({ page, totalPages, onChange }: { page: number; totalPages: nu
       />
       of {totalPages}
     </span>
+  );
+}
+
+// Grid-mode body for DataTable — reuses the same react-table row model list mode builds (no
+// second column-resolution path), rendering each row via the caller's `renderCard` or, when
+// omitted, an auto-generated card derived from the same `columns` already passed to the table.
+function GridView<T>({
+  table,
+  isLoading,
+  pagedData,
+  data,
+  columns,
+  emptyMessage,
+  onRowClick,
+  renderCard,
+}: {
+  table: ReturnType<typeof useReactTable<T>>;
+  isLoading?: boolean;
+  pagedData: T[];
+  data: T[];
+  columns: ColumnDef<T, any>[];
+  emptyMessage: string;
+  onRowClick?: (row: T) => void;
+  renderCard?: (row: T, index: number) => ReactNode;
+}) {
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-4" style={{ gap: 12 }}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
+    );
+  }
+  if (pagedData.length === 0) {
+    return <div className="empty-state">{data.length > 0 ? "No records match your search." : emptyMessage}</div>;
+  }
+  return (
+    <div className="grid grid-cols-4" style={{ gap: 12 }}>
+      {table.getRowModel().rows.map((row, i) =>
+        renderCard ? (
+          <div key={row.id}>{renderCard(row.original, i)}</div>
+        ) : (
+          <AutoCard key={row.id} row={row} columns={columns} onClick={onRowClick ? () => onRowClick(row.original) : undefined} />
+        )
+      )}
+    </div>
+  );
+}
+
+// Fallback grid card for tables that don't pass a bespoke `renderCard` — derives its layout from
+// the same columns already given to the table, so grid view works for every table with zero
+// per-page card component required. The column flagged `meta: { cardTitle: true }` (else the
+// first column) becomes the card title; an `id === "actions"` column (a convention already
+// consistent at every call site) becomes a compact action row instead of inline table buttons;
+// everything else renders as a stacked label:value list.
+function AutoCard<T>({ row, columns, onClick }: { row: Row<T>; columns: ColumnDef<T, any>[]; onClick?: () => void }) {
+  const cells = row.getVisibleCells();
+  const titleIndex = columns.findIndex((c) => (c as any).meta?.cardTitle);
+  const titleCell = cells[titleIndex >= 0 ? titleIndex : 0];
+  const actionsCell = cells.find((c) => c.column.id === "actions");
+  const bodyCells = cells.filter((c) => c.id !== titleCell?.id && c.column.id !== "actions");
+
+  return (
+    <div className="card" style={{ cursor: onClick ? "pointer" : undefined }} onClick={onClick}>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, gap: 8 }}>
+        <div style={{ fontWeight: 600 }}>{titleCell ? flexRender(titleCell.column.columnDef.cell, titleCell.getContext()) : null}</div>
+        {actionsCell && <div onClick={(e) => e.stopPropagation()}>{flexRender(actionsCell.column.columnDef.cell, actionsCell.getContext())}</div>}
+      </div>
+      <div className="stack gap-1">
+        {bodyCells.map((cell) => {
+          const header = cell.column.columnDef.header;
+          const label = typeof header === "string" && header ? header : undefined;
+          return (
+            <div key={cell.id} className="row gap-2" style={{ fontSize: 12, justifyContent: "space-between" }}>
+              {label && <span className="muted">{label}</span>}
+              <span>{flexRender(cell.column.columnDef.cell, cell.getContext())}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

@@ -302,7 +302,7 @@ export function DoorStatusTab() {
             Auto Update Record
           </label>
         </div>
-        <DataTable columns={eventColumns} data={events ?? []} clientPageSize={8} emptyMessage="No recent door events." />
+        <DataTable tableId="accessControl.doorEvents" defaultViewMode="list" columns={eventColumns} data={events ?? []} clientPageSize={8} emptyMessage="No recent door events." />
       </div>
 
       {activeDoor && (

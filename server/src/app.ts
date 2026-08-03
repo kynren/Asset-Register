@@ -68,6 +68,7 @@ export function createApp() {
   app.use("/uploads/avatars", express.static(path.join(__dirname, "..", "uploads", "avatars")));
   app.use("/uploads/assets", express.static(path.join(__dirname, "..", "uploads", "assets")));
   app.use("/uploads/email-templates", express.static(path.join(__dirname, "..", "uploads", "email-templates")));
+  app.use("/uploads/org-logos", express.static(path.join(__dirname, "..", "uploads", "org-logos")));
 
   app.use("/api/auth", authRoutes);
   app.use("/api/users", usersRoutes);

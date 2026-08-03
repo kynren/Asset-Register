@@ -188,7 +188,7 @@ export function DocsLibrary({ onOpen }: { onOpen: (id: number) => void }) {
           <div className="empty-state">No documents in this {activeCollection ? "collection" : "category"} yet.</div>
         ) : categoryView === "table" ? (
           <div className="card" style={{ marginTop: 12 }}>
-            <DataTable columns={columns} data={categoryDocs} onRowClick={(row) => onOpen(row.id)} />
+            <DataTable tableId="docs.library" defaultViewMode="list" columns={columns} data={categoryDocs} onRowClick={(row) => onOpen(row.id)} />
           </div>
         ) : (
           <div className="docs-recent-grid" style={{ marginTop: 12 }}>
