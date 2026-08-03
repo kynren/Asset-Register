@@ -8,8 +8,8 @@ export const createTicketSchema = z.object({
   categoryId: z.number().int().nullable().optional(),
   assetId: z.number().int().nullable().optional(),
   locationId: z.number().int().nullable().optional(),
-  assigneeId: z.number().int().nullable().optional(),
-  assignedTeamId: z.number().int().nullable().optional(),
+  assigneeIds: z.array(z.number().int()).optional(),
+  assignedTeamIds: z.array(z.number().int()).optional(),
   dueAt: z.coerce.date().nullable().optional(),
 });
 
@@ -21,8 +21,8 @@ export const updateTicketSchema = z.object({
   categoryId: z.number().int().nullable().optional(),
   assetId: z.number().int().nullable().optional(),
   locationId: z.number().int().nullable().optional(),
-  assigneeId: z.number().int().nullable().optional(),
-  assignedTeamId: z.number().int().nullable().optional(),
+  assigneeIds: z.array(z.number().int()).optional(),
+  assignedTeamIds: z.array(z.number().int()).optional(),
   dueAt: z.coerce.date().nullable().optional(),
 });
 

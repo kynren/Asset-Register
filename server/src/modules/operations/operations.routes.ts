@@ -84,7 +84,7 @@ router.get("/reports/:type", requirePermission("operations", "export"), async (r
     columns = ["sku", "name", "quantityOnHand", "reorderLevel", "unit"];
     rows = items.map((i) => ({ sku: i.sku, name: i.name, quantityOnHand: i.quantityOnHand, reorderLevel: i.reorderLevel, unit: i.unit }));
   } else if (type === "tickets") {
-    const tickets = await prisma.ticket.findMany({ include: { requester: true, assignee: true } });
+    const tickets = await prisma.ticket.findMany({ include: { requester: true, assignees: { include: { user: true } } } });
     title = "Helpdesk Ticket Report";
     columns = ["ticketNumber", "title", "status", "priority", "requester", "assignee"];
     rows = tickets.map((t) => ({
@@ -93,7 +93,7 @@ router.get("/reports/:type", requirePermission("operations", "export"), async (r
       status: t.status,
       priority: t.priority,
       requester: `${t.requester.firstName} ${t.requester.lastName}`,
-      assignee: t.assignee ? `${t.assignee.firstName} ${t.assignee.lastName}` : "",
+      assignee: t.assignees.map((a) => `${a.user.firstName} ${a.user.lastName}`).join(", "),
     }));
   } else {
     return res.status(400).json({ error: "Unknown report type" });

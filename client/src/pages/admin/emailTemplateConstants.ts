@@ -1,6 +1,6 @@
-export type EmailEventType = "ACCOUNT_CREATED" | "ASSET_ASSIGNED" | "PASSWORD_RESET" | "TASK_OVERDUE" | "LOW_STOCK" | "MAGIC_LOGIN_LINK";
+export type EmailEventType = "ACCOUNT_CREATED" | "ASSET_ASSIGNED" | "PASSWORD_RESET" | "TASK_OVERDUE" | "LOW_STOCK" | "MAGIC_LOGIN_LINK" | "TICKET_ASSIGNED";
 
-export const EVENT_TYPES: EmailEventType[] = ["ACCOUNT_CREATED", "ASSET_ASSIGNED", "PASSWORD_RESET", "TASK_OVERDUE", "LOW_STOCK", "MAGIC_LOGIN_LINK"];
+export const EVENT_TYPES: EmailEventType[] = ["ACCOUNT_CREATED", "ASSET_ASSIGNED", "PASSWORD_RESET", "TASK_OVERDUE", "LOW_STOCK", "MAGIC_LOGIN_LINK", "TICKET_ASSIGNED"];
 
 export const EVENT_LABELS: Record<EmailEventType, string> = {
   ACCOUNT_CREATED: "Account Created",
@@ -9,6 +9,7 @@ export const EVENT_LABELS: Record<EmailEventType, string> = {
   TASK_OVERDUE: "Overdue Task",
   LOW_STOCK: "Low Stock",
   MAGIC_LOGIN_LINK: "Magic Login Link",
+  TICKET_ASSIGNED: "Ticket Assigned",
 };
 
 export const EVENT_DESCRIPTIONS: Record<EmailEventType, string> = {
@@ -18,6 +19,7 @@ export const EVENT_DESCRIPTIONS: Record<EmailEventType, string> = {
   TASK_OVERDUE: "Sent when an asset checkout, helpdesk ticket, IT project task, or asset maintenance date is overdue.",
   LOW_STOCK: "Sent to stock managers when an item drops to or below its reorder level.",
   MAGIC_LOGIN_LINK: "Sent when an admin sends a one-time login link to a user from their User Detail page.",
+  TICKET_ASSIGNED: "Sent to a user (or every member of a team) when a helpdesk ticket is assigned to them.",
 };
 
 // Merge fields available to {{token}} interpolation per event — shown as a picker in the
@@ -29,6 +31,7 @@ export const EVENT_VARIABLES: Record<EmailEventType, string[]> = {
   TASK_OVERDUE: ["firstName", "taskType", "taskName", "dueDate", "taskUrl"],
   LOW_STOCK: ["itemName", "quantityOnHand", "reorderLevel", "stockUrl"],
   MAGIC_LOGIN_LINK: ["firstName", "magicUrl"],
+  TICKET_ASSIGNED: ["firstName", "ticketNumber", "ticketTitle", "priority", "ticketUrl"],
 };
 
 // Mirrors the server's SAMPLE_VARIABLES (server/src/modules/emailTemplates/emailTemplates.controller.ts)
@@ -40,6 +43,7 @@ export const SAMPLE_VARIABLES: Record<EmailEventType, Record<string, string>> = 
   TASK_OVERDUE: { firstName: "Jordan", taskType: "Asset Checkout", taskName: "Dell Latitude 5440 (KYN-0142)", dueDate: "12 Jul 2026", taskUrl: "https://app-assets.kynren.com/assets/142" },
   LOW_STOCK: { itemName: "HDMI Cable 2m", quantityOnHand: "3", reorderLevel: "10", stockUrl: "https://app-assets.kynren.com/stock" },
   MAGIC_LOGIN_LINK: { firstName: "Jordan", magicUrl: "https://app-assets.kynren.com/magic-login/sample-token" },
+  TICKET_ASSIGNED: { firstName: "Jordan", ticketNumber: "TCK-00142", ticketTitle: "Printer on 3rd floor not responding", priority: "HIGH", ticketUrl: "https://app-assets.kynren.com/helpdesk/142" },
 };
 
 export type EmailBlock =

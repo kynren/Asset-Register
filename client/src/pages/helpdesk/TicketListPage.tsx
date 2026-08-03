@@ -55,7 +55,13 @@ export function TicketListPage() {
     { header: "Requester", accessorFn: (row) => `${row.requester.firstName} ${row.requester.lastName}` },
     {
       header: "Assignee",
-      accessorFn: (row) => (row.assignedTeam ? row.assignedTeam.name : row.assignee ? `${row.assignee.firstName} ${row.assignee.lastName}` : "Unassigned"),
+      accessorFn: (row) => {
+        const names = [
+          ...(row.assignees ?? []).map((a: any) => `${a.user.firstName} ${a.user.lastName}`),
+          ...(row.assignedTeams ?? []).map((t: any) => t.team.name),
+        ];
+        return names.length ? names.join(", ") : "Unassigned";
+      },
     },
     {
       header: "Due",
