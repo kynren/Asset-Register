@@ -12,6 +12,8 @@ import { DocumentFormModal } from "./DocumentFormModal";
 import { DocsLibrary } from "./DocsLibrary";
 import { DocBookCard } from "./DocBookCard";
 import { CollectionsManageModal, DocCollectionItem } from "./CollectionsManageModal";
+import { ModuleDashboardTab } from "../dashboard/ModuleDashboardTab";
+import { DOCS_WIDGET_CATALOG, DEFAULT_DOCS_DASHBOARD_LAYOUT } from "./docsDashboardWidgets";
 
 interface DocListItem {
   id: number;
@@ -36,7 +38,7 @@ export function DocsListPage() {
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [showManageCollections, setShowManageCollections] = useState(false);
-  const [view, setView] = useState<"library" | "table">("library");
+  const [view, setView] = useState<"library" | "table" | "dashboard">("dashboard");
   const navigate = useNavigate();
 
   const { data: collections } = useQuery({
@@ -123,6 +125,9 @@ export function DocsListPage() {
           <Icon name="layers" size={13} /> Collections
         </button>
         <div className="docs-view-toggle">
+          <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}>
+            <Icon name="gauge" size={13} /> Dashboard
+          </button>
           <button className={view === "library" ? "active" : ""} onClick={() => setView("library")}>
             <Icon name="book" size={13} /> Library
           </button>
@@ -131,6 +136,16 @@ export function DocsListPage() {
           </button>
         </div>
       </div>
+
+      {view === "dashboard" && (
+        <ModuleDashboardTab
+          module="docs"
+          catalog={DOCS_WIDGET_CATALOG}
+          defaultLayout={DEFAULT_DOCS_DASHBOARD_LAYOUT}
+          title="Docs & SOPs"
+          showHeader={false}
+        />
+      )}
 
       {showShelves && <DocsLibrary onOpen={(id) => navigate(`/docs/${id}`)} />}
 

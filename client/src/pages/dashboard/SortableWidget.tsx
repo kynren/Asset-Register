@@ -8,12 +8,18 @@ export function SortableWidget({
   cols,
   onExpandToggle,
   onRemove,
+  onConfigure,
+  configureActive,
   children,
 }: {
   id: string;
   cols: number;
   onExpandToggle: () => void;
   onRemove: () => void;
+  /** Opens this widget's filter/query config — omitted for widgets that don't support it. */
+  onConfigure?: () => void;
+  /** Highlights the configure icon when the widget currently has non-default filters applied. */
+  configureActive?: boolean;
   children: ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -32,6 +38,15 @@ export function SortableWidget({
           <Icon name="grid" size={13} />
         </button>
         <div className="row gap-1">
+          {onConfigure && (
+            <button
+              className={`btn btn-sm btn-icon ${configureActive ? "btn-primary" : "btn-secondary"}`}
+              onClick={onConfigure}
+              title="Configure filters"
+            >
+              <Icon name="filter" size={12} />
+            </button>
+          )}
           <button className="btn btn-secondary btn-sm btn-icon" onClick={onExpandToggle} title="Toggle size">
             <Icon name={cols >= 4 ? "zoomOut" : "zoomIn"} size={12} />
           </button>

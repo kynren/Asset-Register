@@ -7,12 +7,14 @@ import { CategoriesLocationsTab } from "./CategoriesLocationsTab";
 import { AuditLogTab } from "./AuditLogTab";
 import { EmailTemplatesTab } from "./EmailTemplatesTab";
 import { ToastSettingsTab } from "./ToastSettingsTab";
+import { HelpdeskConfigTab } from "./HelpdeskConfigTab";
 
 const TABS = [
   { key: "users", label: "Users" },
   { key: "roles", label: "Roles & Permissions" },
   { key: "teams", label: "Teams" },
   { key: "catalog", label: "Categories & Locations" },
+  { key: "helpdesk-config", label: "Helpdesk Config" },
   { key: "email-ingest", label: "Email Ingestion" },
   { key: "email-templates", label: "Email Templates" },
   { key: "toasts", label: "Toast Designer" },
@@ -47,6 +49,7 @@ export function AdminPage() {
       {tab === "roles" && <RolesTab />}
       {tab === "teams" && <TeamsTab />}
       {tab === "catalog" && <CategoriesLocationsTab />}
+      {tab === "helpdesk-config" && <HelpdeskConfigTab />}
       {tab === "email-ingest" && <EmailIngestSettingsTab />}
       {tab === "email-templates" && <EmailTemplatesTab />}
       {tab === "toasts" && <ToastSettingsTab />}

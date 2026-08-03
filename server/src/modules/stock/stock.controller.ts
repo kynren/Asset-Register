@@ -190,6 +190,29 @@ export async function lowStock(_req: Request, res: Response) {
   res.json(items.filter((i) => i.quantityOnHand <= i.reorderLevel));
 }
 
+export async function stats(req: Request, res: Response) {
+  const { category } = req.query as Record<string, string | undefined>;
+  const items = await prisma.stockItem.findMany({ where: category ? { category } : undefined });
+  const totalItems = items.length;
+  const totalOnHand = items.reduce((sum, i) => sum + i.quantityOnHand, 0);
+  const totalValue = items.reduce((sum, i) => sum + i.quantityOnHand * Number(i.unitCost ?? 0), 0);
+  const lowStockCount = items.filter((i) => i.quantityOnHand <= i.reorderLevel).length;
+
+  const byCategory = new Map<string, number>();
+  for (const i of items) {
+    const key = i.category ?? "Uncategorized";
+    byCategory.set(key, (byCategory.get(key) ?? 0) + 1);
+  }
+
+  res.json({
+    totalItems,
+    totalOnHand,
+    totalValue,
+    lowStockCount,
+    byCategory: [...byCategory.entries()].map(([category, count]) => ({ category, count })),
+  });
+}
+
 export async function analytics(_req: Request, res: Response) {
   const transactions = await prisma.stockTransaction.findMany({
     include: { stockItem: { select: { name: true } } },

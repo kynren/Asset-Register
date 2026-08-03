@@ -70,8 +70,9 @@ model User {
   networkScans      NetworkScan[]
   vaultEntries      VaultEntry[]
   images            UserImage[]
-  dashboardLayout   DashboardLayout?
-  preferences       UserPreference[]
+  dashboardsOwned         Dashboard[]      @relation("DashboardOwner")
+  dashboardSharesReceived DashboardShare[] @relation("DashboardShareUser")
+  preferences             UserPreference[]
   mcpApiKeys        McpApiKey[]
 
   projectCardsAssigned ProjectCard[]      @relation("ProjectCardAssignee")
@@ -102,6 +103,15 @@ model User {
   emailIngestFallbackFor        EmailIngestSettings[]
   systemStatusSettingsUpdates   SystemStatusSettings[]
   notificationPreferences       NotificationPreference[]
+
+  ticketTasksAssigned      TicketTask[]      @relation("TicketTaskAssignee")
+  ticketTasksAuthored      TicketTask[]      @relation("TicketTaskAuthor")
+  ticketSolutionsAuthored  TicketSolution[]  @relation("TicketSolutionAuthor")
+  ticketSolutionsAnswered  TicketSolution[]  @relation("TicketSolutionAnswerer")
+  ticketApprovalsRequested TicketApproval[]  @relation("TicketApprovalRequester")
+  ticketApprovalsTargeted  TicketApproval[]  @relation("TicketApprovalTargetUser")
+  ticketApprovalsAnswered  TicketApproval[]  @relation("TicketApprovalAnswerer")
+  ticketRecurrencesOwned   TicketRecurrence[] @relation("TicketRecurrenceRequester")
 }
 
 model RefreshSession {
@@ -176,12 +186,47 @@ model VaultEntry {
   updatedAt         DateTime @updatedAt
 }
 
-model DashboardLayout {
+// A named, per-module widget dashboard. "home" is the original whole-app Dashboard; other modules
+// are the per-page dashboards (assets, helpdesk, stock, network, docs). A user can own any number
+// of dashboards per module (switchable via a picker on that page) — this superseded the older
+// one-row-per-(user,module) DashboardLayout once dashboards needed names and sharing.
+model Dashboard {
   id         Int      @id @default(autoincrement())
-  userId     Int      @unique
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  module     String   @default("home")
+  ownerId    Int
+  owner      User     @relation("DashboardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   layoutJson Json
+  // The dashboard that opens by default when the owner visits that module's page — exactly one
+  // per (ownerId, module) is enforced in application code (Prisma partial-unique-index support is
+  // provider-limited, so this is checked the same way other single-default-per-scope flags in this
+  // codebase are).
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  shares DashboardShare[]
+
+  @@index([ownerId, module])
+}
+
+// Grants a specific user or a whole team access to someone else's Dashboard. Exactly one of
+// sharedWithUserId/sharedWithTeamId is set (enforced in dashboards.schema.ts, mirroring how other
+// either/or relations in this schema are validated at the API layer rather than via DB check
+// constraints). canEdit is chosen per-share by the owner at share time.
+model DashboardShare {
+  id               Int       @id @default(autoincrement())
+  dashboardId      Int
+  dashboard        Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  sharedWithUserId Int?
+  sharedWithUser   User?     @relation("DashboardShareUser", fields: [sharedWithUserId], references: [id], onDelete: Cascade)
+  sharedWithTeamId Int?
+  sharedWithTeam   Team?     @relation(fields: [sharedWithTeamId], references: [id], onDelete: Cascade)
+  canEdit          Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+
+  @@unique([dashboardId, sharedWithUserId])
+  @@unique([dashboardId, sharedWithTeamId])
 }
 
 // Generic per-user UI-state store (grid layouts, panel selections, collapsed states, etc.) so
@@ -902,6 +947,7 @@ model PurchaseOrderItem {
 enum TicketStatus {
   OPEN
   IN_PROGRESS
+  PENDING
   RESOLVED
   CLOSED
 }
@@ -918,9 +964,69 @@ enum TicketType {
   INFORMATION
 }
 
+// The ITIL object type a ticket represents — reuses the entire ticket infrastructure (tasks,
+// solutions, comments, assignees, approvals) for all four instead of GLPI's approach of
+// triplicating Ticket/Problem/Change into separate classes. PROBLEM/CHANGE tickets relate to the
+// INCIDENT/REQUEST tickets they aggregate or resolve via TicketLink rather than a bespoke schema.
+enum TicketItilType {
+  INCIDENT
+  REQUEST
+  PROBLEM
+  CHANGE
+}
+
+enum PlanningState {
+  TODO
+  DONE
+}
+
+enum SolutionStatus {
+  WAITING
+  ACCEPTED
+  REFUSED
+}
+
+enum ApprovalStatus {
+  WAITING
+  ACCEPTED
+  REFUSED
+}
+
+enum TicketLinkType {
+  RELATES_TO
+  CAUSES
+  CAUSED_BY
+  DUPLICATES
+}
+
+enum TemplateFieldMode {
+  HIDDEN
+  MANDATORY
+  READONLY
+  PREDEFINED
+}
+
+// Global config for the satisfaction-survey sampling/delay/throttle cron and the solution
+// autoclose delay — the singleton-row pattern already used by EmailIngestSettings.
+model HelpdeskSettings {
+  id                      Int      @id @default(1)
+  surveySampleRatePercent Int      @default(100)
+  surveyDelayDays         Int      @default(1)
+  surveyExpireDays        Int      @default(30)
+  autoCloseDelayDays      Int      @default(4)
+  updatedAt               DateTime @updatedAt
+}
+
 model TicketCategory {
   id                 Int                   @id @default(autoincrement())
   name               String                @unique
+  parentId           Int?
+  parent             TicketCategory?       @relation("TicketCategoryTree", fields: [parentId], references: [id])
+  children           TicketCategory[]      @relation("TicketCategoryTree")
+  defaultTemplateId  Int?
+  defaultTemplate    TicketTemplate?       @relation("CategoryDefaultTemplate", fields: [defaultTemplateId], references: [id])
+  defaultSlaId       Int?
+  defaultSla         TicketSla?            @relation(fields: [defaultSlaId], references: [id])
   tickets            Ticket[]
   emailIngestDefault EmailIngestSettings[]
 }
@@ -930,6 +1036,8 @@ model Team {
   name              String               @unique
   members           TeamMember[]
   ticketAssignments TicketAssignedTeam[]
+  ticketApprovals   TicketApproval[]
+  dashboardShares   DashboardShare[]
   createdAt         DateTime             @default(now())
 }
 
@@ -967,10 +1075,13 @@ model Ticket {
   title               String
   description         String
   type                TicketType         @default(ACTION)
+  itilType            TicketItilType     @default(INCIDENT)
   status              TicketStatus       @default(OPEN)
   priority            TicketPriority     @default(MEDIUM)
   categoryId          Int?
   category            TicketCategory?    @relation(fields: [categoryId], references: [id])
+  templateId          Int?
+  template            TicketTemplate?    @relation(fields: [templateId], references: [id])
   assetId             Int?
   asset               Asset?             @relation(fields: [assetId], references: [id])
   locationId          Int?
@@ -980,11 +1091,26 @@ model Ticket {
   assignees           TicketAssignee[]
   assignedTeams       TicketAssignedTeam[]
   dueAt               DateTime?
+  // SLA — a simplified, calendar-time (not business-hours-aware) version of GLPI's TTO/TTR split.
+  slaId               Int?
+  sla                 TicketSla?         @relation(fields: [slaId], references: [id])
+  ttoDueAt            DateTime?
+  ttrDueAt            DateTime?
+  ttoMetAt            DateTime?
+  ttrMetAt            DateTime?
   satisfactionRating  Int?
   satisfactionComment String?
+  satisfactionAskedAt DateTime?
   comments            TicketComment[]
   attachments         TicketAttachment[]
   watchers            TicketWatcher[]
+  tasks               TicketTask[]
+  solutions           TicketSolution[]
+  approvals           TicketApproval[]
+  knowledgeArticles   TicketKnowledgeArticle[]
+  linksFrom           TicketLink[]       @relation("TicketLinkFrom")
+  linksTo             TicketLink[]       @relation("TicketLinkTo")
+  recurrenceSpawns    TicketRecurrence[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
   resolvedAt          DateTime?
@@ -1044,6 +1170,172 @@ model TicketAssignedTeam {
   team     Team   @relation(fields: [teamId], references: [id])
 
   @@unique([ticketId, teamId])
+}
+
+// A technician's time-tracked unit of work on a ticket — separate from TicketComment, which is
+// just a timeline note. `actionTimeSeconds` feeds cost/effort reporting; `begin`/`end` are what a
+// future Planning/calendar view would read.
+model TicketTask {
+  id                Int           @id @default(autoincrement())
+  ticketId          Int
+  ticket            Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  content           String
+  category          String?
+  actionTimeSeconds Int           @default(0)
+  begin             DateTime?
+  end               DateTime?
+  state             PlanningState @default(TODO)
+  assignedToId      Int?
+  assignedTo        User?         @relation("TicketTaskAssignee", fields: [assignedToId], references: [id])
+  authorId          Int
+  author            User          @relation("TicketTaskAuthor", fields: [authorId], references: [id])
+  isPrivate         Boolean       @default(false)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+// A proposed fix for the ticket, distinct from a plain comment — carries its own accept/refuse
+// workflow (see tickets.controller.ts's solution handlers). Multiple rows can exist per ticket if
+// an earlier solution gets refused and a new one is proposed.
+model TicketSolution {
+  id            Int            @id @default(autoincrement())
+  ticketId      Int
+  ticket        Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  content       String
+  authorId      Int
+  author        User           @relation("TicketSolutionAuthor", fields: [authorId], references: [id])
+  status        SolutionStatus @default(WAITING)
+  answeredById  Int?
+  answeredBy    User?          @relation("TicketSolutionAnswerer", fields: [answeredById], references: [id])
+  answerComment String?
+  answeredAt    DateTime?
+  createdAt     DateTime       @default(now())
+}
+
+// A reusable ticket "shape" — predefined/hidden/mandatory/readonly per-field control, mirroring
+// GLPI's flat (not rule-based) template model. `fields` holds one row per controlled fieldKey.
+model TicketTemplate {
+  id          Int                   @id @default(autoincrement())
+  name        String                @unique
+  itilType    TicketItilType        @default(INCIDENT)
+  isDefault   Boolean               @default(false)
+  fields      TicketTemplateField[]
+  categories  TicketCategory[]      @relation("CategoryDefaultTemplate")
+  recurrences TicketRecurrence[]
+  tickets     Ticket[]
+  createdAt   DateTime              @default(now())
+}
+
+// fieldKey is a client-known identifier (e.g. "title", "priority", "categoryId", "assetId",
+// "locationId", "description") — not FK-validated here, same convention as
+// assetTableColumns.ts's field-key registry on the client.
+model TicketTemplateField {
+  id              Int               @id @default(autoincrement())
+  templateId      Int
+  template        TicketTemplate    @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  fieldKey        String
+  mode            TemplateFieldMode
+  predefinedValue String?
+
+  @@unique([templateId, fieldKey, mode])
+}
+
+// Simplified SLA/OLA: a flat TTO (time-to-own/first-response)/TTR (time-to-resolve) minute pair
+// computed as a plain offset from ticket creation — not GLPI's working-hours-calendar-aware due
+// date math, a deliberate scope cut (see the GLPI-parity research summary).
+model TicketSla {
+  id         Int              @id @default(autoincrement())
+  name       String           @unique
+  ttoMinutes Int?
+  ttrMinutes Int
+  categories TicketCategory[]
+  tickets    Ticket[]
+  createdAt  DateTime         @default(now())
+}
+
+// Stamps out a new Ticket from `template` every `periodicityDays`, `createBeforeDays` ahead of
+// the actual due occurrence — a day-granularity simplification of GLPI's calendar-aware
+// recurrence engine.
+model TicketRecurrence {
+  id                  Int            @id @default(autoincrement())
+  name                String
+  templateId          Int
+  template            TicketTemplate @relation(fields: [templateId], references: [id])
+  // Auto-created tickets need a requester — set once from whoever creates the recurrence rule
+  // (server-assigned, not client-editable), not a per-run choice.
+  requesterId         Int
+  requester           User           @relation("TicketRecurrenceRequester", fields: [requesterId], references: [id])
+  periodicityDays     Int
+  createBeforeDays    Int            @default(0)
+  nextCreationAt      DateTime
+  endDate             DateTime?
+  isActive            Boolean        @default(true)
+  lastCreatedTicketId Int?
+  lastCreatedTicket   Ticket?        @relation(fields: [lastCreatedTicketId], references: [id])
+  createdAt           DateTime       @default(now())
+}
+
+// A generic condition-list -> action-list rule evaluated synchronously against every new ticket
+// (see tickets.controller.ts's create handler) — a JSON-based simplification of GLPI's
+// Rule/RuleCriteria/RuleAction class hierarchy. conditions: [{field,operator,value}], actions:
+// [{field,value}].
+model TicketRule {
+  id         Int      @id @default(autoincrement())
+  name       String
+  isActive   Boolean  @default(true)
+  order      Int      @default(0)
+  conditions Json
+  actions    Json
+  createdAt  DateTime @default(now())
+}
+
+// Relates two tickets — e.g. a PROBLEM aggregating several INCIDENTs, or a CHANGE resolving a
+// PROBLEM. Directional (ticketId -> linkedTicketId) with a typed relationship.
+model TicketLink {
+  id             Int            @id @default(autoincrement())
+  ticketId       Int
+  ticket         Ticket         @relation("TicketLinkFrom", fields: [ticketId], references: [id], onDelete: Cascade)
+  linkedTicketId Int
+  linkedTicket   Ticket         @relation("TicketLinkTo", fields: [linkedTicketId], references: [id], onDelete: Cascade)
+  linkType       TicketLinkType @default(RELATES_TO)
+  createdAt      DateTime       @default(now())
+
+  @@unique([ticketId, linkedTicketId])
+}
+
+// A request for a user or a team to accept/refuse a ticket — addressed to exactly one of
+// targetUser/targetTeam. Aggregate approval status is derived (any WAITING/REFUSED blocks) rather
+// than GLPI 11's multi-step ValidationStep sequencing, a deliberate scope cut.
+model TicketApproval {
+  id            Int            @id @default(autoincrement())
+  ticketId      Int
+  ticket        Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  requestedById Int
+  requestedBy   User           @relation("TicketApprovalRequester", fields: [requestedById], references: [id])
+  targetUserId  Int?
+  targetUser    User?          @relation("TicketApprovalTargetUser", fields: [targetUserId], references: [id])
+  targetTeamId  Int?
+  targetTeam    Team?          @relation(fields: [targetTeamId], references: [id])
+  status        ApprovalStatus @default(WAITING)
+  comment       String?
+  answeredById  Int?
+  answeredBy    User?          @relation("TicketApprovalAnswerer", fields: [answeredById], references: [id])
+  answerComment String?
+  answeredAt    DateTime?
+  createdAt     DateTime       @default(now())
+}
+
+// Attaches an existing Knowledge Base article to a ticket (suggested reading / documented fix) —
+// a simple many-to-many, unlike GLPI's fully generic polymorphic itemtype/items_id join.
+model TicketKnowledgeArticle {
+  id        Int              @id @default(autoincrement())
+  ticketId  Int
+  ticket    Ticket           @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  articleId Int
+  article   KnowledgeArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+
+  @@unique([ticketId, articleId])
 }
 
 // ───────────────────────── NVR / Cameras ─────────────────────────
@@ -1747,14 +2039,15 @@ model RssFeedSource {
 }
 
 model KnowledgeArticle {
-  id          Int      @id @default(autoincrement())
-  title       String
-  content     String
-  category    String?
-  createdById Int
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             Int                      @id @default(autoincrement())
+  title          String
+  content        String
+  category       String?
+  createdById    Int
+  createdBy      User                     @relation(fields: [createdById], references: [id])
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  ticketArticles TicketKnowledgeArticle[]
 }
 
 model AssetBooking {

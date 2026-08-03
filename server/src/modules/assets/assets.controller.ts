@@ -72,11 +72,19 @@ export async function getByTag(req: Request, res: Response) {
   res.json(asset);
 }
 
-export async function stats(_req: Request, res: Response) {
-  const [total, byCategory, categories] = await Promise.all([
-    prisma.asset.count(),
-    prisma.asset.groupBy({ by: ["categoryId"], _count: { _all: true } }),
+export async function stats(req: Request, res: Response) {
+  const { categoryId, status, locationId, assignedToId } = req.query as Record<string, string | undefined>;
+  const where = {
+    ...(categoryId ? { categoryId: Number(categoryId) } : {}),
+    ...(status ? { status: status as any } : {}),
+    ...(locationId ? { locationId: Number(locationId) } : {}),
+    ...(assignedToId ? { assignedToId: Number(assignedToId) } : {}),
+  };
+  const [total, byCategory, categories, byStatus] = await Promise.all([
+    prisma.asset.count({ where }),
+    prisma.asset.groupBy({ by: ["categoryId"], where, _count: { _all: true } }),
     prisma.assetCategory.findMany(),
+    prisma.asset.groupBy({ by: ["status"], where, _count: { _all: true } }),
   ]);
 
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
@@ -87,6 +95,7 @@ export async function stats(_req: Request, res: Response) {
       name: g.categoryId ? categoryMap.get(g.categoryId) ?? "Unknown" : "Uncategorized",
       count: g._count._all,
     })),
+    byStatus: byStatus.map((g) => ({ status: g.status, count: g._count._all })),
   });
 }
 

@@ -24,6 +24,7 @@ router.use(verifyJwt);
 
 router.get("/", requirePermission("docs", "view"), controller.list);
 router.get("/categories", requirePermission("docs", "view"), controller.categories);
+router.get("/stats", requirePermission("docs", "view"), controller.stats);
 router.get("/library", requirePermission("docs", "view"), controller.libraryFeed);
 
 router.get("/collections", requirePermission("docs", "view"), controller.listCollections);

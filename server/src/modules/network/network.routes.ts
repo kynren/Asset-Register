@@ -324,6 +324,35 @@ router.get("/monitor/devices", requirePermission("network", "view"), async (_req
   res.json(devices.map(shapeMonitoredDevice));
 });
 
+// Aggregate counts for the Network dashboard tab — the continuously-monitored (SNMP/ping) device
+// set and the agent-reported (Device table, has its own lastSeen heartbeat) set are two distinct
+// device concepts in this app (see MonitoredNetworkDevice vs Device models); both are surfaced
+// here rather than picking one, since either can be "the" device list depending on how a site is
+// set up (agent-only, monitor-only, or both).
+router.get("/monitor/summary", requirePermission("network", "view"), async (req, res) => {
+  const { deviceType, vendor } = req.query as Record<string, string | undefined>;
+  const where = {
+    ...(deviceType ? { deviceType } : {}),
+    ...(vendor ? { vendor } : {}),
+  };
+  const [byStatus, agentDevices, subnetCount] = await Promise.all([
+    prisma.monitoredNetworkDevice.groupBy({ by: ["status"], where, _count: { _all: true } }),
+    prisma.device.findMany({ select: { lastSeen: true } }),
+    prisma.relayDiscoveredSubnet.count(),
+  ]);
+
+  const cutoff = Date.now() - 15 * 60 * 1000;
+  const agentOnline = agentDevices.filter((d) => d.lastSeen.getTime() >= cutoff).length;
+  const online = byStatus.find((g) => g.status === "ONLINE")?._count._all ?? 0;
+  const offline = byStatus.find((g) => g.status === "OFFLINE")?._count._all ?? 0;
+
+  res.json({
+    monitored: { total: online + offline, online, offline },
+    agent: { total: agentDevices.length, online: agentOnline, offline: agentDevices.length - agentOnline },
+    subnetCount,
+  });
+});
+
 router.post(
   "/monitor/devices/:id/snmp",
   requirePermission("network", "edit"),

@@ -19,10 +19,13 @@ import { AssetCollectionsManageModal } from "./AssetCollectionsManageModal";
 import { AddAssetCategoryModal } from "./AddAssetCategoryModal";
 import { Asset } from "./assetTypes";
 import { buildAssetColumnDefs, STATUS_OPTIONS } from "./assetColumnBuilder";
+import { ModuleDashboardTab } from "../dashboard/ModuleDashboardTab";
+import { ASSETS_WIDGET_CATALOG, DEFAULT_ASSETS_DASHBOARD_LAYOUT } from "./assetsDashboardWidgets";
 
 export type { Asset };
 
 export function AssetListPage() {
+  const [view, setView] = useState<"inventory" | "dashboard">("dashboard");
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [status, setStatus] = useState(searchParams.get("status") ?? "");
@@ -168,6 +171,15 @@ export function AssetListPage() {
           <h1 className="page-title">Asset Inventory</h1>
           <p className="page-subtitle">Track and manage all Kynren IT and physical assets.</p>
         </div>
+        <div className="row gap-2">
+          <div className="docs-view-toggle">
+            <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}>
+              <Icon name="gauge" size={13} /> Dashboard
+            </button>
+            <button className={view === "inventory" ? "active" : ""} onClick={() => setView("inventory")}>
+              <Icon name="grid" size={13} /> Inventory
+            </button>
+          </div>
         <PermissionGate module="assets" action="create">
           <button
             className="btn btn-primary"
@@ -199,8 +211,19 @@ export function AssetListPage() {
               : "Add Asset"}
           </button>
         </PermissionGate>
+        </div>
       </div>
 
+      {view === "dashboard" ? (
+        <ModuleDashboardTab
+          module="assets"
+          catalog={ASSETS_WIDGET_CATALOG}
+          defaultLayout={DEFAULT_ASSETS_DASHBOARD_LAYOUT}
+          title="Asset Inventory"
+          showHeader={false}
+        />
+      ) : (
+      <>
       <CategoryTabBar categories={collectionTabs} active={activeCollection} onSelect={selectCollection} allCount={collectionTabs.length} />
 
       <div className="row gap-2 flex-wrap" style={{ marginTop: 16, marginBottom: 14, paddingBottom: 30 }}>
@@ -292,6 +315,8 @@ export function AssetListPage() {
           />
         ))}
       </div>
+      </>
+      )}
 
       {showCategoryPicker && (
         <AddAssetCategoryModal

@@ -10,20 +10,32 @@ import { ApiError } from "../../middleware/errorHandler";
 const router = Router();
 router.use(verifyJwt);
 
-const schema = z.object({ name: z.string().min(1) });
+const schema = z.object({
+  name: z.string().min(1),
+  parentId: z.number().int().nullable().optional(),
+  defaultTemplateId: z.number().int().nullable().optional(),
+  defaultSlaId: z.number().int().nullable().optional(),
+});
+
+const include = {
+  parent: { select: { id: true, name: true } },
+  children: { select: { id: true, name: true } },
+  defaultTemplate: { select: { id: true, name: true } },
+  defaultSla: { select: { id: true, name: true } },
+};
 
 router.get("/", requirePermission("helpdesk", "view"), async (_req, res) => {
-  res.json(await prisma.ticketCategory.findMany({ orderBy: { name: "asc" } }));
+  res.json(await prisma.ticketCategory.findMany({ include, orderBy: { name: "asc" } }));
 });
 
 router.post("/", requirePermission("admin", "create"), validateBody(schema), async (req, res) => {
-  const category = await prisma.ticketCategory.create({ data: req.body });
+  const category = await prisma.ticketCategory.create({ data: req.body, include });
   await logAudit({ userId: req.user!.id, action: "ticketCategory.create", entityType: "TicketCategory", entityId: category.id });
   res.status(201).json(category);
 });
 
-router.patch("/:id", requirePermission("admin", "edit"), validateBody(schema), async (req, res) => {
-  const category = await prisma.ticketCategory.update({ where: { id: Number(req.params.id) }, data: req.body });
+router.patch("/:id", requirePermission("admin", "edit"), validateBody(schema.partial()), async (req, res) => {
+  const category = await prisma.ticketCategory.update({ where: { id: Number(req.params.id) }, data: req.body, include });
   await logAudit({ userId: req.user!.id, action: "ticketCategory.update", entityType: "TicketCategory", entityId: category.id });
   res.json(category);
 });
