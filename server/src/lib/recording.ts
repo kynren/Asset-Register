@@ -4,6 +4,8 @@ import path from "path";
 import { Readable } from "stream";
 import { prisma } from "../config/prisma";
 import { runForEachOrganization } from "../config/controlPlane";
+import { isNetworkRelayEnabled } from "../modules/network/scan.service";
+import { enqueueVideoJob, requestStop } from "./relayVideoJobs";
 
 export const RECORDING_ROOT = path.join(__dirname, "..", "..", "uploads", "recordings");
 fs.mkdirSync(RECORDING_ROOT, { recursive: true });
@@ -16,6 +18,9 @@ interface ActiveRecording {
   stderrTail: string;
   failed: boolean;
   failMessage: string | null;
+  // True when an on-prem relay agent owns the ffmpeg process and uploads the finished .mp4 to
+  // `filePath` in one shot once it stops — see relay.routes.ts's /video-jobs/:id/segment.
+  relayBacked: boolean;
 }
 
 const active = new Map<number, ActiveRecording>();
@@ -40,8 +45,17 @@ export async function startRecording(cameraId: number, streamUrl: string, trigge
     data: { cameraId, filePath: path.relative(RECORDING_ROOT, filePath), startedAt: new Date(), trigger },
   });
 
-  const entry: ActiveRecording = { recordingId: recording.id, cameraId, process: null, filePath, stderrTail: "", failed: false, failMessage: null };
+  const relayBacked = await isNetworkRelayEnabled();
+  const entry: ActiveRecording = { recordingId: recording.id, cameraId, process: null, filePath, stderrTail: "", failed: false, failMessage: null, relayBacked };
   active.set(cameraId, entry);
+
+  if (relayBacked) {
+    // Recording id doubles as the relay video job id — the agent uploads the finished .mp4 to
+    // /video-jobs/<recordingId>/segment, which resolves this same CameraRecording row to learn
+    // where on disk it belongs (see relay.routes.ts's resolveVideoJobForUpload).
+    await enqueueVideoJob(String(recording.id), "RECORDING", streamUrl);
+    return { recordingId: recording.id };
+  }
 
   const args = ["-rtsp_transport", "tcp", "-timeout", "5000000", "-i", streamUrl, "-c", "copy", "-f", "mp4", "-movflags", "frag_keyframe+empty_moov", filePath];
   const proc = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
@@ -78,7 +92,11 @@ export async function stopRecording(cameraId: number): Promise<{ recordingId: nu
   if (!entry) return null;
   active.delete(cameraId);
 
-  entry.process?.kill("SIGTERM");
+  if (entry.relayBacked) {
+    await requestStop(String(entry.recordingId));
+  } else {
+    entry.process?.kill("SIGTERM");
+  }
 
   let sizeBytes: number | undefined;
   try {

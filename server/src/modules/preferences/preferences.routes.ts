@@ -11,7 +11,7 @@ router.use(verifyJwt);
 // A short allowlist of recognized preference keys — not for security (these are always scoped to
 // req.user!.id, never another account), just to stop an arbitrary/unbounded set of rows from
 // accumulating under a typo'd key.
-const KNOWN_KEYS = new Set(["nvr.matrixLayout", "sidebar.collapsed", "theme", "accessControl.cardReaderSettings"]);
+const KNOWN_KEYS = new Set(["nvr.matrixLayout", "sidebar.collapsed", "theme", "accessControl.cardReaderSettings", "docs.recentRangePreset"]);
 // Prefixes cover key families with unbounded suffixes (e.g. one viewMode key per DataTable
 // instance) that can't be hand-enumerated in KNOWN_KEYS.
 const KNOWN_KEY_PREFIXES = ["dataTable.viewMode."];

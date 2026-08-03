@@ -91,7 +91,10 @@ const paths: Record<string, string> = {
   info: "M12 22a10 10 0 100-20 10 10 0 000 20zM12 16v-4M12 8h.01",
   filter: "M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
   sliders: "M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6",
+  zap: "M13 2L3 14h9l-1 8 10-12h-9l1-8z",
 };
+
+export const ICON_NAMES = Object.keys(paths);
 
 export function Icon({ name, size = 18 }: IconProps) {
   const d = paths[name] ?? paths.assets;

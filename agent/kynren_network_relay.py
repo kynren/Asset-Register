@@ -28,10 +28,12 @@ import os
 import platform
 import random
 import re
+import shutil
 import socket
 import struct
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from collections import deque
@@ -56,6 +58,15 @@ POLL_INTERVAL_SECONDS = 3          # how often to ask "any scans queued?" while 
 DEVICE_JOB_WORKERS = 20             # matches server's assetHeartbeat.ts PING_CONCURRENCY so this
                                     # agent can actually keep pace with a full asset-sweep burst
 DEVICE_JOB_IDLE_POLL_SECONDS = 1    # how often each idle device-job worker re-checks the queue
+VIDEO_JOB_WORKERS = 2                # deliberately modest — unlike PING/HTTP, a claimed video job
+                                    # holds a local ffmpeg process (CPU + bandwidth) alive for the
+                                    # full duration of a live view or recording, not milliseconds
+VIDEO_JOB_IDLE_POLL_SECONDS = 2      # how often each idle video-job worker re-checks the queue
+VIDEO_STATUS_POLL_SECONDS = 2        # how often a running video job checks whether the server
+                                    # wants it stopped (the agent only learns this by polling —
+                                    # the server has no way to push to it)
+VIDEO_SEGMENT_WATCH_SECONDS = 0.5    # how often a LIVE job's temp dir is scanned for new/changed
+                                    # HLS files to upload
 HOST_CONCURRENCY = 24              # mirrors server SCAN_CONCURRENCY
 PROGRESS_REPORT_EVERY = 15         # PATCH progress every N hosts scanned
 PING_TIMEOUT_MS = 800
@@ -1014,6 +1025,230 @@ def device_job_worker_loop(worker_id: int, api_base_url: str, api_key: str, logg
             (stop_event.wait if stop_event else time.sleep)(DEVICE_JOB_IDLE_POLL_SECONDS)
 
 
+# ───────────────────────── Video job (live view / recording) ─────────────────────────
+#
+# The counterpart to fetch_next_device_job/run_device_job above, but long-running: a claimed
+# video job holds a local ffmpeg process alive for minutes-to-hours instead of completing in one
+# request/response round trip. This is the one place in this file that spawns and tracks a
+# long-lived subprocess (every other subprocess.run() call above is short and blocking) — see
+# server/src/lib/relayVideoJobs.ts and server/src/modules/network/relay.routes.ts's
+# /next-video-job, /video-jobs/:id/status, /video-jobs/:id/complete, /video-jobs/:id/segment for
+# the server side of this protocol.
+
+def fetch_next_video_job(api_base_url: str, api_key: str, logger: logging.Logger) -> dict | None:
+    url = f"{api_base_url.rstrip('/')}/api/network-relay/next-video-job"
+    try:
+        response = requests.get(url, headers={"X-Agent-Key": api_key}, timeout=10)
+        if response.status_code == 204:
+            return None
+        if response.status_code != 200:
+            logger.warning(f"next-video-job responded {response.status_code} — {response.text[:200]}")
+            return None
+        return response.json()
+    except requests.RequestException as exc:
+        logger.warning(f"next-video-job request failed: {exc}")
+        return None
+
+
+def fetch_video_job_status(api_base_url: str, api_key: str, job_id: str, logger: logging.Logger) -> str | None:
+    """Polled while a job's ffmpeg is running so the agent can learn the server wants it stopped
+    — returns None on any request failure (transient network issues are never treated as a stop
+    request, only an explicit "STOPPING" status is)."""
+    url = f"{api_base_url.rstrip('/')}/api/network-relay/video-jobs/{job_id}/status"
+    try:
+        response = requests.get(url, headers={"X-Agent-Key": api_key}, timeout=10)
+        if response.status_code != 200:
+            return None
+        return response.json().get("status")
+    except requests.RequestException as exc:
+        logger.warning(f"video-job {job_id} status check failed: {exc}")
+        return None
+
+
+def complete_video_job(api_base_url: str, api_key: str, job_id: str, status: str, error_message: str | None, logger: logging.Logger) -> None:
+    url = f"{api_base_url.rstrip('/')}/api/network-relay/video-jobs/{job_id}/complete"
+    body: dict = {"status": status}
+    if error_message:
+        body["errorMessage"] = error_message
+    try:
+        response = requests.post(
+            url,
+            headers={"X-Agent-Key": api_key, "Content-Type": "application/json"},
+            data=json.dumps(body),
+            timeout=15,
+        )
+        if response.status_code != 200:
+            logger.warning(f"video-job {job_id} complete responded {response.status_code} — {response.text[:200]}")
+    except requests.RequestException as exc:
+        logger.warning(f"video-job {job_id} complete request failed: {exc}")
+
+
+def upload_video_segment(api_base_url: str, api_key: str, job_id: str, file_path: str, filename: str, logger: logging.Logger, timeout: int = 30) -> bool:
+    """Uploads one file (an HLS playlist/segment for LIVE, or the whole recording.mp4 for
+    RECORDING) to /video-jobs/:id/segment. `filename` travels as a query param rather than a
+    multipart text field so the server's multer destination/filename callbacks can resolve it
+    without depending on multipart field ordering."""
+    url = f"{api_base_url.rstrip('/')}/api/network-relay/video-jobs/{job_id}/segment"
+    try:
+        with open(file_path, "rb") as f:
+            response = requests.post(
+                url,
+                headers={"X-Agent-Key": api_key},
+                params={"filename": filename},
+                files={"file": (filename, f)},
+                timeout=timeout,
+            )
+        if response.status_code != 200:
+            logger.warning(f"video-job {job_id} segment upload ({filename}) responded {response.status_code} — {response.text[:200]}")
+            return False
+        return True
+    except (requests.RequestException, OSError) as exc:
+        logger.warning(f"video-job {job_id} segment upload ({filename}) failed: {exc}")
+        return False
+
+
+def run_video_job(job: dict, api_base_url: str, api_key: str, logger: logging.Logger) -> None:
+    job_id = job["id"]
+    kind = job.get("kind")
+    stream_url = job.get("streamUrl")
+    tmpdir = tempfile.mkdtemp(prefix="kynren-video-")
+    logger.info(f"Video job {job_id}: starting {kind} relay for {stream_url}")
+
+    proc: subprocess.Popen | None = None
+    try:
+        if kind == "LIVE":
+            playlist_path = os.path.join(tmpdir, "playlist.m3u8")
+            args = [
+                "ffmpeg", "-rtsp_transport", "tcp", "-timeout", "5000000", "-i", stream_url,
+                "-an", "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
+                "-f", "hls", "-hls_time", "2", "-hls_list_size", "4", "-hls_flags", "delete_segments",
+                playlist_path,
+            ]
+        elif kind == "RECORDING":
+            args = [
+                "ffmpeg", "-rtsp_transport", "tcp", "-timeout", "5000000", "-i", stream_url,
+                "-c", "copy", "-f", "mp4", "-movflags", "frag_keyframe+empty_moov",
+                os.path.join(tmpdir, "recording.mp4"),
+            ]
+        else:
+            logger.warning(f"Video job {job_id}: unrecognized kind {kind!r}")
+            complete_video_job(api_base_url, api_key, job_id, "FAILED", f"Unrecognized job kind: {kind}", logger)
+            return
+
+        try:
+            proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        except FileNotFoundError:
+            complete_video_job(api_base_url, api_key, job_id, "FAILED", "ffmpeg is not installed on this relay agent's machine.", logger)
+            return
+
+        stderr_tail: deque[str] = deque(maxlen=40)
+
+        def _drain_stderr() -> None:
+            if proc.stderr is None:
+                return
+            for line in proc.stderr:
+                stderr_tail.append(line)
+
+        stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+        stderr_thread.start()
+
+        uploaded_mtimes: dict[str, float] = {}
+        stop_requested = False
+        last_status_check = 0.0
+
+        def _sync_live_segments() -> None:
+            try:
+                for name in os.listdir(tmpdir):
+                    if not (name.endswith(".m3u8") or name.endswith(".ts")):
+                        continue
+                    full_path = os.path.join(tmpdir, name)
+                    try:
+                        mtime = os.path.getmtime(full_path)
+                    except OSError:
+                        continue
+                    if uploaded_mtimes.get(name) == mtime:
+                        continue
+                    if upload_video_segment(api_base_url, api_key, job_id, full_path, name, logger):
+                        uploaded_mtimes[name] = mtime
+            except OSError:
+                pass
+
+        while proc.poll() is None:
+            now = time.time()
+            if now - last_status_check >= VIDEO_STATUS_POLL_SECONDS:
+                last_status_check = now
+                if fetch_video_job_status(api_base_url, api_key, job_id, logger) == "STOPPING":
+                    stop_requested = True
+                    proc.terminate()
+                    break
+
+            if kind == "LIVE":
+                _sync_live_segments()
+
+            time.sleep(VIDEO_SEGMENT_WATCH_SECONDS)
+
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+
+        stderr_thread.join(timeout=2)
+        exit_code = proc.returncode
+        tail_text = "".join(list(stderr_tail)[-6:]).strip()
+
+        if kind == "LIVE":
+            _sync_live_segments()  # catch a final segment that landed right at exit
+            if stop_requested or exit_code == 0:
+                complete_video_job(api_base_url, api_key, job_id, "STOPPED", None, logger)
+                logger.info(f"Video job {job_id}: live relay stopped")
+            else:
+                error_message = f"ffmpeg exited unexpectedly (code {exit_code}). {tail_text}".strip()
+                complete_video_job(api_base_url, api_key, job_id, "FAILED", error_message, logger)
+                logger.warning(f"Video job {job_id}: {error_message}")
+        else:  # RECORDING
+            recording_path = os.path.join(tmpdir, "recording.mp4")
+            has_file = os.path.exists(recording_path) and os.path.getsize(recording_path) > 0
+            if not has_file:
+                error_message = f"ffmpeg exited (code {exit_code}) without producing a recording. {tail_text}".strip()
+                complete_video_job(api_base_url, api_key, job_id, "FAILED", error_message, logger)
+                logger.warning(f"Video job {job_id}: {error_message}")
+            elif stop_requested or exit_code == 0:
+                if upload_video_segment(api_base_url, api_key, job_id, recording_path, "recording.mp4", logger, timeout=120):
+                    complete_video_job(api_base_url, api_key, job_id, "STOPPED", None, logger)
+                    logger.info(f"Video job {job_id}: recording uploaded")
+                else:
+                    complete_video_job(api_base_url, api_key, job_id, "FAILED", "Recording finished but upload to the server failed.", logger)
+            else:
+                error_message = f"ffmpeg exited unexpectedly (code {exit_code}). {tail_text}".strip()
+                complete_video_job(api_base_url, api_key, job_id, "FAILED", error_message, logger)
+                logger.warning(f"Video job {job_id}: {error_message}")
+
+    except Exception as exc:
+        logger.exception(f"Video job {job_id}: unexpected error")
+        if proc is not None and proc.poll() is None:
+            proc.kill()
+        complete_video_job(api_base_url, api_key, job_id, "FAILED", f"Unexpected relay agent error: {exc}", logger)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def video_job_worker_loop(worker_id: int, api_base_url: str, api_key: str, logger: logging.Logger, stop_event) -> None:
+    """One of VIDEO_JOB_WORKERS background workers draining the video-job queue. Kept to a small
+    pool — unlike device_job_worker_loop's PING/HTTP jobs, each claimed job occupies its worker
+    for the full duration of a live view or recording, not milliseconds."""
+    while stop_event is None or not stop_event.is_set():
+        try:
+            job = fetch_next_video_job(api_base_url, api_key, logger)
+            if job is None:
+                (stop_event.wait if stop_event else time.sleep)(VIDEO_JOB_IDLE_POLL_SECONDS)
+                continue
+            run_video_job(job, api_base_url, api_key, logger)
+        except Exception:
+            logger.exception(f"Unexpected error in video-job worker {worker_id}")
+            (stop_event.wait if stop_event else time.sleep)(VIDEO_JOB_IDLE_POLL_SECONDS)
+
+
 def run_job(job: dict, api_base_url: str, api_key: str, logger: logging.Logger) -> None:
     job_id = job["id"]
     addresses = expand_range(job["startIp"], job["endIp"])
@@ -1098,6 +1333,16 @@ def run_loop(api_base_url: str, api_key: str, logger: logging.Logger, stop_event
     for worker_id in range(DEVICE_JOB_WORKERS):
         threading.Thread(
             target=device_job_worker_loop,
+            args=(worker_id, api_base_url, api_key, logger, stop_event),
+            daemon=True,
+        ).start()
+
+    # Video jobs (live view / recording) get their own small worker pool — see run_video_job()'s
+    # module comment for why this needs Popen-based long-lived process tracking, unlike every
+    # other job kind in this file.
+    for worker_id in range(VIDEO_JOB_WORKERS):
+        threading.Thread(
+            target=video_job_worker_loop,
             args=(worker_id, api_base_url, api_key, logger, stop_event),
             daemon=True,
         ).start()

@@ -183,6 +183,21 @@ actual source of silent connection failures.
   reported hostnames (the relay has no database access) — only DNS and
   NetBIOS, versus the three-way fallback direct-mode scanning uses.
 
+### Live view & recording (NVR video relay)
+
+When Network Relay Agent is enabled, this script also handles NVR/camera
+**live view** and **recording** — the same "server has no LAN route" problem
+applies to RTSP video, not just ping/ARP/SNMP. A claimed video job spawns
+`ffmpeg` locally (on this machine, which *can* reach the camera) and uploads
+its output to the server (HLS segments for live view, the finished `.mp4`
+once recording stops).
+
+**This requires `ffmpeg` to be installed and on `PATH` on the relay agent's
+own machine** — a separate requirement from the main app server's own ffmpeg
+install, since the process now runs here instead. If `ffmpeg` isn't found, an
+attempted live view or recording fails with a clear "ffmpeg is not installed
+on this relay agent's machine" error rather than hanging.
+
 ### Logs
 
 Each run appends to `network_relay.log` in this folder (rotated at ~2MB, 3

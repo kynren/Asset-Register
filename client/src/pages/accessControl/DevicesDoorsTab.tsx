@@ -56,7 +56,7 @@ export function DevicesDoorsTab() {
   const [renameValue, setRenameValue] = useState("");
   // Keyed by door id — same pattern as discoveryResults below, but for a single door's forced
   // status re-read instead of a whole device's rediscovery.
-  const [doorStatusResults, setDoorStatusResults] = useState<Record<number, { ok: boolean; message: string }>>({});
+  const [doorStatusResults, setDoorStatusResults] = useState<Record<number, { ok: boolean; message: string; statusUnsupported?: boolean }>>({});
   // Keyed by device id — lets "Refresh Doors" (and door discovery right after adding a device)
   // explain *why* no doors showed up (auth failure, unreachable, unsupported firmware) instead
   // of silently leaving the door list empty with no explanation.
@@ -138,8 +138,8 @@ export function DevicesDoorsTab() {
   const refreshDoorStatusMutation = useMutation({
     mutationFn: (id: number) => axiosClient.post(`/access-control/doors/${id}/refresh-status`),
     onSuccess: (res, id) => {
-      const { ok, message } = res.data as { ok: boolean; message: string };
-      setDoorStatusResults((r) => ({ ...r, [id]: { ok, message } }));
+      const { ok, message, statusUnsupported } = res.data as { ok: boolean; message: string; statusUnsupported?: boolean };
+      setDoorStatusResults((r) => ({ ...r, [id]: { ok, message, statusUnsupported } }));
       invalidate();
     },
   });
@@ -285,9 +285,20 @@ export function DevicesDoorsTab() {
                     {doorStatusResults[door.id] && (
                       <tr>
                         <td colSpan={6} style={{ paddingTop: 0 }}>
-                          <div className={`alert ${doorStatusResults[door.id].ok ? "alert-success" : "alert-danger"}`} style={{ fontSize: 12, margin: 0 }}>
-                            {doorStatusResults[door.id].message}
-                          </div>
+                          {doorStatusResults[door.id].statusUnsupported ? (
+                            // The device answered, but this specific controller/firmware doesn't
+                            // implement a live door-status read (confirmed against real hardware —
+                            // see getDoorStatus's doc comment) — a permanent capability gap, not a
+                            // transient error, so this is shown calmly rather than as an alarm.
+                            <div className="alert alert-warning" style={{ fontSize: 12, margin: 0 }}>
+                              This controller doesn't support live door-status reads — door/lock state
+                              here reflects the last action taken in this app, not a live reading.
+                            </div>
+                          ) : (
+                            <div className={`alert ${doorStatusResults[door.id].ok ? "alert-success" : "alert-danger"}`} style={{ fontSize: 12, margin: 0 }}>
+                              {doorStatusResults[door.id].message}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}

@@ -107,3 +107,10 @@ export const relayDeviceJobCompleteSchema = z.object({
   responseBodyBase64: z.string().optional(),
   errorMessage: z.string().optional(),
 });
+
+// ───────────────────────── Relay video job (live view / recording) ─────────────────────────
+
+export const relayVideoJobCompleteSchema = z.object({
+  status: z.enum(["STOPPED", "FAILED"]),
+  errorMessage: z.string().optional(),
+});

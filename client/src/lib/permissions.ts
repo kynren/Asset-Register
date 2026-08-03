@@ -12,9 +12,11 @@ export const MODULES = [
   "lighting",
   "virtual-assistant",
   "docs",
+  "reports",
   "admin",
   "password",
   "app-settings",
+  "branding",
 ] as const;
 
 export type ModuleName = (typeof MODULES)[number];

@@ -480,8 +480,8 @@ router.post("/isapi/channels", requirePermission("nvr", "view"), validateBody(is
 // Stateless and keyed by a session id rather than a saved Camera row, so live preview works
 // while adding a camera (before it has been saved) as well as when editing an existing one.
 
-router.post("/stream/sessions", requirePermission("nvr", "view"), validateBody(startStreamSchema), (req, res) => {
-  const sessionId = startStreamSession(req.body.streamUrl);
+router.post("/stream/sessions", requirePermission("nvr", "view"), validateBody(startStreamSchema), async (req, res) => {
+  const sessionId = await startStreamSession(req.body.streamUrl);
   res.status(201).json({ sessionId });
 });
 

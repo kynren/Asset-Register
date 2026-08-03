@@ -27,6 +27,10 @@ export interface SourceDef {
   fields: FieldDef[];
   groupableFields: string[];
   defaultColumns: string[];
+  // Every column key a table-visualization row can carry for this source (superset of
+  // defaultColumns) — lets a report builder offer a column picker without hardcoding each
+  // source's row shape a second time.
+  availableColumns: FieldOption[];
 }
 
 export interface FilterCondition {
@@ -67,6 +71,17 @@ export const SOURCES: Record<string, SourceDef> = {
     ],
     groupableFields: ["status", "categoryId", "locationId"],
     defaultColumns: ["assetTag", "name", "status", "category", "location"],
+    availableColumns: [
+      { value: "assetTag", label: "Asset Tag" },
+      { value: "name", label: "Name" },
+      { value: "status", label: "Status" },
+      { value: "category", label: "Category" },
+      { value: "location", label: "Location" },
+      { value: "assignedTo", label: "Assigned To" },
+      { value: "manufacturer", label: "Manufacturer" },
+      { value: "model", label: "Model" },
+      { value: "createdAt", label: "Created" },
+    ],
   },
   tickets: {
     id: "tickets",
@@ -83,6 +98,17 @@ export const SOURCES: Record<string, SourceDef> = {
     ],
     groupableFields: ["status", "priority", "itilType", "categoryId"],
     defaultColumns: ["ticketNumber", "title", "status", "priority", "requester"],
+    availableColumns: [
+      { value: "ticketNumber", label: "Ticket #" },
+      { value: "title", label: "Title" },
+      { value: "status", label: "Status" },
+      { value: "priority", label: "Priority" },
+      { value: "itilType", label: "ITIL Type" },
+      { value: "category", label: "Category" },
+      { value: "requester", label: "Requester" },
+      { value: "dueAt", label: "Due" },
+      { value: "createdAt", label: "Created" },
+    ],
   },
   stock: {
     id: "stock",
@@ -97,6 +123,15 @@ export const SOURCES: Record<string, SourceDef> = {
     ],
     groupableFields: ["category"],
     defaultColumns: ["sku", "name", "category", "quantityOnHand", "reorderLevel"],
+    availableColumns: [
+      { value: "sku", label: "SKU" },
+      { value: "name", label: "Name" },
+      { value: "category", label: "Category" },
+      { value: "quantityOnHand", label: "Quantity On Hand" },
+      { value: "reorderLevel", label: "Reorder Level" },
+      { value: "unit", label: "Unit" },
+      { value: "createdAt", label: "Created" },
+    ],
   },
   docs: {
     id: "docs",
@@ -111,6 +146,15 @@ export const SOURCES: Record<string, SourceDef> = {
     ],
     groupableFields: ["docType", "category"],
     defaultColumns: ["title", "docType", "category", "updatedAt"],
+    availableColumns: [
+      { value: "title", label: "Title" },
+      { value: "docType", label: "Type" },
+      { value: "category", label: "Category" },
+      { value: "isPublished", label: "Published" },
+      { value: "reviewDueDate", label: "Review Due" },
+      { value: "updatedAt", label: "Updated" },
+      { value: "createdBy", label: "Created By" },
+    ],
   },
   network: {
     id: "network",
@@ -125,6 +169,15 @@ export const SOURCES: Record<string, SourceDef> = {
     ],
     groupableFields: ["status", "deviceType", "vendor"],
     defaultColumns: ["hostname", "ipAddress", "vendor", "deviceType", "status"],
+    availableColumns: [
+      { value: "hostname", label: "Hostname" },
+      { value: "ipAddress", label: "IP Address" },
+      { value: "macAddress", label: "MAC Address" },
+      { value: "vendor", label: "Vendor" },
+      { value: "deviceType", label: "Device Type" },
+      { value: "status", label: "Status" },
+      { value: "lastSeenAt", label: "Last Seen" },
+    ],
   },
   users: {
     id: "users",
@@ -138,6 +191,14 @@ export const SOURCES: Record<string, SourceDef> = {
     ],
     groupableFields: ["roleId"],
     defaultColumns: ["name", "email", "role", "isActive"],
+    availableColumns: [
+      { value: "name", label: "Name" },
+      { value: "email", label: "Email" },
+      { value: "role", label: "Role" },
+      { value: "isActive", label: "Active" },
+      { value: "lastLoginAt", label: "Last Login" },
+      { value: "createdAt", label: "Created" },
+    ],
   },
 };
 
@@ -174,11 +235,21 @@ function buildClause(field: FieldDef, operator: string, value: unknown): Record<
   }
 }
 
+// A condition mid-edit in the UI (field/operator picked, value not yet chosen) has an empty
+// string or empty array value — skip it rather than forwarding it to Prisma, which throws on
+// e.g. an empty string for an enum column. Booleans are exempt since "false" is a real, valid
+// value that must not be dropped here.
+function hasUsableValue(field: FieldDef, operator: string, value: unknown): boolean {
+  if (field.type === "boolean") return true;
+  if (operator === "in") return Array.isArray(value) ? value.length > 0 : String(value ?? "").length > 0;
+  return value !== "" && value !== null && value !== undefined;
+}
+
 function buildWhere(fields: FieldDef[], spec: FilterSpec | undefined | null): Record<string, unknown> {
   if (!spec || !spec.conditions?.length) return {};
   const fieldMap = new Map(fields.map((f) => [f.key, f]));
   const clauses = spec.conditions
-    .filter((c) => fieldMap.has(c.field) && fieldMap.get(c.field)!.operators.includes(c.operator))
+    .filter((c) => fieldMap.has(c.field) && fieldMap.get(c.field)!.operators.includes(c.operator) && hasUsableValue(fieldMap.get(c.field)!, c.operator, c.value))
     .map((c) => buildClause(fieldMap.get(c.field)!, c.operator, c.value))
     .filter((c): c is Record<string, unknown> => Boolean(c));
   if (clauses.length === 0) return {};
@@ -191,6 +262,37 @@ export interface QuerySpec {
   groupBy?: string;
   visualization: "kpi" | "table" | "bar" | "pie" | "line";
   columns?: string[];
+  // Row cap for table visualizations. Dashboard widgets stick to the default (100); report
+  // execution/export raise this (capped at MAX_QUERY_LIMIT below) to return a fuller dataset.
+  limit?: number;
+}
+
+const DEFAULT_QUERY_LIMIT = 100;
+const MAX_QUERY_LIMIT = 2000;
+
+// Minimal caller identity needed to compute row-level scoping — a subset of Express's req.user.
+export interface QueryUser {
+  id: number;
+  roleId: number;
+  roleName: string;
+}
+
+// Generalizes the row-level restriction tickets.controller.ts's list() already applies for roles
+// with RolePermission.scopeAssignedOnly on the helpdesk module (see roles.controller.ts) — without
+// this, a "my tickets only" user could use the dashboard Custom Query widget or a Report to see
+// every ticket, bypassing the restriction their own ticket list already enforces. System Admin is
+// exempt, matching every other permission check in this app.
+async function getRowScope(source: SourceDef, user: QueryUser | undefined): Promise<Record<string, unknown> | undefined> {
+  if (!user || user.roleName === "System Admin") return undefined;
+  if (source.id === "tickets") {
+    const helpdeskPermission = await prisma.rolePermission.findUnique({
+      where: { roleId_module: { roleId: user.roleId, module: "helpdesk" } },
+    });
+    if (helpdeskPermission?.scopeAssignedOnly) {
+      return { assignees: { some: { userId: user.id } } };
+    }
+  }
+  return undefined;
 }
 
 export type QueryResult =
@@ -198,10 +300,10 @@ export type QueryResult =
   | { kind: "table"; columns: string[]; rows: Record<string, unknown>[] }
   | { kind: "chart"; data: { label: string; count: number }[] };
 
-async function queryAssets(where: Record<string, unknown>, groupBy: string | undefined, visualization: string, columns: string[] | undefined): Promise<QueryResult> {
+async function queryAssets(where: Record<string, unknown>, groupBy: string | undefined, visualization: string, columns: string[] | undefined, limit: number): Promise<QueryResult> {
   if (visualization === "kpi") return { kind: "kpi", value: await prisma.asset.count({ where }) };
   if (visualization === "table") {
-    const rows = await prisma.asset.findMany({ where, take: 100, orderBy: { createdAt: "desc" }, include: { category: true, location: true, assignedTo: true } });
+    const rows = await prisma.asset.findMany({ where, take: limit, orderBy: { createdAt: "desc" }, include: { category: true, location: true, assignedTo: true } });
     return {
       kind: "table",
       columns: columns?.length ? columns : SOURCES.assets.defaultColumns,
@@ -235,10 +337,10 @@ async function queryAssets(where: Record<string, unknown>, groupBy: string | und
   return { kind: "chart", data: g.map((x) => ({ label: x.status, count: x._count._all })) };
 }
 
-async function queryTickets(where: Record<string, unknown>, groupBy: string | undefined, visualization: string, columns: string[] | undefined): Promise<QueryResult> {
+async function queryTickets(where: Record<string, unknown>, groupBy: string | undefined, visualization: string, columns: string[] | undefined, limit: number): Promise<QueryResult> {
   if (visualization === "kpi") return { kind: "kpi", value: await prisma.ticket.count({ where }) };
   if (visualization === "table") {
-    const rows = await prisma.ticket.findMany({ where, take: 100, orderBy: { createdAt: "desc" }, include: { category: true, requester: { select: { firstName: true, lastName: true } } } });
+    const rows = await prisma.ticket.findMany({ where, take: limit, orderBy: { createdAt: "desc" }, include: { category: true, requester: { select: { firstName: true, lastName: true } } } });
     return {
       kind: "table",
       columns: columns?.length ? columns : SOURCES.tickets.defaultColumns,
@@ -274,10 +376,10 @@ async function queryTickets(where: Record<string, unknown>, groupBy: string | un
   return { kind: "chart", data: g.map((x) => ({ label: x.status, count: x._count._all })) };
 }
 
-async function queryStock(where: Record<string, unknown>, _groupBy: string | undefined, visualization: string, columns: string[] | undefined): Promise<QueryResult> {
+async function queryStock(where: Record<string, unknown>, _groupBy: string | undefined, visualization: string, columns: string[] | undefined, limit: number): Promise<QueryResult> {
   if (visualization === "kpi") return { kind: "kpi", value: await prisma.stockItem.count({ where }) };
   if (visualization === "table") {
-    const rows = await prisma.stockItem.findMany({ where, take: 100, orderBy: { createdAt: "desc" } });
+    const rows = await prisma.stockItem.findMany({ where, take: limit, orderBy: { createdAt: "desc" } });
     return {
       kind: "table",
       columns: columns?.length ? columns : SOURCES.stock.defaultColumns,
@@ -288,10 +390,10 @@ async function queryStock(where: Record<string, unknown>, _groupBy: string | und
   return { kind: "chart", data: g.map((x) => ({ label: x.category ?? "Uncategorized", count: x._count._all })) };
 }
 
-async function queryDocs(where: Record<string, unknown>, groupBy: string | undefined, visualization: string, columns: string[] | undefined): Promise<QueryResult> {
+async function queryDocs(where: Record<string, unknown>, groupBy: string | undefined, visualization: string, columns: string[] | undefined, limit: number): Promise<QueryResult> {
   if (visualization === "kpi") return { kind: "kpi", value: await prisma.document.count({ where }) };
   if (visualization === "table") {
-    const rows = await prisma.document.findMany({ where, take: 100, orderBy: { updatedAt: "desc" }, include: { createdBy: { select: { firstName: true, lastName: true } } } });
+    const rows = await prisma.document.findMany({ where, take: limit, orderBy: { updatedAt: "desc" }, include: { createdBy: { select: { firstName: true, lastName: true } } } });
     return {
       kind: "table",
       columns: columns?.length ? columns : SOURCES.docs.defaultColumns,
@@ -315,10 +417,10 @@ async function queryDocs(where: Record<string, unknown>, groupBy: string | undef
   return { kind: "chart", data: g.map((x) => ({ label: x.category, count: x._count._all })) };
 }
 
-async function queryNetwork(where: Record<string, unknown>, groupBy: string | undefined, visualization: string, columns: string[] | undefined): Promise<QueryResult> {
+async function queryNetwork(where: Record<string, unknown>, groupBy: string | undefined, visualization: string, columns: string[] | undefined, limit: number): Promise<QueryResult> {
   if (visualization === "kpi") return { kind: "kpi", value: await prisma.monitoredNetworkDevice.count({ where }) };
   if (visualization === "table") {
-    const rows = await prisma.monitoredNetworkDevice.findMany({ where, take: 100, orderBy: { lastSeenAt: "desc" } });
+    const rows = await prisma.monitoredNetworkDevice.findMany({ where, take: limit, orderBy: { lastSeenAt: "desc" } });
     return {
       kind: "table",
       columns: columns?.length ? columns : SOURCES.network.defaultColumns,
@@ -338,12 +440,12 @@ async function queryNetwork(where: Record<string, unknown>, groupBy: string | un
   return { kind: "chart", data: g.map((x) => ({ label: x.status, count: x._count._all })) };
 }
 
-async function queryUsers(where: Record<string, unknown>, _groupBy: string | undefined, visualization: string, columns: string[] | undefined): Promise<QueryResult> {
+async function queryUsers(where: Record<string, unknown>, _groupBy: string | undefined, visualization: string, columns: string[] | undefined, limit: number): Promise<QueryResult> {
   if (visualization === "kpi") return { kind: "kpi", value: await prisma.user.count({ where }) };
   if (visualization === "table") {
     const rows = await prisma.user.findMany({
       where,
-      take: 100,
+      take: limit,
       orderBy: { createdAt: "desc" },
       select: { firstName: true, lastName: true, email: true, isActive: true, createdAt: true, lastLoginAt: true, role: { select: { name: true } } },
     });
@@ -359,24 +461,27 @@ async function queryUsers(where: Record<string, unknown>, _groupBy: string | und
   return { kind: "chart", data: g.map((x) => ({ label: map.get(x.roleId) ?? "Unknown", count: x._count._all })) };
 }
 
-export async function runQuery(spec: QuerySpec): Promise<QueryResult> {
+export async function runQuery(spec: QuerySpec, user?: QueryUser): Promise<QueryResult> {
   const source = SOURCES[spec.source];
   if (!source) throw new ApiError(400, `Unknown data source: ${spec.source}`);
-  const where = buildWhere(source.fields, spec.filters);
+  const baseWhere = buildWhere(source.fields, spec.filters);
+  const scope = await getRowScope(source, user);
+  const where = scope ? { AND: [baseWhere, scope] } : baseWhere;
+  const limit = Math.min(spec.limit ?? DEFAULT_QUERY_LIMIT, MAX_QUERY_LIMIT);
 
   switch (spec.source) {
     case "assets":
-      return queryAssets(where, spec.groupBy, spec.visualization, spec.columns);
+      return queryAssets(where, spec.groupBy, spec.visualization, spec.columns, limit);
     case "tickets":
-      return queryTickets(where, spec.groupBy, spec.visualization, spec.columns);
+      return queryTickets(where, spec.groupBy, spec.visualization, spec.columns, limit);
     case "stock":
-      return queryStock(where, spec.groupBy, spec.visualization, spec.columns);
+      return queryStock(where, spec.groupBy, spec.visualization, spec.columns, limit);
     case "docs":
-      return queryDocs(where, spec.groupBy, spec.visualization, spec.columns);
+      return queryDocs(where, spec.groupBy, spec.visualization, spec.columns, limit);
     case "network":
-      return queryNetwork(where, spec.groupBy, spec.visualization, spec.columns);
+      return queryNetwork(where, spec.groupBy, spec.visualization, spec.columns, limit);
     case "users":
-      return queryUsers(where, spec.groupBy, spec.visualization, spec.columns);
+      return queryUsers(where, spec.groupBy, spec.visualization, spec.columns, limit);
     default:
       throw new ApiError(400, `Unknown data source: ${spec.source}`);
   }

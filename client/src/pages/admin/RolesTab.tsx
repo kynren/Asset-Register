@@ -48,9 +48,11 @@ const MODULE_INFO: Record<ModuleName, { label: string; description: string }> = 
   lighting: { label: "Lighting", description: "Devices, Rooms dashboard, Scenes, Automations, ZigBee scaffold." },
   "virtual-assistant": { label: "Virtual Assistant", description: "In-app assistant chat and quick actions." },
   docs: { label: "Docs & SOPs", description: "Manuals, SOPs, runbooks, and other documents — collections, full-text search, attachments." },
+  reports: { label: "Reports", description: "Report Builder, saved/shared reports, CSV/PDF export, print, email delivery, and the Reports dashboard." },
   admin: { label: "Admin & Setup", description: "Users, Roles & Permissions, Categories & Locations, Asset Form Templates, Email Templates, Audit Log." },
   password: { label: "Password Management", description: "Each user's personal password vault." },
   "app-settings": { label: "App Settings", description: "Organizations (create new orgs), Backups, System Settings, System Status — platform-level, System Admin only." },
+  branding: { label: "Branding", description: "App colors, logo, favicon, and the visual Login Page Designer (background, layout, text/icon overlays)." },
 };
 
 export function RolesTab({

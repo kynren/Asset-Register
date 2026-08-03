@@ -48,9 +48,41 @@ router.put("/", requirePermission("app-settings", "edit"), validateBody(updateSc
   res.json({ ok: true });
 });
 
+// Branding's scalar fields (company name, brand colors) get their own branding-gated
+// read/write, separate from the generic app-settings-gated GET/PUT above — a role holding
+// only the "branding" module must not be able to write unrelated app-settings keys (password
+// policy, device thresholds, etc.) through the generic endpoint.
+const BRAND_FIELD_KEYS = ["companyName", "brandPrimaryColor", "brandSecondaryColor"] as const;
+// appIconUrl/faviconUrl are read-only here (written only via POST /branding below) — included
+// so a "branding"-only role can see current logo/favicon previews without needing app-settings.
+const BRAND_READ_KEYS = [...BRAND_FIELD_KEYS, "appIconUrl", "faviconUrl"] as const;
+const brandFieldsSchema = z.object({
+  companyName: z.string().min(1).optional(),
+  brandPrimaryColor: z.string().optional(),
+  brandSecondaryColor: z.string().optional(),
+});
+
+router.get("/branding-fields", requirePermission("branding", "view"), async (_req, res) => {
+  const settings = await prisma.systemSetting.findMany({ where: { key: { in: [...BRAND_READ_KEYS] } } });
+  const map: Record<string, string> = {};
+  for (const s of settings) map[s.key] = s.value;
+  res.json(map);
+});
+
+router.put("/branding-fields", requirePermission("branding", "edit"), validateBody(brandFieldsSchema), async (req, res) => {
+  const values = req.body as Record<string, string | undefined>;
+  for (const key of BRAND_FIELD_KEYS) {
+    const value = values[key];
+    if (value === undefined) continue;
+    await prisma.systemSetting.upsert({ where: { key }, update: { value }, create: { key, value } });
+  }
+  await logAudit({ userId: req.user!.id, action: "settings.branding_update", metadata: { keys: Object.keys(values) } });
+  res.json({ ok: true });
+});
+
 const brandingTypeSchema = z.object({ type: z.enum(["appIcon", "favicon"]) });
 
-router.post("/branding", requirePermission("app-settings", "edit"), brandingUpload.single("file"), async (req, res) => {
+router.post("/branding", requirePermission("branding", "edit"), brandingUpload.single("file"), async (req, res) => {
   const parsed = brandingTypeSchema.safeParse(req.body);
   if (!parsed.success || !req.file) throw new ApiError(400, "Missing file or type");
 

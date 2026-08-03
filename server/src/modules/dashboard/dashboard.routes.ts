@@ -27,6 +27,7 @@ const MODULE_PERMISSION: Record<string, ModuleName> = {
   stock: "stock",
   network: "network",
   docs: "docs",
+  reports: "reports",
 };
 
 function requireModuleDashboardPermission(action: "view" | "edit") {
@@ -206,6 +207,7 @@ const dataExplorerQuerySchema = z.object({
   groupBy: z.string().optional(),
   visualization: z.enum(["kpi", "table", "bar", "pie", "line"]),
   columns: z.array(z.string()).optional(),
+  limit: z.number().int().positive().optional(),
 });
 
 router.post("/query", validateBody(dataExplorerQuerySchema), async (req, res) => {
@@ -214,7 +216,7 @@ router.post("/query", validateBody(dataExplorerQuerySchema), async (req, res) =>
   if (req.user!.roleName !== "System Admin" && !(await hasPermission(req.user!.roleId, source.module, "view"))) {
     return res.status(403).json({ error: `Not permitted to view ${source.module}` });
   }
-  const result = await runQuery(req.body);
+  const result = await runQuery(req.body, { id: req.user!.id, roleId: req.user!.roleId, roleName: req.user!.roleName });
   res.json(result);
 });
 

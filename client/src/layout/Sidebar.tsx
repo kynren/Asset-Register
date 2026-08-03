@@ -80,15 +80,15 @@ function SidebarBattery({ collapsed }: { collapsed: boolean }) {
 
   if (collapsed) {
     return (
-      <div className="sidebar-battery sidebar-battery-collapsed" title={label}>
-        <Icon name={state.charging ? "power" : "battery"} size={16} />
+      <div className="sidebar-battery sidebar-battery-collapsed" style={{ border: "none" }} title={label}>
+        <Icon name={state.charging ? "zap" : "battery"} size={16} />
       </div>
     );
   }
 
   return (
-    <div className="sidebar-battery" title={label}>
-      <Icon name={state.charging ? "power" : "battery"} size={15} />
+    <div className="sidebar-battery" style={{ border: "none" }} title={label}>
+      <Icon name={state.charging ? "zap" : "battery"} size={15} />
       <div className="sidebar-battery-bar">
         <div className="sidebar-battery-bar-fill" style={{ width: `${levelPct}%`, background: color }} />
       </div>

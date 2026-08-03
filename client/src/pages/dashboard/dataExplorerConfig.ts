@@ -21,6 +21,7 @@ export interface SourceDef {
   fields: FieldDef[];
   groupableFields: string[];
   defaultColumns: string[];
+  availableColumns: FieldOption[];
 }
 
 const ASSET_STATUS_OPTIONS: FieldOption[] = ["IN_USE", "IN_STORAGE", "IN_REPAIR", "RETIRED", "LOST"].map((v) => ({ value: v, label: v.replace("_", " ") }));
@@ -65,6 +66,17 @@ export const DATA_EXPLORER_SOURCES: SourceDef[] = [
     ],
     groupableFields: ["status", "categoryId", "locationId"],
     defaultColumns: ["assetTag", "name", "status", "category", "location"],
+    availableColumns: [
+      { value: "assetTag", label: "Asset Tag" },
+      { value: "name", label: "Name" },
+      { value: "status", label: "Status" },
+      { value: "category", label: "Category" },
+      { value: "location", label: "Location" },
+      { value: "assignedTo", label: "Assigned To" },
+      { value: "manufacturer", label: "Manufacturer" },
+      { value: "model", label: "Model" },
+      { value: "createdAt", label: "Created" },
+    ],
   },
   {
     id: "tickets",
@@ -81,6 +93,17 @@ export const DATA_EXPLORER_SOURCES: SourceDef[] = [
     ],
     groupableFields: ["status", "priority", "itilType", "categoryId"],
     defaultColumns: ["ticketNumber", "title", "status", "priority", "requester"],
+    availableColumns: [
+      { value: "ticketNumber", label: "Ticket #" },
+      { value: "title", label: "Title" },
+      { value: "status", label: "Status" },
+      { value: "priority", label: "Priority" },
+      { value: "itilType", label: "ITIL Type" },
+      { value: "category", label: "Category" },
+      { value: "requester", label: "Requester" },
+      { value: "dueAt", label: "Due" },
+      { value: "createdAt", label: "Created" },
+    ],
   },
   {
     id: "stock",
@@ -95,6 +118,15 @@ export const DATA_EXPLORER_SOURCES: SourceDef[] = [
     ],
     groupableFields: ["category"],
     defaultColumns: ["sku", "name", "category", "quantityOnHand", "reorderLevel"],
+    availableColumns: [
+      { value: "sku", label: "SKU" },
+      { value: "name", label: "Name" },
+      { value: "category", label: "Category" },
+      { value: "quantityOnHand", label: "Quantity On Hand" },
+      { value: "reorderLevel", label: "Reorder Level" },
+      { value: "unit", label: "Unit" },
+      { value: "createdAt", label: "Created" },
+    ],
   },
   {
     id: "docs",
@@ -109,6 +141,15 @@ export const DATA_EXPLORER_SOURCES: SourceDef[] = [
     ],
     groupableFields: ["docType", "category"],
     defaultColumns: ["title", "docType", "category", "updatedAt"],
+    availableColumns: [
+      { value: "title", label: "Title" },
+      { value: "docType", label: "Type" },
+      { value: "category", label: "Category" },
+      { value: "isPublished", label: "Published" },
+      { value: "reviewDueDate", label: "Review Due" },
+      { value: "updatedAt", label: "Updated" },
+      { value: "createdBy", label: "Created By" },
+    ],
   },
   {
     id: "network",
@@ -123,6 +164,15 @@ export const DATA_EXPLORER_SOURCES: SourceDef[] = [
     ],
     groupableFields: ["status", "deviceType", "vendor"],
     defaultColumns: ["hostname", "ipAddress", "vendor", "deviceType", "status"],
+    availableColumns: [
+      { value: "hostname", label: "Hostname" },
+      { value: "ipAddress", label: "IP Address" },
+      { value: "macAddress", label: "MAC Address" },
+      { value: "vendor", label: "Vendor" },
+      { value: "deviceType", label: "Device Type" },
+      { value: "status", label: "Status" },
+      { value: "lastSeenAt", label: "Last Seen" },
+    ],
   },
   {
     id: "users",
@@ -136,6 +186,14 @@ export const DATA_EXPLORER_SOURCES: SourceDef[] = [
     ],
     groupableFields: ["roleId"],
     defaultColumns: ["name", "email", "role", "isActive"],
+    availableColumns: [
+      { value: "name", label: "Name" },
+      { value: "email", label: "Email" },
+      { value: "role", label: "Role" },
+      { value: "isActive", label: "Active" },
+      { value: "lastLoginAt", label: "Last Login" },
+      { value: "createdAt", label: "Created" },
+    ],
   },
 ];
 
