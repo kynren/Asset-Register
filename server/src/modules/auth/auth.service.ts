@@ -93,7 +93,42 @@ export async function recordPasswordHistory(userId: number, passwordHash: string
   }
 }
 
-export async function verifyCredentials(email: string, password: string) {
+// Single choke point for "does this credential prove the caller is this user" — shared by login
+// (password OR PIN) and appSettings.controller.ts's org-switch re-verification. A 6-digit PIN has
+// far less entropy than a password, so PIN attempts deliberately share the exact same
+// failedLoginAttempts/lockedUntil counters as password attempts rather than a separate, weaker
+// lockout of their own.
+export async function verifyUserCredential(
+  user: { id: number; passwordHash: string; pinHash: string | null; pinEnabled: boolean; failedLoginAttempts: number; lockedUntil: Date | null },
+  credential: { password: string } | { pin: string }
+): Promise<void> {
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    const minutesLeft = Math.max(1, Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000));
+    throw new ApiError(423, `Account locked due to too many failed login attempts. Try again in ${minutesLeft} minute(s).`);
+  }
+
+  const valid =
+    "pin" in credential
+      ? user.pinEnabled && !!user.pinHash && (await bcrypt.compare(credential.pin, user.pinHash))
+      : await bcrypt.compare(credential.password, user.passwordHash);
+
+  if (!valid) {
+    const settings = await getSecuritySettings();
+    const attempts = user.failedLoginAttempts + 1;
+    const data: { failedLoginAttempts: number; lockedUntil?: Date } = { failedLoginAttempts: attempts };
+    if (attempts >= settings.maxFailedLoginAttempts) {
+      data.lockedUntil = new Date(Date.now() + settings.lockoutDurationMinutes * 60_000);
+    }
+    await prisma.user.update({ where: { id: user.id }, data });
+    throw new ApiError(401, "pin" in credential ? "Invalid PIN" : "Invalid email or password");
+  }
+
+  if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+    await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
+  }
+}
+
+export async function verifyCredentials(email: string, credential: { password: string } | { pin: string }) {
   const user = await prisma.user.findUnique({
     where: { email: email.toLowerCase() },
     include: { role: true },
@@ -103,27 +138,7 @@ export async function verifyCredentials(email: string, password: string) {
     throw new ApiError(401, "Invalid email or password");
   }
 
-  if (user.lockedUntil && user.lockedUntil > new Date()) {
-    const minutesLeft = Math.max(1, Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000));
-    throw new ApiError(423, `Account locked due to too many failed login attempts. Try again in ${minutesLeft} minute(s).`);
-  }
-
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) {
-    const settings = await getSecuritySettings();
-    const attempts = user.failedLoginAttempts + 1;
-    const data: { failedLoginAttempts: number; lockedUntil?: Date } = { failedLoginAttempts: attempts };
-    if (attempts >= settings.maxFailedLoginAttempts) {
-      data.lockedUntil = new Date(Date.now() + settings.lockoutDurationMinutes * 60_000);
-    }
-    await prisma.user.update({ where: { id: user.id }, data });
-    throw new ApiError(401, "Invalid email or password");
-  }
-
-  if (user.failedLoginAttempts > 0 || user.lockedUntil) {
-    await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
-  }
-
+  await verifyUserCredential(user, credential);
   return user;
 }
 
@@ -237,6 +252,7 @@ export function sanitizeUser(user: {
   mustChangePassword: boolean;
   lastLoginAt: Date | null;
   mfaEnabled: boolean;
+  pinEnabled: boolean;
 }) {
   return {
     id: user.id,
@@ -250,5 +266,6 @@ export function sanitizeUser(user: {
     mustChangePassword: user.mustChangePassword,
     lastLoginAt: user.lastLoginAt,
     mfaEnabled: user.mfaEnabled,
+    pinEnabled: user.pinEnabled,
   };
 }

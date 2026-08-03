@@ -7,6 +7,7 @@ import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/FormModal";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { PermissionGate } from "../../auth/PermissionGate";
+import { CategoryColumnsModal } from "./CategoryColumnsModal";
 
 interface FormTemplateRef {
   id: number;
@@ -34,6 +35,7 @@ export function AssetCategoriesTable() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<AssetCategory | null>(null);
   const [deleting, setDeleting] = useState<AssetCategory | null>(null);
+  const [configuringColumns, setConfiguringColumns] = useState<AssetCategory | null>(null);
   const queryClient = useQueryClient();
 
   const { data: categories, isLoading } = useQuery({
@@ -107,6 +109,11 @@ export function AssetCategoriesTable() {
               <Icon name="edit" size={12} /> Edit
             </button>
           </PermissionGate>
+          <PermissionGate module="admin" action="edit">
+            <button className="btn btn-secondary btn-sm btn-icon" title="Configure columns" onClick={() => setConfiguringColumns(row.original)}>
+              <Icon name="grid" size={12} />
+            </button>
+          </PermissionGate>
           <PermissionGate module="admin" action="create">
             <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
               <Icon name="paperclip" size={12} />
@@ -132,7 +139,7 @@ export function AssetCategoriesTable() {
           </button>
         </PermissionGate>
       </div>
-      <DataTable columns={columns} data={categories ?? []} isLoading={isLoading} clientPageSize={8} emptyMessage="No asset categories yet." />
+      <DataTable tableId="admin.assetCategories" columns={columns} data={categories ?? []} isLoading={isLoading} clientPageSize={8} emptyMessage="No asset categories yet." />
 
       {showForm && (
         <CategoryFormModal
@@ -148,6 +155,10 @@ export function AssetCategoriesTable() {
           initial={editing}
           onClose={() => setEditing(null)}
         />
+      )}
+
+      {configuringColumns && (
+        <CategoryColumnsModal categoryId={configuringColumns.id} onClose={() => setConfiguringColumns(null)} />
       )}
 
       {deleting && (

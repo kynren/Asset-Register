@@ -435,6 +435,7 @@ export function MonitoringTab() {
       <div className="card">
         <h3 className="mt-0">Monitored Devices</h3>
         <DataTable
+          tableId="network.monitoredDevices"
           columns={columns}
           data={devices ?? []}
           isLoading={isLoading}

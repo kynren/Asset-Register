@@ -110,6 +110,7 @@ export function TicketListPage() {
 
       <div className="card">
         <DataTable
+          tableId="helpdesk.tickets"
           columns={columns}
           data={data?.items ?? []}
           isLoading={isLoading}

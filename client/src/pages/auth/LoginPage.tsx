@@ -11,6 +11,8 @@ export function LoginPage() {
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [pin, setPin] = useState("");
+  const [usePin, setUsePin] = useState(false);
   const [mfaToken, setMfaToken] = useState("");
   const [mfaRequired, setMfaRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +28,8 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const result = await login(email, password, mfaRequired ? mfaToken : undefined);
+      const credential = usePin ? { pin } : { password };
+      const result = await login(email, credential, mfaRequired ? mfaToken : undefined);
       if (result.mfaRequired) {
         setMfaRequired(true);
       } else {
@@ -58,12 +61,35 @@ export function LoginPage() {
               <label>Email</label>
               <input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
             </div>
-            <div className="field">
-              <label>Password</label>
-              <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
-            <div className="row" style={{ justifyContent: "flex-end", marginTop: -8, marginBottom: 4 }}>
-              <Link to="/forgot-password" className="muted" style={{ fontSize: 12 }}>Forgot password?</Link>
+            {usePin ? (
+              <div className="field">
+                <label>PIN</label>
+                <input
+                  className="input"
+                  inputMode="numeric"
+                  required
+                  maxLength={6}
+                  placeholder="123456"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+                />
+              </div>
+            ) : (
+              <div className="field">
+                <label>Password</label>
+                <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+            )}
+            <div className="row" style={{ justifyContent: "space-between", marginTop: -8, marginBottom: 4 }}>
+              <button
+                type="button"
+                className="muted"
+                style={{ fontSize: 12, background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}
+                onClick={() => { setUsePin((v) => !v); setPassword(""); setPin(""); setError(null); }}
+              >
+                {usePin ? "Log in with password instead" : "Log in with PIN instead"}
+              </button>
+              {!usePin && <Link to="/forgot-password" className="muted" style={{ fontSize: 12 }}>Forgot password?</Link>}
             </div>
           </>
         ) : (

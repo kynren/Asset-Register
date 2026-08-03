@@ -160,7 +160,10 @@ router.post("/log", validateBody(relayLogSchema), async (req, res) => {
 // the two protocols.
 
 router.get("/next-device-job", async (_req, res) => {
-  const pending = await prisma.relayDeviceJob.findFirst({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" } });
+  // Lower priority number claims first (see RelayDeviceJob.priority) — an on-demand check (NVR,
+  // lighting, ICMP pinger, single asset ping) always jumps ahead of the background asset-heartbeat
+  // sweep's own bulk pings, so a burst of heartbeat traffic can't starve a user waiting on a result.
+  const pending = await prisma.relayDeviceJob.findFirst({ where: { status: "PENDING" }, orderBy: [{ priority: "asc" }, { createdAt: "asc" }] });
   if (!pending) {
     res.status(204).end();
     return;

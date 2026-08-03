@@ -18,6 +18,7 @@ export interface AuthUser {
   mustChangePassword: boolean;
   lastLoginAt: string | null;
   mfaEnabled: boolean;
+  pinEnabled: boolean;
 }
 
 export interface ViewingOrganization {
@@ -31,12 +32,14 @@ interface AuthContextValue {
   permissions: PermissionMap;
   organization: ViewingOrganization | null;
   loading: boolean;
-  login: (email: string, password: string, mfaToken?: string) => Promise<{ mfaRequired: boolean }>;
+  login: (email: string, credential: { password: string } | { pin: string }, mfaToken?: string) => Promise<{ mfaRequired: boolean }>;
   magicLogin: (token: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   hasPermission: (module: ModuleName, action: ActionName) => boolean;
-  switchOrganization: (organizationId: number) => Promise<void>;
+  switchOrganization: (organizationId: number, credential: { password: string } | { pin: string }, rememberMinutes: number | null) => Promise<void>;
+  /** Has the caller already re-verified their identity to switch into this org, within the remembered window? */
+  isOrgSwitchConfirmed: (organizationId: number) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -54,6 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<PermissionMap>({});
   const [organization, setOrganization] = useState<ViewingOrganization | null>(null);
   const [loading, setLoading] = useState(true);
+  const [orgSwitchConfirmedOrgId, setOrgSwitchConfirmedOrgId] = useState<number | null>(null);
+  const [orgSwitchConfirmedUntil, setOrgSwitchConfirmedUntil] = useState<string | null>(null);
 
   async function bootstrap() {
     try {
@@ -66,12 +71,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPermissions(res.data.permissions);
       setOrganization(res.data.organization ?? null);
       setViewingOrgId(res.data.organization?.id ?? null);
+      setOrgSwitchConfirmedOrgId(res.data.orgSwitchConfirmedOrgId ?? null);
+      setOrgSwitchConfirmedUntil(res.data.orgSwitchConfirmedUntil ?? null);
     } catch {
       setAccessToken(null);
       setUser(null);
       setPermissions({});
       setOrganization(null);
       setViewingOrgId(null);
+      setOrgSwitchConfirmedOrgId(null);
+      setOrgSwitchConfirmedUntil(null);
     } finally {
       setLoading(false);
     }
@@ -91,14 +100,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     applyAccentColor(user?.accentColor ?? null);
   }, [user?.accentColor]);
 
-  async function login(email: string, password: string, mfaToken?: string) {
-    const res = await axiosClient.post("/auth/login", { email, password, mfaToken });
+  async function login(email: string, credential: { password: string } | { pin: string }, mfaToken?: string) {
+    const res = await axiosClient.post("/auth/login", { email, ...credential, mfaToken });
     if (res.data.mfaRequired) return { mfaRequired: true };
     setAccessToken(res.data.accessToken);
     setUser(res.data.user);
     setPermissions(res.data.permissions);
     setOrganization(res.data.organization ?? null);
     setViewingOrgId(res.data.organization?.id ?? null);
+    setOrgSwitchConfirmedOrgId(null);
+    setOrgSwitchConfirmedUntil(null);
     return { mfaRequired: false };
   }
 
@@ -109,6 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPermissions(res.data.permissions);
     setOrganization(res.data.organization ?? null);
     setViewingOrgId(res.data.organization?.id ?? null);
+    setOrgSwitchConfirmedOrgId(null);
+    setOrgSwitchConfirmedUntil(null);
   }
 
   async function logout() {
@@ -118,6 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPermissions({});
     setOrganization(null);
     setViewingOrgId(null);
+    setOrgSwitchConfirmedOrgId(null);
+    setOrgSwitchConfirmedUntil(null);
   }
 
   async function refreshSession() {
@@ -125,6 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.data.user);
     setPermissions(res.data.permissions);
     setOrganization(res.data.organization ?? null);
+    setOrgSwitchConfirmedOrgId(res.data.orgSwitchConfirmedOrgId ?? null);
+    setOrgSwitchConfirmedUntil(res.data.orgSwitchConfirmedUntil ?? null);
   }
 
   // System Admin only (enforced server-side too) — swaps the active access token for one scoped
@@ -134,12 +151,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // and would keep serving stale results. The choice itself persists indefinitely from here (see
   // viewingOrgStore.ts + auth.controller.ts's refresh()) — it only ever changes on the next
   // switch or on logout, never on its own from a token refresh.
-  async function switchOrganization(organizationId: number) {
-    const res = await axiosClient.post(`/app-settings/organizations/${organizationId}/switch`);
+  async function switchOrganization(organizationId: number, credential: { password: string } | { pin: string }, rememberMinutes: number | null) {
+    const res = await axiosClient.post(`/app-settings/organizations/${organizationId}/switch`, { ...credential, rememberMinutes });
     setAccessToken(res.data.accessToken);
     setPermissions(res.data.permissions);
     setOrganization(res.data.organization ?? null);
     setViewingOrgId(res.data.organization?.id ?? null);
+    setOrgSwitchConfirmedOrgId(res.data.orgSwitchConfirmedOrgId ?? null);
+    setOrgSwitchConfirmedUntil(res.data.orgSwitchConfirmedUntil ?? null);
     await queryClient.cancelQueries();
     queryClient.clear();
   }
@@ -150,9 +169,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return Boolean(perm[actionKey[action]]);
   }
 
+  function isOrgSwitchConfirmed(organizationId: number) {
+    if (orgSwitchConfirmedOrgId !== organizationId) return false;
+    if (orgSwitchConfirmedUntil === null) return true;
+    return new Date(orgSwitchConfirmedUntil).getTime() > Date.now();
+  }
+
   const value = useMemo(
-    () => ({ user, permissions, organization, loading, login, magicLogin, logout, refreshSession, hasPermission, switchOrganization }),
-    [user, permissions, organization, loading]
+    () => ({ user, permissions, organization, loading, login, magicLogin, logout, refreshSession, hasPermission, switchOrganization, isOrgSwitchConfirmed }),
+    [user, permissions, organization, loading, orgSwitchConfirmedOrgId, orgSwitchConfirmedUntil]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

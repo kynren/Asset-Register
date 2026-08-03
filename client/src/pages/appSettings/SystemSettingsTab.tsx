@@ -241,7 +241,7 @@ export function SystemSettingsTab({
             </div>
           </div>
         )}
-        <DataTable columns={agentKeyColumns} data={agentKeys ?? []} clientPageSize={5} />
+        <DataTable tableId="appSettings.agentKeys" defaultViewMode="list" columns={agentKeyColumns} data={agentKeys ?? []} clientPageSize={5} />
       </div>
 
       {showPublishModal && (

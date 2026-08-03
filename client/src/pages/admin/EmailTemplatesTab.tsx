@@ -133,6 +133,7 @@ export function EmailTemplatesTab() {
       </div>
 
       <DataTable
+        tableId="admin.emailTemplates"
         columns={columns}
         data={templates ?? []}
         isLoading={isLoading}

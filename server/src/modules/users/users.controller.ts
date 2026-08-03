@@ -2,13 +2,13 @@ import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import { env } from "../../config/env";
 import { currentSchemaName, prisma } from "../../config/prisma";
-import { registerToken } from "../../config/controlPlane";
+import { registerAccount, registerToken } from "../../config/controlPlane";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { sendEventEmail } from "../../lib/emailNotify";
 import { generateTempPassword } from "../../lib/passwords";
 import { getPagination, paginatedResponse } from "../../lib/pagination";
-import { generateOpaqueToken, hashToken } from "../auth/auth.service";
+import { generateOpaqueToken, getViewingOrganization, hashToken } from "../auth/auth.service";
 
 const SYSTEM_ADMIN_ROLE_NAME = "System Admin";
 
@@ -95,6 +95,12 @@ export async function create(req: Request, res: Response) {
     data: { email: email.toLowerCase(), firstName, lastName, roleId, passwordHash, mustChangePassword: true },
     select: userSelect,
   });
+
+  // Login resolves which tenant schema an email belongs to via this cross-tenant control-plane
+  // index (see resolveAccountSchema in controlPlane.ts) — without this, a user created here could
+  // never log in at all, since their email would be absent from that index.
+  const organization = await getViewingOrganization(currentSchemaName());
+  if (organization) await registerAccount(user.email, currentSchemaName(), organization.id);
 
   await logAudit({ userId: req.user!.id, action: "user.create", entityType: "User", entityId: user.id });
   await sendEventEmail({

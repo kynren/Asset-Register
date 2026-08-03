@@ -156,6 +156,7 @@ export function SwitchingTab() {
           </PermissionGate>
         </div>
         <DataTable
+          tableId="network.adoptedSwitches"
           columns={adoptedColumns}
           data={data?.adopted ?? []}
           isLoading={isLoading}
@@ -174,6 +175,8 @@ export function SwitchingTab() {
           IP Range Scanner to refresh this list.
         </p>
         <DataTable
+          tableId="network.discoveredSwitches"
+          defaultViewMode="list"
           columns={discoveredColumns}
           data={data?.discovered ?? []}
           isLoading={isLoading}

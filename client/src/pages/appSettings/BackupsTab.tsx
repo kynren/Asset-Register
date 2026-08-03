@@ -290,6 +290,8 @@ export function BackupsTab({
       <div className="card">
         <h3 className="mt-0">Run History</h3>
         <DataTable
+          tableId="appSettings.backupRuns"
+          defaultViewMode="list"
           columns={runColumns}
           data={runsPage?.runs ?? []}
           isLoading={runsLoading}

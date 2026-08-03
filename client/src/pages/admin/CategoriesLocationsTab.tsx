@@ -119,6 +119,7 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
         />
       </BulkActionsBar>
       <DataTable
+        tableId={`admin.${queryKey}`}
         columns={columns}
         data={data ?? []}
         isLoading={isLoading}

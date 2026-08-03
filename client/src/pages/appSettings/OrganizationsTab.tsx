@@ -1,27 +1,30 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/FormModal";
-import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Icon } from "../../components/Icon";
 import { PasswordInput } from "../../components/PasswordInput";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { useAuth } from "../../auth/AuthContext";
+import { OrganizationLogoCard } from "./OrganizationLogoCard";
+import { OrgSwitchConfirmModal } from "./OrgSwitchConfirmModal";
 
 interface OrganizationRow {
   id: number;
   name: string;
   schemaName: string;
   createdAt: string;
+  logoUrl: string | null;
 }
 
-export function OrganizationsTab({ onOrgSelected, strictActiveDisable }: { onOrgSelected?: () => void; strictActiveDisable?: boolean }) {
+export function OrganizationsTab({ strictActiveDisable }: { strictActiveDisable?: boolean }) {
   const [showCreate, setShowCreate] = useState(false);
   const [editingOrg, setEditingOrg] = useState<OrganizationRow | null>(null);
   const [pendingSwitchOrg, setPendingSwitchOrg] = useState<OrganizationRow | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { organization, switchOrganization } = useAuth();
   const [switchingId, setSwitchingId] = useState<number | null>(null);
@@ -31,13 +34,15 @@ export function OrganizationsTab({ onOrgSelected, strictActiveDisable }: { onOrg
     queryFn: async () => (await axiosClient.get("/app-settings/organizations")).data as OrganizationRow[],
   });
 
-  async function confirmSwitch() {
+  async function confirmSwitch(credential: { password: string } | { pin: string }, rememberMinutes: number | null) {
     if (!pendingSwitchOrg) return;
     setSwitchingId(pendingSwitchOrg.id);
+    setSwitchError(null);
     try {
-      await switchOrganization(pendingSwitchOrg.id);
+      await switchOrganization(pendingSwitchOrg.id, credential, rememberMinutes);
       setPendingSwitchOrg(null);
-      onOrgSelected?.();
+    } catch (err: any) {
+      setSwitchError(err.response?.data?.error ?? "Could not verify your credential.");
     } finally {
       setSwitchingId(null);
     }
@@ -89,15 +94,30 @@ export function OrganizationsTab({ onOrgSelected, strictActiveDisable }: { onOrg
       </div>
 
       <div className="card">
-        <DataTable columns={columns} data={data ?? []} isLoading={isLoading} emptyMessage="No organizations yet." />
+        <DataTable
+          tableId="appSettings.organizations"
+          columns={columns}
+          data={data ?? []}
+          isLoading={isLoading}
+          emptyMessage="No organizations yet."
+          renderCard={(org) => (
+            <OrganizationLogoCard
+              organization={org}
+              isActive={org.id === organization?.id}
+              disabled={(strictActiveDisable ? org.id === organization?.id : false) || switchingId !== null}
+              onSwitch={() => setPendingSwitchOrg(org)}
+              onEdit={() => setEditingOrg(org)}
+            />
+          )}
+        />
       </div>
 
       {pendingSwitchOrg && (
-        <ConfirmDialog
-          title={`Manage ${pendingSwitchOrg.name}?`}
-          message='You are now managing this organization. Changes you save here take effect immediately for its users — use "Schedule for Later" when saving a change if you want to avoid disrupting them.'
-          loading={switchingId !== null}
-          onCancel={() => setPendingSwitchOrg(null)}
+        <OrgSwitchConfirmModal
+          organizationName={pendingSwitchOrg.name}
+          submitting={switchingId !== null}
+          error={switchError}
+          onCancel={() => { setPendingSwitchOrg(null); setSwitchError(null); }}
           onConfirm={confirmSwitch}
         />
       )}
@@ -129,18 +149,48 @@ export function OrganizationsTab({ onOrgSelected, strictActiveDisable }: { onOrg
 function EditOrganizationModal({ organization, onClose, onSaved }: { organization: OrganizationRow; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(organization.name);
   const [schemaName, setSchemaName] = useState(organization.schemaName);
+  const [logoUrl, setLogoUrl] = useState(organization.logoUrl);
   const isDefaultOrg = organization.schemaName === "public";
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const mutation = useMutation({
     mutationFn: () => axiosClient.patch(`/app-settings/organizations/${organization.id}`, { name, schemaName }),
     onSuccess: () => onSaved(),
   });
 
+  const logoMutation = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return axiosClient.post(`/app-settings/organizations/${organization.id}/logo`, formData, { headers: { "Content-Type": "multipart/form-data" } });
+    },
+    onSuccess: (res) => setLogoUrl(res.data.logoUrl),
+  });
+
+  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) logoMutation.mutate(file);
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  }
+
   const canSubmit = name.trim() && schemaName.trim();
 
   return (
     <FormModal title="Edit Organization" onClose={onClose} onSubmit={() => mutation.mutate()} submitting={mutation.isPending} submitDisabled={!canSubmit}>
       {mutation.isError && <div className="alert alert-danger">{(mutation.error as any)?.response?.data?.error ?? "Could not save this organization."}</div>}
+
+      <div className="field">
+        <label>Logo</label>
+        <div className="row gap-3" style={{ alignItems: "center" }}>
+          <div style={{ width: 48, height: 48, borderRadius: 8, background: "var(--color-bg)", border: "1px solid var(--color-border)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            {logoUrl ? <img src={logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Icon name="briefcase" size={18} />}
+          </div>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={logoMutation.isPending} onClick={() => logoInputRef.current?.click()}>
+            {logoMutation.isPending ? "Uploading..." : "Upload Logo"}
+          </button>
+          <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoChange} />
+        </div>
+      </div>
 
       <div className="field"><label>Organization Name *</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
 
@@ -160,8 +210,9 @@ function EditOrganizationModal({ organization, onClose, onSaved }: { organizatio
         </p>
       )}
       <p className="muted" style={{ fontSize: 12 }}>
-        Branding, logo, and every other per-organization setting is edited by selecting this organization to manage
-        (use the arrow icon in the Organizations table) and opening System Settings there.
+        The logo above is shown here in the Organizations list. Everything else per-organization (app icon, favicon,
+        and other branding) is edited by selecting this organization to manage (use the arrow icon in the
+        Organizations table) and opening System Settings there.
       </p>
     </FormModal>
   );

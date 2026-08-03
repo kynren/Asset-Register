@@ -12,9 +12,14 @@ router.use(verifyJwt);
 // req.user!.id, never another account), just to stop an arbitrary/unbounded set of rows from
 // accumulating under a typo'd key.
 const KNOWN_KEYS = new Set(["nvr.matrixLayout", "sidebar.collapsed", "theme", "accessControl.cardReaderSettings"]);
+// Prefixes cover key families with unbounded suffixes (e.g. one viewMode key per DataTable
+// instance) that can't be hand-enumerated in KNOWN_KEYS.
+const KNOWN_KEY_PREFIXES = ["dataTable.viewMode."];
 
 function assertKnownKey(key: string) {
-  if (!KNOWN_KEYS.has(key)) throw new ApiError(400, `Unknown preference key: ${key}`);
+  if (KNOWN_KEYS.has(key)) return;
+  if (KNOWN_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) return;
+  throw new ApiError(400, `Unknown preference key: ${key}`);
 }
 
 router.get("/:key", async (req, res) => {

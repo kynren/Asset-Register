@@ -4,7 +4,6 @@ import { ColumnDef } from "@tanstack/react-table";
 import { NavigateFunction, useNavigate, useSearchParams } from "react-router-dom";
 import { axiosClient } from "../../api/axiosClient";
 import { DataTable } from "../../components/DataTable";
-import { StatusBadge } from "../../components/StatusBadge";
 import { Icon } from "../../components/Icon";
 import { CsvExportButton } from "../../components/CsvButtons";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
@@ -15,35 +14,13 @@ import { QrLabelModal } from "./QrLabelModal";
 import { QrScannerModal } from "./QrScannerModal";
 import { DiscoverDevicesModal } from "./DiscoverDevicesModal";
 import { AssetImportWizardModal } from "./AssetImportWizardModal";
-import { AssetTelemetryCell } from "./AssetTelemetryCell";
-import { Skeleton } from "../../components/Skeleton";
 import { CategoryTabBar } from "../docs/CategoryTabBar";
 import { AssetCollectionsManageModal } from "./AssetCollectionsManageModal";
+import { AddAssetCategoryModal } from "./AddAssetCategoryModal";
+import { Asset } from "./assetTypes";
+import { buildAssetColumnDefs, STATUS_OPTIONS } from "./assetColumnBuilder";
 
-export interface Asset {
-  id: number;
-  assetTag: string;
-  name: string;
-  status: string;
-  signOffStatus: string;
-  categoryId: number | null;
-  category: { name: string } | null;
-  locationId: number | null;
-  location: { name: string } | null;
-  assignedToId: number | null;
-  assignedTo: { id: number; firstName: string; lastName: string } | null;
-  manufacturer: string | null;
-  model: string | null;
-  serialNumber: string | null;
-  nextServiceDate: string | null;
-  notes: string | null;
-  device: { lastSeen: string; batteryPresent: boolean | null; batteryPercent: number | null; batteryCharging: boolean | null } | null;
-  featuredImageUrl: string | null;
-  gridPowered: boolean;
-  remoteManagementEnabled: boolean;
-}
-
-const STATUS_OPTIONS = ["IN_USE", "IN_STORAGE", "IN_REPAIR", "RETIRED", "LOST"];
+export type { Asset };
 
 export function AssetListPage() {
   const [searchParams] = useSearchParams();
@@ -53,10 +30,11 @@ export function AssetListPage() {
   const [assignedToId, setAssignedToId] = useState(searchParams.get("assignedToId") ?? "");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkStatus, setBulkStatus] = useState("IN_STORAGE");
   const [showForm, setShowForm] = useState(false);
+  const [newAssetCategoryId, setNewAssetCategoryId] = useState<number | null>(null);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [editing, setEditing] = useState<Asset | null>(null);
   const [deleting, setDeleting] = useState<Asset | null>(null);
   const [qrAsset, setQrAsset] = useState<Asset | null>(null);
@@ -181,7 +159,7 @@ export function AssetListPage() {
   // Remounts every category section (resetting its own page back to 1) whenever a filter that
   // changes the underlying result set changes — cheaper and simpler than wiring a reset effect
   // into each section individually.
-  const filtersKey = JSON.stringify({ ...filters, viewMode });
+  const filtersKey = JSON.stringify(filters);
 
   return (
     <div>
@@ -191,7 +169,35 @@ export function AssetListPage() {
           <p className="page-subtitle">Track and manage all Kynren IT and physical assets.</p>
         </div>
         <PermissionGate module="assets" action="create">
-          <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" size={14} /> Add Hardware Asset</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              if (categoryId != null) {
+                setNewAssetCategoryId(categoryId);
+                setShowForm(true);
+              } else if (activeCollection) {
+                // A top-level collection tab (e.g. Harness) is active but no specific category
+                // chip is picked — the collection already narrows things down, so skip the
+                // picker and default straight to the first (often only) category in it.
+                const firstInCollection = visibleCategories?.[0];
+                if (firstInCollection) {
+                  setNewAssetCategoryId(firstInCollection.id);
+                  setShowForm(true);
+                } else {
+                  setShowCategoryPicker(true);
+                }
+              } else {
+                setShowCategoryPicker(true);
+              }
+            }}
+          >
+            <Icon name="plus" size={14} />
+            {categoryId != null
+              ? `Add ${categories?.find((c: any) => c.id === categoryId)?.name ?? "Asset"}`
+              : activeCollection
+              ? `Add ${activeCollection}`
+              : "Add Asset"}
+          </button>
         </PermissionGate>
       </div>
 
@@ -248,10 +254,6 @@ export function AssetListPage() {
             <Icon name="upload" size={14} /> Import CSV
           </button>
         </PermissionGate>
-        <div className="row gap-1">
-          <button className={`btn btn-sm btn-icon ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("list")} title="List view"><Icon name="grid" size={13} /></button>
-          <button className={`btn btn-sm btn-icon ${viewMode === "grid" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("grid")} title="Grid view"><Icon name="camera" size={13} /></button>
-        </div>
       </div>
 
       {showImportWizard && (
@@ -276,7 +278,6 @@ export function AssetListPage() {
             key={`${c.id}:${filtersKey}`}
             category={c}
             filters={filters}
-            viewMode={viewMode}
             canEdit={canEdit}
             users={users}
             selectedIds={selectedIds}
@@ -292,8 +293,26 @@ export function AssetListPage() {
         ))}
       </div>
 
+      {showCategoryPicker && (
+        <AddAssetCategoryModal
+          collections={collections ?? []}
+          categories={categories ?? []}
+          onSelect={(id) => {
+            setNewAssetCategoryId(id);
+            setShowCategoryPicker(false);
+            setShowForm(true);
+          }}
+          onClose={() => setShowCategoryPicker(false)}
+        />
+      )}
+
       {showForm && (
-        <AssetFormModal onClose={() => setShowForm(false)} onSubmit={(v) => createMutation.mutate(v)} submitting={createMutation.isPending} />
+        <AssetFormModal
+          initial={{ categoryId: newAssetCategoryId }}
+          onClose={() => setShowForm(false)}
+          onSubmit={(v) => createMutation.mutate(v)}
+          submitting={createMutation.isPending}
+        />
       )}
       {editing && (
         <AssetFormModal
@@ -340,7 +359,6 @@ export function AssetListPage() {
 interface CategoryAssetsSectionProps {
   category: { id: number; name: string };
   filters: Record<string, unknown>;
-  viewMode: "list" | "grid";
   canEdit: boolean;
   users: any[] | undefined;
   selectedIds: number[];
@@ -360,7 +378,6 @@ interface CategoryAssetsSectionProps {
 function CategoryAssetsSection({
   category,
   filters,
-  viewMode,
   canEdit,
   users,
   selectedIds,
@@ -376,129 +393,34 @@ function CategoryAssetsSection({
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["assets", { ...filters, categoryId: category.id, page, viewMode }],
+    queryKey: ["assets", { ...filters, categoryId: category.id, page }],
     queryFn: async () =>
-      (await axiosClient.get("/assets", { params: { ...filters, categoryId: category.id, page, pageSize: viewMode === "grid" ? 24 : 15 } })).data,
+      (await axiosClient.get("/assets", { params: { ...filters, categoryId: category.id, page, pageSize: 20 } })).data,
+  });
+
+  // Same call AssetFormModal.tsx already makes for its own custom-field rendering — gets us
+  // `tableColumns` and the live `formTemplate.fields` list the column builder resolves `field:`
+  // keys against, with no extra server response shape needed (customFieldValues is already
+  // included in every GET /assets response above).
+  const { data: categoryDetail } = useQuery({
+    queryKey: ["asset-category-detail", category.id],
+    queryFn: async () => (await axiosClient.get(`/asset-categories/${category.id}`)).data,
   });
 
   const columns: ColumnDef<Asset, any>[] = useMemo(
-    () => [
-      {
-        header: "Asset",
-        cell: ({ row }) => (
-          <div>
-            <div style={{ fontWeight: 600 }}>{row.original.name}</div>
-            <div className="muted" style={{ fontSize: 11 }}>{row.original.assetTag}{row.original.serialNumber ? ` · SN ${row.original.serialNumber}` : ""}</div>
-          </div>
-        ),
-      },
-      {
-        header: "Status",
-        cell: ({ row }) =>
-          canEdit ? (
-            <select
-              className="select"
-              style={{ fontSize: 12, padding: "4px 6px" }}
-              value={row.original.status}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => quickPatchMutation.mutate({ id: row.original.id, data: { status: e.target.value } })}
-            >
-              {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
-            </select>
-          ) : (
-            <StatusBadge status={row.original.status} />
-          ),
-      },
-      { header: "Location", accessorFn: (r) => r.location?.name ?? "—" },
-      {
-        header: "Power",
-        cell: ({ row }) => {
-          const a = row.original;
-          if (a.gridPowered) {
-            return (
-              <span className="badge badge-neutral" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <Icon name="plug" size={11} /> Grid
-              </span>
-            );
-          }
-          const battery = a.device;
-          if (!battery || battery.batteryPresent !== true || battery.batteryPercent == null) {
-            return <span className="muted" style={{ fontSize: 12 }}>—</span>;
-          }
-          const level = battery.batteryPercent;
-          const color = level <= 20 ? "var(--color-danger)" : level <= 50 ? "var(--color-warning)" : "var(--color-success)";
-          return (
-            <span
-              className="row gap-1"
-              style={{ fontSize: 12, alignItems: "center", color }}
-              title={battery.batteryCharging ? "Charging" : "On battery"}
-            >
-              <Icon name="battery" size={13} />
-              {level}%{battery.batteryCharging ? " ⚡" : ""}
-            </span>
-          );
-        },
-      },
-      {
-        header: "Telemetry",
-        cell: ({ row }) => <AssetTelemetryCell assetId={row.original.id} />,
-      },
-      {
-        header: "Custodian",
-        cell: ({ row }) =>
-          canEdit ? (
-            <select
-              className="select"
-              style={{ fontSize: 12, padding: "4px 6px" }}
-              value={row.original.assignedToId ?? ""}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => quickPatchMutation.mutate({ id: row.original.id, data: { assignedToId: e.target.value ? Number(e.target.value) : null } })}
-            >
-              <option value="">Unassigned</option>
-              {users?.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-            </select>
-          ) : (
-            <span>{row.original.assignedTo ? `${row.original.assignedTo.firstName} ${row.original.assignedTo.lastName}` : "Unassigned"}</span>
-          ),
-      },
-      {
-        header: "Sign-off",
-        cell: ({ row }) => (
-          <button
-            className={`badge ${row.original.signOffStatus === "CONFIRMED" ? "badge-success" : "badge-warning"}`}
-            style={{ border: "none", cursor: canEdit ? "pointer" : "default" }}
-            disabled={!canEdit}
-            onClick={(e) => {
-              e.stopPropagation();
-              quickPatchMutation.mutate({ id: row.original.id, data: { signOffStatus: row.original.signOffStatus === "CONFIRMED" ? "PENDING" : "CONFIRMED" } });
-            }}
-          >
-            {row.original.signOffStatus}
-          </button>
-        ),
-      },
-      {
-        header: "",
-        id: "actions",
-        cell: ({ row }) => (
-          <div className="row gap-1" onClick={(e) => e.stopPropagation()}>
-            <button className="btn btn-secondary btn-sm btn-icon" title="View" onClick={() => navigate(`/assets/${row.original.id}`)}><Icon name="search" size={12} /></button>
-            <PermissionGate module="assets" action="edit">
-              <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={() => onEdit(row.original)}><Icon name="edit" size={12} /></button>
-            </PermissionGate>
-            <button className="btn btn-secondary btn-sm btn-icon" title="Print QR label" onClick={() => onQr(row.original)}><Icon name="grid" size={12} /></button>
-            <PermissionGate module="assets" action="create">
-              <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}><Icon name="paperclip" size={12} /></button>
-            </PermissionGate>
-            <button className="btn btn-secondary btn-sm btn-icon" title="Copy share link" onClick={() => copyShareLink(row.original)}><Icon name="chevronRight" size={12} /></button>
-            <PermissionGate module="assets" action="delete">
-              <button className="btn btn-danger btn-sm btn-icon" title="Delete" onClick={() => onDelete(row.original)}><Icon name="trash" size={12} /></button>
-            </PermissionGate>
-          </div>
-        ),
-      },
-    ],
-    [canEdit, users, quickPatchMutation, duplicateMutation, navigate, onEdit, onQr, onDelete, copyShareLink]
+    () =>
+      buildAssetColumnDefs(categoryDetail?.tableColumns ?? null, categoryDetail?.formTemplate?.fields, {
+        canEdit,
+        users,
+        quickPatchMutation,
+        duplicateMutation,
+        navigate,
+        onEdit,
+        onDelete,
+        onQr,
+        copyShareLink,
+      }),
+    [categoryDetail, canEdit, users, quickPatchMutation, duplicateMutation, navigate, onEdit, onQr, onDelete, copyShareLink]
   );
 
   return (
@@ -506,31 +428,23 @@ function CategoryAssetsSection({
       <h3 className="mt-0 mb-0" style={{ marginBottom: 12 }}>
         {category.name} <span className="badge badge-neutral" style={{ marginLeft: 6 }}>{data?.total ?? 0}</span>
       </h3>
-      {viewMode === "grid" ? (
-        <div className="grid grid-cols-4">
-          {isLoading && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} height={140} />)}
-          {!isLoading && (data?.items ?? []).map((a: Asset) => (
-            <AssetGridCard key={a.id} asset={a} onOpen={() => navigate(`/assets/${a.id}`)} />
-          ))}
-          {(data?.items ?? []).length === 0 && !isLoading && <div className="empty-state">No {category.name} assets found.</div>}
-        </div>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={data?.items ?? []}
-          isLoading={isLoading}
-          page={data?.page}
-          totalPages={data?.totalPages}
-          onPageChange={setPage}
-          onRowClick={(row) => navigate(`/assets/${row.id}`)}
-          selection={{
-            selectedIds: new Set(selectedIds),
-            onSelectedIdsChange: (next) => onSelectedIdsChange(Array.from(next)),
-            getRowId: (a) => a.id,
-          }}
-          emptyMessage={`No ${category.name} assets found.`}
-        />
-      )}
+      <DataTable
+        tableId={`assets.category.${category.id}`}
+        columns={columns}
+        data={data?.items ?? []}
+        isLoading={isLoading}
+        page={data?.page}
+        totalPages={data?.totalPages}
+        onPageChange={setPage}
+        onRowClick={(row) => navigate(`/assets/${row.id}`)}
+        renderCard={(a) => <AssetGridCard asset={a} onOpen={() => navigate(`/assets/${a.id}`)} />}
+        selection={{
+          selectedIds: new Set(selectedIds),
+          onSelectedIdsChange: (next) => onSelectedIdsChange(Array.from(next)),
+          getRowId: (a) => a.id,
+        }}
+        emptyMessage={`No ${category.name} assets found.`}
+      />
     </div>
   );
 }

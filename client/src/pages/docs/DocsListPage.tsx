@@ -155,6 +155,8 @@ export function DocsListPage() {
       {view === "table" && (
         <div className="card">
           <DataTable
+            tableId="docs.list"
+            defaultViewMode="list"
             columns={columns}
             data={data?.items ?? []}
             isLoading={isLoading}
