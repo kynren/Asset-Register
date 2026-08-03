@@ -76,7 +76,7 @@ export function HarnessDetailPage({ asset, onUpdated }: { asset: AssetDetail; on
     <div className="ad-shell">
       <div className="ad-header">
         <div className="ad-header-left">
-          <button className="ad-back-btn" onClick={() => navigate("/harness")} title="Back to Harness Register">
+          <button className="ad-back-btn" onClick={() => navigate("/assets")} title="Back to Asset Inventory">
             <Icon name="arrowLeft" size={16} />
           </button>
           <div className="ad-title-block">

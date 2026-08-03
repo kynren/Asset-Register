@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import QRCode from "qrcode";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { AssetDetail } from "./detail/types";
+import { HarnessDetailPage } from "./HarnessDetailPage";
 import { AssetProfileTab } from "./detail/AssetProfileTab";
 import { ImpactAnalysisTab } from "./detail/ImpactAnalysisTab";
 import { LocationHistoryTab } from "./detail/LocationHistoryTab";
@@ -131,7 +132,7 @@ export function AssetDetailPage() {
   }
 
   if (asset.category?.name === "Harness") {
-    return <Navigate to={`/harness/${asset.id}`} replace />;
+    return <HarnessDetailPage asset={asset} onUpdated={invalidate} />;
   }
 
   const isOnline = asset.device ? Date.now() - new Date(asset.device.lastSeen).getTime() < 15 * 60 * 1000 : null;

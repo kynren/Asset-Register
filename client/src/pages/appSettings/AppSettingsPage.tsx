@@ -6,12 +6,14 @@ import { SystemStatusTab } from "./SystemStatusTab";
 import { ChangeManagementTab } from "./ChangeManagementTab";
 import { AgentLogTab } from "./AgentLogTab";
 import { RolesTab } from "../admin/RolesTab";
+import { UsersTab } from "../admin/UsersTab";
 import { Icon } from "../../components/Icon";
 import { useAuth } from "../../auth/AuthContext";
 import { CHANGE_TYPE_INFO, ScheduledChangeRow } from "./scheduledChangeTypes";
 
 const TABS = [
   { key: "organizations", label: "Organizations" },
+  { key: "users", label: "Users" },
   { key: "roles", label: "Roles & Permissions" },
   { key: "backups", label: "Backups" },
   { key: "settings", label: "System Settings" },
@@ -101,6 +103,14 @@ export function AppSettingsPage() {
       </div>
 
       {activeTab === "organizations" && <OrganizationsTab onOrgSelected={handleOrgSelected} strictActiveDisable={orgConfirmed} />}
+      {activeTab === "users" && (
+        <div className="stack gap-3">
+          <p className="muted" style={{ margin: 0 }}>
+            Managing users for <strong>{organization?.name ?? "the current organization"}</strong>.
+          </p>
+          <UsersTab />
+        </div>
+      )}
       {activeTab === "roles" && (
         <div className="stack gap-3">
           <p className="muted" style={{ margin: 0 }}>
