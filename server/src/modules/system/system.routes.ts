@@ -19,6 +19,14 @@ router.get("/info", async (_req, res) => {
   });
 });
 
+// Powers App Settings → Agent Log, fed by the relay agent's periodic uploads to
+// POST /api/network-relay/log (see relay.routes.ts). Rows older than 24h are pruned by
+// pruneAgentLogEntries() (lib/agentLogPruner.ts).
+router.get("/agent-log", requirePermission("app-settings", "view"), async (_req, res) => {
+  const entries = await prisma.agentLogEntry.findMany({ orderBy: { createdAt: "desc" }, take: 300 });
+  res.json(entries);
+});
+
 // Reports back what this device's own IP is — real values only (no fabricated "public IP"
 // lookups). A remote server behind NAT can only ever see the shared public/router IP of an
 // incoming connection, which is legitimately identical for every device on the same office

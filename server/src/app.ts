@@ -11,6 +11,7 @@ import authRoutes from "./modules/auth/auth.routes";
 import usersRoutes from "./modules/users/users.routes";
 import rolesRoutes from "./modules/roles/roles.routes";
 import assetCategoriesRoutes from "./modules/assetCategories/assetCategories.routes";
+import assetCollectionsRoutes from "./modules/assetCollections/assetCollections.routes";
 import locationsRoutes from "./modules/locations/locations.routes";
 import assetsRoutes from "./modules/assets/assets.routes";
 import devicesRoutes from "./modules/devices/devices.routes";
@@ -72,6 +73,7 @@ export function createApp() {
   app.use("/api/users", usersRoutes);
   app.use("/api/roles", rolesRoutes);
   app.use("/api/asset-categories", assetCategoriesRoutes);
+  app.use("/api/asset-collections", assetCollectionsRoutes);
   app.use("/api/locations", locationsRoutes);
   app.use("/api/assets", assetsRoutes);
   app.use("/api/asset-resources", assetResourcesRoutes);

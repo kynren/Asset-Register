@@ -4,6 +4,7 @@ import { BackupsTab } from "./BackupsTab";
 import { SystemSettingsTab } from "./SystemSettingsTab";
 import { SystemStatusTab } from "./SystemStatusTab";
 import { ChangeManagementTab } from "./ChangeManagementTab";
+import { AgentLogTab } from "./AgentLogTab";
 import { RolesTab } from "../admin/RolesTab";
 import { Icon } from "../../components/Icon";
 import { useAuth } from "../../auth/AuthContext";
@@ -16,6 +17,7 @@ const TABS = [
   { key: "settings", label: "System Settings" },
   { key: "status", label: "System Status" },
   { key: "changeManagement", label: "Change Management" },
+  { key: "agentLog", label: "Agent Log" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -125,6 +127,7 @@ export function AppSettingsPage() {
       )}
       {activeTab === "status" && <SystemStatusTab />}
       {activeTab === "changeManagement" && <ChangeManagementTab onEdit={handleEditScheduledChange} />}
+      {activeTab === "agentLog" && <AgentLogTab />}
     </div>
   );
 }

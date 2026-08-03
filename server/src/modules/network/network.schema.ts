@@ -94,6 +94,10 @@ export const relayDiscoverySchema = z.object({
   subnets: z.array(z.object({ cidr: z.string().min(1), label: z.string().nullable().optional() })).default([]),
 });
 
+export const relayLogSchema = z.object({
+  lines: z.array(z.string()).max(200),
+});
+
 // ───────────────────────── Generic relay device job (PING/HTTP) ─────────────────────────
 
 export const relayDeviceJobCompleteSchema = z.object({

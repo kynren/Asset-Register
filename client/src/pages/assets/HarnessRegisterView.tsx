@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
+import { ColumnDef } from "@tanstack/react-table";
 import { useNavigate } from "react-router-dom";
 import { axiosClient } from "../../api/axiosClient";
+import { DataTable } from "../../components/DataTable";
 import { Icon } from "../../components/Icon";
 import { Asset } from "./AssetListPage";
-import { SkeletonTableRows } from "../../components/Skeleton";
 import { PermissionGate } from "../../auth/PermissionGate";
 
 interface CustomFieldValue {
@@ -48,8 +49,11 @@ function TestCycleCell({ testDate, expiryDate }: { testDate: string | null | und
 }
 
 // Dedicated compliance-register view for the Harness category, laid out to match the source
-// "Harness Certification Matrix" spreadsheet. Days-remaining is always computed live from the
-// stored expiry dates rather than imported as a static number, so it never goes stale.
+// "Harness Certification Matrix" spreadsheet — but built on the app's standard DataTable
+// component (sorting, resizing, per-column filters, search) rather than a bespoke table, so it
+// looks and behaves like every other data grid in the app. Days-remaining is always computed
+// live from the stored expiry dates rather than imported as a static number, so it never goes
+// stale.
 export function HarnessRegisterView({ categoryId, onEdit }: { categoryId: number; onEdit: (asset: HarnessAsset) => void }) {
   const navigate = useNavigate();
   const { data, isLoading } = useQuery({
@@ -57,64 +61,53 @@ export function HarnessRegisterView({ categoryId, onEdit }: { categoryId: number
     queryFn: async () => (await axiosClient.get("/assets", { params: { categoryId, pageSize: 200 } })).data.items as HarnessAsset[],
   });
 
-  return (
-    <div className="card" style={{ overflowX: "auto" }}>
-      <table className="ad-table" style={{ minWidth: 1400 }}>
-        <thead>
-          <tr>
-            <th>Make and Model</th>
-            <th>Serial No.</th>
-            <th>ID/Batch Number</th>
-            <th>Test Cert No.</th>
-            <th>Tester</th>
-            <th>Notes</th>
-            <th>Manufacture Date</th>
-            <th>Life Span Expiry</th>
-            <th>Test 1</th>
-            <th>Test 2</th>
-            <th>Test 3</th>
-            <th>Purchased From</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {isLoading && <SkeletonTableRows columns={13} />}
-          {data?.map((asset) => {
-            const f = fieldMap(asset);
-            return (
-              <tr key={asset.id} style={{ cursor: "pointer" }} onClick={() => navigate(`/harness/${asset.id}`)}>
-                <td>
-                  <div style={{ fontWeight: 600 }}>{asset.name}</div>
-                  <div className="muted" style={{ fontSize: 11 }}>{asset.assetTag}</div>
-                </td>
-                <td>{asset.serialNumber ?? "—"}</td>
-                <td>{f.id_batch_number ?? "—"}</td>
-                <td>{f.test_cert_no ?? "—"}</td>
-                <td>{f.tester ?? "—"}</td>
-                <td style={{ maxWidth: 180 }}>{asset.notes ?? "—"}</td>
-                <td>{f.manufacture_date ?? "—"}</td>
-                <td><ExpiryCell dateStr={f.life_span_expiry_date} /></td>
-                <td><TestCycleCell testDate={f.test_1_test_date} expiryDate={f.test_1_expiry_date} /></td>
-                <td><TestCycleCell testDate={f.test_2_test_date} expiryDate={f.test_2_expiry_date} /></td>
-                <td><TestCycleCell testDate={f.test_3_test_date} expiryDate={f.test_3_expiry_date} /></td>
-                <td style={{ maxWidth: 200, fontSize: 11 }}>{f.purchased_from ?? "—"}</td>
-                <td onClick={(e) => e.stopPropagation()}>
-                  <PermissionGate module="harness" action="edit">
-                    <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={() => onEdit(asset)}>
-                      <Icon name="edit" size={12} />
-                    </button>
-                  </PermissionGate>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {!isLoading && (data ?? []).length === 0 && (
-        <div className="empty-state">
-          <Icon name="assets" size={20} /> No harnesses registered yet.
+  const columns: ColumnDef<HarnessAsset, any>[] = [
+    {
+      header: "Make and Model",
+      cell: ({ row }) => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{row.original.name}</div>
+          <div className="muted" style={{ fontSize: 11 }}>{row.original.assetTag}</div>
         </div>
-      )}
+      ),
+    },
+    { header: "Serial No.", accessorFn: (r) => r.serialNumber ?? "—" },
+    { header: "ID/Batch Number", accessorFn: (r) => fieldMap(r).id_batch_number ?? "—" },
+    { header: "Test Cert No.", accessorFn: (r) => fieldMap(r).test_cert_no ?? "—" },
+    { header: "Tester", accessorFn: (r) => fieldMap(r).tester ?? "—" },
+    { header: "Notes", cell: ({ row }) => <span style={{ maxWidth: 180, display: "inline-block" }}>{row.original.notes ?? "—"}</span> },
+    { header: "Manufacture Date", accessorFn: (r) => fieldMap(r).manufacture_date ?? "—" },
+    { header: "Life Span Expiry", cell: ({ row }) => <ExpiryCell dateStr={fieldMap(row.original).life_span_expiry_date} /> },
+    { header: "Test 1", cell: ({ row }) => <TestCycleCell testDate={fieldMap(row.original).test_1_test_date} expiryDate={fieldMap(row.original).test_1_expiry_date} /> },
+    { header: "Test 2", cell: ({ row }) => <TestCycleCell testDate={fieldMap(row.original).test_2_test_date} expiryDate={fieldMap(row.original).test_2_expiry_date} /> },
+    { header: "Test 3", cell: ({ row }) => <TestCycleCell testDate={fieldMap(row.original).test_3_test_date} expiryDate={fieldMap(row.original).test_3_expiry_date} /> },
+    { header: "Purchased From", cell: ({ row }) => <span style={{ maxWidth: 200, fontSize: 11, display: "inline-block" }}>{fieldMap(row.original).purchased_from ?? "—"}</span> },
+    {
+      header: "",
+      id: "actions",
+      cell: ({ row }) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <PermissionGate module="harness" action="edit">
+            <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={() => onEdit(row.original)}>
+              <Icon name="edit" size={12} />
+            </button>
+          </PermissionGate>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="card">
+      <DataTable
+        columns={columns}
+        data={data ?? []}
+        isLoading={isLoading}
+        clientPageSize={15}
+        onRowClick={(row) => navigate(`/harness/${row.id}`)}
+        emptyMessage="No harnesses registered yet."
+        searchPlaceholder="Search harnesses..."
+      />
     </div>
   );
 }
