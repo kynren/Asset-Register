@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { Request, Response } from "express";
 import { prisma } from "../../config/prisma";
+import { env } from "../../config/env";
 import { ApiError } from "../../middleware/errorHandler";
 import { hasPermission } from "../../middleware/rbac";
 import { logAudit } from "../../lib/auditLogger";
@@ -11,10 +12,10 @@ import { computeDueAt } from "./sla";
 
 const include = {
   requester: { select: { id: true, firstName: true, lastName: true } },
-  assignee: { select: { id: true, firstName: true, lastName: true } },
+  assignees: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
   asset: { select: { id: true, assetTag: true, name: true } },
   location: { select: { id: true, name: true } },
-  assignedTeam: { select: { id: true, name: true } },
+  assignedTeams: { include: { team: { select: { id: true, name: true } } } },
   category: true,
 };
 
@@ -32,6 +33,80 @@ async function teamMemberIds(teamId: number): Promise<number[]> {
   return members.map((m) => m.userId);
 }
 
+// Replaces a ticket's assignee/team-assignment join rows with the given arrays (delete-all-then-
+// recreate, same convention teams.routes.ts uses for TeamMember) and returns only the ids that
+// are newly added — so re-saving unrelated ticket fields doesn't re-notify people already
+// assigned. `undefined` for either array means "don't touch that assignment type".
+async function syncAssignments(
+  ticketId: number,
+  assigneeIds: number[] | undefined,
+  assignedTeamIds: number[] | undefined
+): Promise<{ newAssigneeIds: number[]; newTeamIds: number[] }> {
+  let newAssigneeIds: number[] = [];
+  let newTeamIds: number[] = [];
+
+  if (assigneeIds !== undefined) {
+    const existing = await prisma.ticketAssignee.findMany({ where: { ticketId }, select: { userId: true } });
+    const existingIds = new Set(existing.map((a) => a.userId));
+    newAssigneeIds = assigneeIds.filter((id) => !existingIds.has(id));
+    await prisma.$transaction([
+      prisma.ticketAssignee.deleteMany({ where: { ticketId } }),
+      ...(assigneeIds.length
+        ? [prisma.ticketAssignee.createMany({ data: assigneeIds.map((userId) => ({ ticketId, userId })) })]
+        : []),
+    ]);
+  }
+
+  if (assignedTeamIds !== undefined) {
+    const existing = await prisma.ticketAssignedTeam.findMany({ where: { ticketId }, select: { teamId: true } });
+    const existingIds = new Set(existing.map((t) => t.teamId));
+    newTeamIds = assignedTeamIds.filter((id) => !existingIds.has(id));
+    await prisma.$transaction([
+      prisma.ticketAssignedTeam.deleteMany({ where: { ticketId } }),
+      ...(assignedTeamIds.length
+        ? [prisma.ticketAssignedTeam.createMany({ data: assignedTeamIds.map((teamId) => ({ ticketId, teamId })) })]
+        : []),
+    ]);
+  }
+
+  return { newAssigneeIds, newTeamIds };
+}
+
+async function notifyNewAssignments(ticket: { id: number; ticketNumber: string; title: string; priority: string }, newAssigneeIds: number[], newTeamIds: number[], excludeUserId: number) {
+  const ticketUrl = `${env.CLIENT_ORIGIN}/helpdesk/${ticket.id}`;
+  const emailConfig = {
+    eventType: "TICKET_ASSIGNED" as const,
+    fallbackSubject: `You were assigned ticket ${ticket.ticketNumber}`,
+    fallbackText: `You were assigned ticket ${ticket.ticketNumber}: ${ticket.title}.\n\nView it here: ${ticketUrl}`,
+    variables: { ticketNumber: ticket.ticketNumber, ticketTitle: ticket.title, priority: ticket.priority, ticketUrl },
+  };
+
+  if (newAssigneeIds.length) {
+    await notifyUsers({
+      userIds: newAssigneeIds,
+      excludeUserId,
+      kind: "TICKET_ASSIGNED",
+      type: "ticket_assigned",
+      message: `You were assigned ticket ${ticket.ticketNumber}: ${ticket.title}`,
+      linkUrl: `/helpdesk/${ticket.id}`,
+      email: emailConfig,
+    });
+  }
+
+  for (const teamId of newTeamIds) {
+    const memberIds = await teamMemberIds(teamId);
+    await notifyUsers({
+      userIds: memberIds,
+      excludeUserId,
+      kind: "TICKET_ASSIGNED",
+      type: "ticket_assigned",
+      message: `Your team was assigned ticket ${ticket.ticketNumber}: ${ticket.title}`,
+      linkUrl: `/helpdesk/${ticket.id}`,
+      email: emailConfig,
+    });
+  }
+}
+
 export async function list(req: Request, res: Response) {
   const { page, pageSize, skip, take } = getPagination(req);
   const { status, priority, type, categoryId, assignedToMe, mine, overdue, search } = req.query as Record<string, string | undefined>;
@@ -41,7 +116,7 @@ export async function list(req: Request, res: Response) {
   if (priority) where.priority = priority;
   if (type) where.type = type;
   if (categoryId) where.categoryId = Number(categoryId);
-  if (assignedToMe === "true") where.assigneeId = req.user!.id;
+  if (assignedToMe === "true") where.assignees = { some: { userId: req.user!.id } };
   if (mine === "true") where.requesterId = req.user!.id;
   if (overdue === "true") {
     where.dueAt = { lt: new Date() };
@@ -52,7 +127,7 @@ export async function list(req: Request, res: Response) {
       { ticketNumber: { contains: search, mode: "insensitive" } },
       { title: { contains: search, mode: "insensitive" } },
       { requester: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { lastName: { contains: search, mode: "insensitive" } }] } },
-      { assignee: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { lastName: { contains: search, mode: "insensitive" } }] } },
+      { assignees: { some: { user: { OR: [{ firstName: { contains: search, mode: "insensitive" } }, { lastName: { contains: search, mode: "insensitive" } }] } } } },
     ];
   }
 
@@ -93,62 +168,33 @@ async function nextTicketNumber(): Promise<string> {
 export async function create(req: Request, res: Response) {
   const ticketNumber = await nextTicketNumber();
   const priority = req.body.priority || "MEDIUM";
+  const { assigneeIds, assignedTeamIds, ...rest } = req.body;
   const ticket = await prisma.ticket.create({
-    data: { ...req.body, ticketNumber, requesterId: req.user!.id, dueAt: req.body.dueAt ?? computeDueAt(priority) },
+    data: { ...rest, ticketNumber, requesterId: req.user!.id, dueAt: req.body.dueAt ?? computeDueAt(priority) },
     include,
   });
   await logAudit({ userId: req.user!.id, action: "ticket.create", entityType: "Ticket", entityId: ticket.id });
 
-  if (ticket.assigneeId) {
-    await notifyUsers({
-      userIds: [ticket.assigneeId],
-      excludeUserId: req.user!.id,
-      type: "ticket_assigned",
-      message: `You were assigned ticket ${ticket.ticketNumber}: ${ticket.title}`,
-      linkUrl: `/helpdesk/${ticket.id}`,
-    });
-  }
-  if (ticket.assignedTeamId) {
-    const memberIds = await teamMemberIds(ticket.assignedTeamId);
-    await notifyUsers({
-      userIds: memberIds,
-      excludeUserId: req.user!.id,
-      type: "ticket_assigned",
-      message: `Your team was assigned ticket ${ticket.ticketNumber}: ${ticket.title}`,
-      linkUrl: `/helpdesk/${ticket.id}`,
-    });
-  }
+  const { newAssigneeIds, newTeamIds } = await syncAssignments(ticket.id, assigneeIds ?? [], assignedTeamIds ?? []);
+  await notifyNewAssignments(ticket, newAssigneeIds, newTeamIds, req.user!.id);
 
-  res.status(201).json(ticket);
+  const refreshed = await prisma.ticket.findUnique({ where: { id: ticket.id }, include });
+  res.status(201).json(refreshed);
 }
 
 export async function update(req: Request, res: Response) {
   const id = Number(req.params.id);
-  const before = await prisma.ticket.findUnique({ where: { id } });
-  const ticket = await prisma.ticket.update({ where: { id }, data: req.body, include });
+  const { assigneeIds, assignedTeamIds, ...rest } = req.body;
+  const ticket = await prisma.ticket.update({ where: { id }, data: rest, include });
   await logAudit({ userId: req.user!.id, action: "ticket.update", entityType: "Ticket", entityId: id, metadata: req.body });
 
-  if (req.body.assigneeId && req.body.assigneeId !== before?.assigneeId) {
-    await notifyUsers({
-      userIds: [req.body.assigneeId],
-      excludeUserId: req.user!.id,
-      type: "ticket_assigned",
-      message: `You were assigned ticket ${ticket.ticketNumber}: ${ticket.title}`,
-      linkUrl: `/helpdesk/${ticket.id}`,
-    });
-  }
-  if (req.body.assignedTeamId && req.body.assignedTeamId !== before?.assignedTeamId) {
-    const memberIds = await teamMemberIds(req.body.assignedTeamId);
-    await notifyUsers({
-      userIds: memberIds,
-      excludeUserId: req.user!.id,
-      type: "ticket_assigned",
-      message: `Your team was assigned ticket ${ticket.ticketNumber}: ${ticket.title}`,
-      linkUrl: `/helpdesk/${ticket.id}`,
-    });
-  }
+  const { newAssigneeIds, newTeamIds } = await syncAssignments(id, assigneeIds, assignedTeamIds);
+  await notifyNewAssignments(ticket, newAssigneeIds, newTeamIds, req.user!.id);
 
-  res.json(ticket);
+  const refreshed = newAssigneeIds.length || newTeamIds.length || assigneeIds !== undefined || assignedTeamIds !== undefined
+    ? await prisma.ticket.findUnique({ where: { id }, include })
+    : ticket;
+  res.json(refreshed);
 }
 
 export async function updateStatus(req: Request, res: Response) {
@@ -163,8 +209,9 @@ export async function updateStatus(req: Request, res: Response) {
 
   const watchers = await watcherIds(id);
   await notifyUsers({
-    userIds: [ticket.requesterId, ...(ticket.assigneeId ? [ticket.assigneeId] : []), ...watchers],
+    userIds: [ticket.requesterId, ...ticket.assignees.map((a) => a.userId), ...watchers],
     excludeUserId: req.user!.id,
+    kind: "TICKET_WATCHING",
     type: "ticket_status_change",
     message: `Ticket ${ticket.ticketNumber} is now ${status.replace("_", " ")}`,
     linkUrl: `/helpdesk/${ticket.id}`,
@@ -184,16 +231,18 @@ export async function addComment(req: Request, res: Response) {
   });
   await logAudit({ userId: req.user!.id, action: "ticket.comment", entityType: "Ticket", entityId: ticketId });
 
-  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, include: { assignees: true } });
   if (ticket) {
     const watchers = await watcherIds(ticketId);
+    const assigneeIds = ticket.assignees.map((a) => a.userId);
     const recipients = isInternal
-      ? watchers.concat(ticket.assigneeId ? [ticket.assigneeId] : [])
-      : [ticket.requesterId, ...(ticket.assigneeId ? [ticket.assigneeId] : []), ...watchers];
+      ? watchers.concat(assigneeIds)
+      : [ticket.requesterId, ...assigneeIds, ...watchers];
 
     await notifyUsers({
       userIds: recipients,
       excludeUserId: req.user!.id,
+      kind: "TICKET_WATCHING",
       type: "ticket_comment",
       message: `New ${isInternal ? "internal note" : "comment"} on ticket ${ticket.ticketNumber}`,
       linkUrl: `/helpdesk/${ticketId}`,

@@ -31,8 +31,8 @@ export async function runOverdueTaskCheck(): Promise<{ checkouts: number; ticket
       select: { checkedOutToId: true, dueBackAt: true, asset: { select: { id: true, name: true, assetTag: true } } },
     }),
     prisma.ticket.findMany({
-      where: { status: { notIn: ["RESOLVED", "CLOSED"] }, dueAt: { lt: now }, assigneeId: { not: null } },
-      select: { id: true, ticketNumber: true, title: true, dueAt: true, assigneeId: true },
+      where: { status: { notIn: ["RESOLVED", "CLOSED"] }, dueAt: { lt: now }, assignees: { some: {} } },
+      select: { id: true, ticketNumber: true, title: true, dueAt: true, assignees: { select: { userId: true } } },
     }),
     prisma.projectCard.findMany({
       where: { status: { not: "DONE" }, dueDate: { lt: now }, assigneeId: { not: null } },
@@ -60,10 +60,14 @@ export async function runOverdueTaskCheck(): Promise<{ checkouts: number; ticket
 
   for (const t of overdueTickets) {
     const message = `Ticket ${t.ticketNumber} "${t.title}" is overdue.`;
-    if (await alreadyNotifiedRecently(t.assigneeId!, message)) continue;
+    const toNotify: number[] = [];
+    for (const a of t.assignees) {
+      if (!(await alreadyNotifiedRecently(a.userId, message))) toNotify.push(a.userId);
+    }
+    if (toNotify.length === 0) continue;
     const taskUrl = `${env.CLIENT_ORIGIN}/helpdesk/${t.id}`;
     await notifyUsers({
-      userIds: [t.assigneeId!],
+      userIds: toNotify,
       type: "task_overdue",
       message,
       linkUrl: `/helpdesk/${t.id}`,

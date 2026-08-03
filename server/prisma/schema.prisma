@@ -58,7 +58,7 @@ model User {
 
   assetsAssigned    Asset[]            @relation("AssetAssignee")
   ticketsRequested  Ticket[]           @relation("TicketRequester")
-  ticketsAssigned   Ticket[]           @relation("TicketAssignee")
+  ticketAssignments TicketAssignee[]
   ticketComments    TicketComment[]
   ticketAttachments TicketAttachment[]
   ticketWatching    TicketWatcher[]
@@ -900,11 +900,11 @@ model TicketCategory {
 }
 
 model Team {
-  id        Int          @id @default(autoincrement())
-  name      String       @unique
-  members   TeamMember[]
-  tickets   Ticket[]
-  createdAt DateTime     @default(now())
+  id                Int                  @id @default(autoincrement())
+  name              String               @unique
+  members           TeamMember[]
+  ticketAssignments TicketAssignedTeam[]
+  createdAt         DateTime             @default(now())
 }
 
 model TeamMember {
@@ -951,10 +951,8 @@ model Ticket {
   location            Location?          @relation(fields: [locationId], references: [id])
   requesterId         Int
   requester           User               @relation("TicketRequester", fields: [requesterId], references: [id])
-  assigneeId          Int?
-  assignee            User?              @relation("TicketAssignee", fields: [assigneeId], references: [id])
-  assignedTeamId      Int?
-  assignedTeam        Team?              @relation(fields: [assignedTeamId], references: [id])
+  assignees           TicketAssignee[]
+  assignedTeams       TicketAssignedTeam[]
   dueAt               DateTime?
   satisfactionRating  Int?
   satisfactionComment String?
@@ -1000,6 +998,26 @@ model TicketWatcher {
   user     User   @relation(fields: [userId], references: [id])
 
   @@unique([ticketId, userId])
+}
+
+model TicketAssignee {
+  id       Int    @id @default(autoincrement())
+  ticketId Int
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId   Int
+  user     User   @relation(fields: [userId], references: [id])
+
+  @@unique([ticketId, userId])
+}
+
+model TicketAssignedTeam {
+  id       Int    @id @default(autoincrement())
+  ticketId Int
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  teamId   Int
+  team     Team   @relation(fields: [teamId], references: [id])
+
+  @@unique([ticketId, teamId])
 }
 
 // ───────────────────────── NVR / Cameras ─────────────────────────
@@ -1612,6 +1630,7 @@ enum EmailEventType {
   DEVICE_OFFLINE
   DEVICE_ONLINE
   MAGIC_LOGIN_LINK
+  TICKET_ASSIGNED
 }
 
 // Blocks is an ordered array of { id, type, ...type-specific fields } — rendered to HTML by

@@ -125,7 +125,7 @@ export const tools: ToolDef[] = [
     inputSchema: { assignedToMe: z.boolean().default(false), limit: z.number().int().min(1).max(100).default(25) },
     handler: async (args, ctx) => {
       const where: Record<string, unknown> = { status: { in: ["OPEN", "IN_PROGRESS"] } };
-      if (args.assignedToMe) where.assigneeId = ctx.actingUserId;
+      if (args.assignedToMe) where.assignees = { some: { userId: ctx.actingUserId } };
       const tickets = await prisma.ticket.findMany({
         where,
         take: args.limit,

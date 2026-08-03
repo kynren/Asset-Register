@@ -1,4 +1,4 @@
-import { EmailEventType } from "@prisma/client";
+import { EmailEventType, NotificationEventKind } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import { sendEventEmail } from "./emailNotify";
 
@@ -8,6 +8,11 @@ interface NotifyInput {
   type: string;
   message: string;
   linkUrl?: string;
+  // Optional: when set, each recipient's NotificationPreference row for this kind gates whether
+  // they get the in-app row and/or the email (missing row = enabled, per the opt-out model) —
+  // omit for notification types that don't have a matching NotificationEventKind, which keeps
+  // today's unconditional behavior.
+  kind?: NotificationEventKind;
   // Optional: also dispatch an event-driven email (template if the admin configured one for this
   // eventType, otherwise a plain fallback) to the same recipients as the in-app notification.
   // `variables` can be a flat object shared by every recipient, or a function so callers with
@@ -20,17 +25,29 @@ interface NotifyInput {
   };
 }
 
-export async function notifyUsers({ userIds, excludeUserId, type, message, linkUrl, email }: NotifyInput) {
+export async function notifyUsers({ userIds, excludeUserId, type, message, linkUrl, kind, email }: NotifyInput) {
   const recipients = [...new Set(userIds)].filter((id) => id !== excludeUserId);
   if (recipients.length === 0) return;
 
-  await prisma.notification.createMany({
-    data: recipients.map((userId) => ({ userId, type, message, linkUrl })),
-  });
+  let inAppRecipients = recipients;
+  let emailRecipients = recipients;
 
-  if (!email) return;
+  if (kind) {
+    const prefs = await prisma.notificationPreference.findMany({ where: { userId: { in: recipients }, kind } });
+    const prefByUser = new Map(prefs.map((p) => [p.userId, p]));
+    inAppRecipients = recipients.filter((id) => prefByUser.get(id)?.inAppEnabled ?? true);
+    emailRecipients = recipients.filter((id) => prefByUser.get(id)?.emailEnabled ?? true);
+  }
 
-  const users = await prisma.user.findMany({ where: { id: { in: recipients } }, select: { id: true, email: true, firstName: true, lastName: true } });
+  if (inAppRecipients.length > 0) {
+    await prisma.notification.createMany({
+      data: inAppRecipients.map((userId) => ({ userId, type, message, linkUrl })),
+    });
+  }
+
+  if (!email || emailRecipients.length === 0) return;
+
+  const users = await prisma.user.findMany({ where: { id: { in: emailRecipients } }, select: { id: true, email: true, firstName: true, lastName: true } });
   await Promise.all(
     users.map((u) =>
       sendEventEmail({

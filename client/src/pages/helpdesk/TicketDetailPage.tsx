@@ -19,6 +19,13 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function toggleId(set: Set<number>, setSet: (s: Set<number>) => void, id: number) {
+  const next = new Set(set);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  setSet(next);
+}
+
 export function TicketDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -34,10 +41,24 @@ export function TicketDetailPage() {
   const commentFileInputRef = useRef<HTMLInputElement>(null);
   const [deletingAttachment, setDeletingAttachment] = useState<{ id: number; filename: string } | null>(null);
   const [showQr, setShowQr] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState(false);
+  const [assigneeIds, setAssigneeIds] = useState<Set<number>>(new Set());
+  const [assignedTeamIds, setAssignedTeamIds] = useState<Set<number>>(new Set());
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ["ticket", id],
     queryFn: async () => (await axiosClient.get(`/tickets/${id}`)).data,
+  });
+
+  const { data: users } = useQuery({
+    queryKey: ["users-directory"],
+    queryFn: async () => (await axiosClient.get("/users/directory")).data,
+    enabled: isStaff,
+  });
+  const { data: teams } = useQuery({
+    queryKey: ["teams"],
+    queryFn: async () => (await axiosClient.get("/teams")).data,
+    enabled: isStaff,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["ticket", id] });
@@ -47,6 +68,18 @@ export function TicketDetailPage() {
     meta: { successMessage: "Ticket status updated" },
     onSuccess: invalidate,
   });
+
+  const assignmentMutation = useMutation({
+    mutationFn: () => axiosClient.patch(`/tickets/${id}`, { assigneeIds: [...assigneeIds], assignedTeamIds: [...assignedTeamIds] }),
+    meta: { successMessage: "Assignment updated" },
+    onSuccess: () => { invalidate(); setEditingAssignment(false); },
+  });
+
+  function startEditingAssignment() {
+    setAssigneeIds(new Set((ticket?.assignees ?? []).map((a: any) => a.user.id)));
+    setAssignedTeamIds(new Set((ticket?.assignedTeams ?? []).map((t: any) => t.team.id)));
+    setEditingAssignment(true);
+  }
 
   const commentMutation = useMutation({
     mutationFn: (body: { body: string; isInternal: boolean }) => axiosClient.post(`/tickets/${id}/comments`, body),
@@ -200,12 +233,54 @@ export function TicketDetailPage() {
               ))}
             </div>
           </PermissionGate>
-          <p className="muted" style={{ marginTop: 12 }}>
-            Assignee: {ticket.assignee ? `${ticket.assignee.firstName} ${ticket.assignee.lastName}` : "Unassigned"}
-          </p>
-          <p className="muted">
-            Team: {ticket.assignedTeam ? ticket.assignedTeam.name : "No team"}
-          </p>
+          <div style={{ marginTop: 12 }}>
+            {editingAssignment ? (
+              <div className="stack gap-2">
+                <div className="field">
+                  <label>Assignees ({assigneeIds.size} selected)</label>
+                  <div className="stack gap-1" style={{ maxHeight: 140, overflowY: "auto", border: "1px solid var(--color-border)", borderRadius: 8, padding: 8 }}>
+                    {users?.map((u: any) => (
+                      <label key={u.id} className="row gap-2" style={{ fontSize: 13, cursor: "pointer" }}>
+                        <input type="checkbox" checked={assigneeIds.has(u.id)} onChange={() => toggleId(assigneeIds, setAssigneeIds, u.id)} />
+                        {u.firstName} {u.lastName}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Teams ({assignedTeamIds.size} selected)</label>
+                  <div className="stack gap-1" style={{ maxHeight: 140, overflowY: "auto", border: "1px solid var(--color-border)", borderRadius: 8, padding: 8 }}>
+                    {teams?.length ? teams.map((t: any) => (
+                      <label key={t.id} className="row gap-2" style={{ fontSize: 13, cursor: "pointer" }}>
+                        <input type="checkbox" checked={assignedTeamIds.has(t.id)} onChange={() => toggleId(assignedTeamIds, setAssignedTeamIds, t.id)} />
+                        {t.name}
+                      </label>
+                    )) : <span className="muted" style={{ fontSize: 12 }}>No teams yet.</span>}
+                  </div>
+                </div>
+                <div className="row gap-2">
+                  <button className="btn btn-primary btn-sm" disabled={assignmentMutation.isPending} onClick={() => assignmentMutation.mutate()}>
+                    {assignmentMutation.isPending ? "Saving..." : "Save Assignment"}
+                  </button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setEditingAssignment(false)}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="muted">
+                  Assignees: {ticket.assignees?.length ? ticket.assignees.map((a: any) => `${a.user.firstName} ${a.user.lastName}`).join(", ") : "Unassigned"}
+                </p>
+                <p className="muted">
+                  Teams: {ticket.assignedTeams?.length ? ticket.assignedTeams.map((t: any) => t.team.name).join(", ") : "No team"}
+                </p>
+                <PermissionGate module="helpdesk" action="edit">
+                  <button className="btn btn-secondary btn-sm" onClick={startEditingAssignment}>
+                    <Icon name="edit" size={12} /> Edit Assignment
+                  </button>
+                </PermissionGate>
+              </>
+            )}
+          </div>
           {ticket.satisfactionRating && (
             <p className="muted">
               Satisfaction: {"★".repeat(ticket.satisfactionRating)}{"☆".repeat(5 - ticket.satisfactionRating)}
