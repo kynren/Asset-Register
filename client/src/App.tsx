@@ -10,8 +10,6 @@ import { ForceChangePasswordPage } from "./pages/auth/ForceChangePasswordPage";
 import { DashboardPage } from "./pages/dashboard/DashboardPage";
 import { AssetListPage } from "./pages/assets/AssetListPage";
 import { AssetDetailPage } from "./pages/assets/AssetDetailPage";
-import { HarnessInventoryPage } from "./pages/assets/HarnessInventoryPage";
-import { HarnessDetailRoutePage } from "./pages/assets/HarnessDetailRoutePage";
 import { NetworkMapPage } from "./pages/network/NetworkMapPage";
 import { StockPage } from "./pages/stock/StockPage";
 import { TicketListPage } from "./pages/helpdesk/TicketListPage";
@@ -46,9 +44,6 @@ function App() {
 
           <Route path="/assets" element={<PermissionGate module="assets" redirect><AssetListPage /></PermissionGate>} />
           <Route path="/assets/:id" element={<PermissionGate module="assets" redirect><AssetDetailPage /></PermissionGate>} />
-
-          <Route path="/harness" element={<PermissionGate module="harness" redirect><HarnessInventoryPage /></PermissionGate>} />
-          <Route path="/harness/:id" element={<PermissionGate module="harness" redirect><HarnessDetailRoutePage /></PermissionGate>} />
 
           <Route path="/network" element={<PermissionGate module="network" redirect><NetworkMapPage /></PermissionGate>} />
 

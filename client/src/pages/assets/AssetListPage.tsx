@@ -88,8 +88,7 @@ export function AssetListPage() {
   });
 
   const { data: allCategories } = useQuery({ queryKey: ["asset-categories"], queryFn: async () => (await axiosClient.get("/asset-categories")).data });
-  // Harness has its own dedicated view (/harness) — not selectable as an Asset Type here.
-  const categories = allCategories?.filter((c: any) => c.name !== "Harness");
+  const categories = allCategories;
 
   const { data: collections } = useQuery({
     queryKey: ["asset-collections"],
@@ -114,10 +113,6 @@ export function AssetListPage() {
   const visibleAssetsTotal = (visibleCategories ?? []).reduce((sum: number, c: any) => sum + (stats?.byCategory.find((s) => s.categoryId === c.id)?.count ?? 0), 0);
 
   function selectCollection(name: string) {
-    if (name === "Harness") {
-      navigate("/harness");
-      return;
-    }
     setActiveCollection(name);
     setCategoryId(null);
   }
@@ -298,7 +293,7 @@ export function AssetListPage() {
       </div>
 
       {showForm && (
-        <AssetFormModal excludeCategoryNames={["Harness"]} onClose={() => setShowForm(false)} onSubmit={(v) => createMutation.mutate(v)} submitting={createMutation.isPending} />
+        <AssetFormModal onClose={() => setShowForm(false)} onSubmit={(v) => createMutation.mutate(v)} submitting={createMutation.isPending} />
       )}
       {editing && (
         <AssetFormModal
@@ -319,7 +314,6 @@ export function AssetListPage() {
             gridPowered: editing.gridPowered,
             remoteManagementEnabled: editing.remoteManagementEnabled,
           }}
-          excludeCategoryNames={["Harness"]}
           onClose={() => setEditing(null)}
           onSubmit={(v) => updateMutation.mutate(v)}
           submitting={updateMutation.isPending}
