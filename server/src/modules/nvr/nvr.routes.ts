@@ -7,7 +7,7 @@ import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { decryptSecret, encryptSecret } from "../../lib/crypto";
-import { pingHost } from "../../lib/ping";
+import { relayAwarePing } from "../../lib/relayTransport";
 import { testDeviceConnection } from "../../lib/deviceConnection";
 import { discoverOnvifChannels } from "../../lib/onvifDiscovery";
 import { getSessionFilePath, getSessionStatus, startStreamSession, stopSession } from "../../lib/streamRelay";
@@ -126,7 +126,7 @@ router.post("/:id/check-status", requirePermission("nvr", "edit"), async (req, r
   if (!nvr) throw new ApiError(404, "NVR not found");
   if (!nvr.ipAddress) throw new ApiError(400, "This NVR has no IP address set");
 
-  const { alive } = await pingHost(nvr.ipAddress);
+  const { alive } = await relayAwarePing(nvr.ipAddress);
   const newStatus = alive ? "ONLINE" : "OFFLINE";
 
   if (newStatus !== nvr.status) {
@@ -267,7 +267,7 @@ router.post("/cameras/:cameraId/check-status", requirePermission("nvr", "edit"),
   if (!camera) throw new ApiError(404, "Camera not found");
   if (!camera.ipAddress) throw new ApiError(400, "This camera has no IP address set");
 
-  const { alive } = await pingHost(camera.ipAddress);
+  const { alive } = await relayAwarePing(camera.ipAddress);
   const newStatus = alive ? "ONLINE" : "OFFLINE";
 
   if (newStatus !== camera.status) {
@@ -290,7 +290,7 @@ router.get("/cameras/:cameraId/live-latency", requirePermission("nvr", "view"), 
     res.json({ alive: false, responseTimeMs: null });
     return;
   }
-  res.json(await pingHost(camera.ipAddress));
+  res.json(await relayAwarePing(camera.ipAddress));
 });
 
 function cameraOnvifOptions(camera: { ipAddress: string | null; port: number | null; username: string | null; encryptedPassword: string | null }) {
