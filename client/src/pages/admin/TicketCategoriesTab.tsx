@@ -131,7 +131,17 @@ export function TicketCategoriesTab() {
           {editingId != null && <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>Cancel</button>}
         </form>
       </PermissionGate>
-      <DataTable tableId="admin.ticket-categories" columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={10} emptyMessage="No ticket categories yet." />
+      <DataTable
+        tableId="admin.ticket-categories"
+        exportModule="admin"
+        importUrl="/ticket-categories/import"
+        onImported={() => queryClient.invalidateQueries({ queryKey: ["ticket-categories"] })}
+        columns={columns}
+        data={data ?? []}
+        isLoading={isLoading}
+        clientPageSize={10}
+        emptyMessage="No ticket categories yet."
+      />
       {deleting && (
         <ConfirmDialog
           title={`Delete "${deleting.name}"`}

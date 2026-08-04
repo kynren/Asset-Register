@@ -485,8 +485,8 @@ router.post("/stream/sessions", requirePermission("nvr", "view"), validateBody(s
   res.status(201).json({ sessionId });
 });
 
-router.get("/stream/sessions/:sessionId/status", requirePermission("nvr", "view"), (req, res) => {
-  res.json(getSessionStatus(req.params.sessionId));
+router.get("/stream/sessions/:sessionId/status", requirePermission("nvr", "view"), async (req, res) => {
+  res.json(await getSessionStatus(req.params.sessionId));
 });
 
 router.get("/stream/sessions/:sessionId/:file", requirePermission("nvr", "view"), (req, res) => {

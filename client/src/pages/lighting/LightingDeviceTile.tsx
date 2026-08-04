@@ -60,6 +60,21 @@ export function LightingDeviceTile({
   const dotPos = polarToCartesian(size / 2, size / 2, r, 225);
   const isLight = device.kind === "LIGHT" && device.protocol !== "GENERIC_HTTP";
 
+  // Fires a "pop + radiating ring" burst exactly once whenever isOn actually flips — whether from
+  // this user's own click (once the mutation resolves and the prop updates) or from someone else
+  // toggling it elsewhere — rather than on every re-render, so it reads as feedback for a state
+  // change instead of a constant idle animation.
+  const prevOnRef = useRef(on);
+  const [justToggled, setJustToggled] = useState(false);
+  useEffect(() => {
+    if (prevOnRef.current !== on) {
+      prevOnRef.current = on;
+      setJustToggled(true);
+      const t = setTimeout(() => setJustToggled(false), 550);
+      return () => clearTimeout(t);
+    }
+  }, [on]);
+
   // Local draft value while dragging the slider — only committed (network call) on release, same
   // pattern LightingDeviceCard used, so sweeping the range doesn't fire dozens of requests.
   const [liveBrightness, setLiveBrightness] = useState(device.brightness ?? 0);
@@ -75,7 +90,7 @@ export function LightingDeviceTile({
   }, [menuOpen]);
 
   return (
-    <div className="card" style={{ position: "relative", textAlign: "center", padding: "14px 10px 12px", opacity: offline ? 0.55 : 1 }}>
+    <div className="card" style={{ position: "relative", textAlign: "center", padding: "14px 10px 12px", opacity: offline ? 0.55 : 1, resize: "none", overflow: "visible" }}>
       <div className="row" style={{ position: "absolute", top: 8, right: 8 }} ref={menuRef}>
         <button className="btn-icon" title="Options" onClick={() => setMenuOpen((v) => !v)}>
           <Icon name="moreVertical" size={16} />
@@ -105,16 +120,29 @@ export function LightingDeviceTile({
       </div>
 
       <button
-        className="row"
-        style={{ justifyContent: "center", width: "100%", cursor: offline ? "not-allowed" : "pointer", background: "none", border: "none", padding: 0 }}
+        className={`row${justToggled ? " device-toggle-pop" : ""}`}
+        style={{ justifyContent: "center", width: "100%", cursor: offline ? "not-allowed" : "pointer", background: "none", border: "none", padding: 0, position: "relative" }}
         disabled={offline}
         onClick={() => onToggle(!on)}
         title={offline ? "Offline" : on ? "Turn off" : "Turn on"}
       >
+        {justToggled && (
+          <span
+            className="device-toggle-ring"
+            style={{
+              position: "absolute", top: "50%", left: "50%", width: size, height: size, marginTop: -size / 2, marginLeft: -size / 2,
+              borderRadius: "50%", border: `2px solid ${ringColor}`, pointerEvents: "none",
+            }}
+          />
+        )}
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-          <path d={describeRingArc(size / 2, size / 2, r)} fill="none" stroke={ringColor} strokeWidth={4} strokeLinecap="round" style={{ transition: "stroke 0.2s ease" }} />
+          <path d={describeRingArc(size / 2, size / 2, r)} fill="none" stroke={ringColor} strokeWidth={4} strokeLinecap="round" style={{ transition: "stroke 0.3s ease", filter: on ? `drop-shadow(0 0 3px ${ringColor})` : undefined }} />
           <circle cx={dotPos.x} cy={dotPos.y} r={4} fill={ringColor} />
-          <g transform={`translate(${size / 2 - 14}, ${size / 2 - 14})`} stroke={on ? BULB_ON_COLOR : "var(--color-text-muted)"} style={{ transition: "stroke 0.2s ease" }}>
+          <g
+            transform={`translate(${size / 2 - 14}, ${size / 2 - 14})`}
+            stroke={on ? BULB_ON_COLOR : "var(--color-text-muted)"}
+            style={{ transition: "stroke 0.3s ease, filter 0.3s ease", filter: on ? `drop-shadow(0 0 4px ${BULB_ON_COLOR})` : undefined }}
+          >
             <svg width={28} height={28} viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2.3h6c0-1.1.4-1.8 1-2.3A7 7 0 0012 2z" />
             </svg>

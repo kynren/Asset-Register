@@ -84,7 +84,7 @@ export function AccessEventLogTab() {
       )}
 
       <div className="card">
-        <DataTable tableId="accessControl.eventLog" defaultViewMode="list" columns={columns} data={events ?? []} isLoading={isLoading} clientPageSize={15} emptyMessage="No access events recorded yet — select a device and Sync Now to pull its history." />
+        <DataTable tableId="accessControl.eventLog" exportModule="access-control" defaultViewMode="list" columns={columns} data={events ?? []} isLoading={isLoading} clientPageSize={15} emptyMessage="No access events recorded yet — select a device and Sync Now to pull its history." />
       </div>
     </div>
   );

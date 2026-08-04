@@ -382,6 +382,39 @@ router.post("/groups/reorder", requirePermission("lighting", "edit"), validateBo
   res.json({ ok: true });
 });
 
+// Master switch for a whole location — turns every device currently in the group on/off in one
+// call, distinct from the per-device toggles Manage Locations already had. Runs in parallel and
+// is best-effort per device (one unreachable light doesn't block the rest), mirroring
+// /devices/refresh-all's Promise.all-over-catch pattern.
+router.post("/groups/:id/power", requirePermission("lighting", "edit"), validateBody(powerSchema), async (req, res) => {
+  const groupId = Number(req.params.id);
+  const devices = await prisma.lightingDevice.findMany({ where: { groupId } });
+
+  const results = await Promise.all(
+    devices.map(async (device) => {
+      let gen = device.gen;
+      let kind = device.kind;
+      if (needsDetection(device.protocol, gen, kind)) {
+        const detected = await detectIotDevice(toIotDevice(device)).catch(() => null);
+        if (!detected) return markOffline(device.id).catch(() => null);
+        gen = detected.gen;
+        kind = detected.kind;
+      }
+      try {
+        await setIotPower(toIotDevice(device, { gen, kind }), req.body.on);
+      } catch {
+        return markOffline(device.id).catch(() => null);
+      }
+      return refreshDevice(device.id).catch(() =>
+        prisma.lightingDevice.update({ where: { id: device.id }, data: { gen, kind, isOn: req.body.on, status: "ONLINE", lastCheckedAt: new Date() }, select: deviceSelect })
+      );
+    })
+  );
+
+  await logAudit({ userId: req.user!.id, action: "lightingGroup.power", entityType: "LightingGroup", entityId: groupId, metadata: { on: req.body.on, deviceCount: devices.length } });
+  res.json(results.filter(Boolean));
+});
+
 router.delete("/groups/:id", requirePermission("lighting", "delete"), async (req, res) => {
   // Ungroup its devices rather than cascading — deleting a card shouldn't delete the lights in it.
   await prisma.lightingDevice.updateMany({ where: { groupId: Number(req.params.id) }, data: { groupId: null } });

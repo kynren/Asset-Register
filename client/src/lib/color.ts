@@ -43,3 +43,17 @@ export function applyAccentColor(hex: string | null | undefined) {
   root.style.setProperty("--color-primary-hover", shadeColor(hex, -0.15));
   root.style.setProperty("--color-primary-soft", hexToRgba(hex, 0.14));
 }
+
+// Applied on top of applyAccentColor by an active AppearanceTheme (see theme/AppearanceContext.tsx)
+// — each slot is independently optional (null means "leave the app's own light/dark default
+// alone"), so a theme can override just the sidebar color and leave the page background untouched.
+export function applyAppearanceOverrides(theme: { sidebarBgColor?: string | null; sidebarTextColor?: string | null; pageBgColor?: string | null } | null | undefined) {
+  const root = document.documentElement;
+  const set = (prop: string, value?: string | null) => {
+    if (value) root.style.setProperty(prop, value);
+    else root.style.removeProperty(prop);
+  };
+  set("--color-sidebar-bg", theme?.sidebarBgColor);
+  set("--color-sidebar-text", theme?.sidebarTextColor);
+  set("--color-bg", theme?.pageBgColor);
+}

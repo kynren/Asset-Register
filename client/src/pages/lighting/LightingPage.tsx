@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ControlsSubNav } from "../controls/ControlsSubNav";
 import { ZigbeeScaffoldTab } from "../../components/ZigbeeScaffoldTab";
 import { DashboardTab } from "./DashboardTab";
 import { DevicesTab } from "./DevicesTab";
@@ -25,6 +26,7 @@ export function LightingPage() {
       <div className="page-header-sticky">
         <div className="page-header-content">
           <div>
+            <ControlsSubNav />
             <h1 className="page-title">Lighting</h1>
             <p className="muted">Control lighting and IoT devices over the local network — Shelly, Tasmota, or any device with an HTTP control endpoint. No cloud account required.</p>
           </div>

@@ -7,6 +7,7 @@ const rolePermissionSchema = z.object({
   canEdit: z.boolean(),
   canDelete: z.boolean(),
   canExport: z.boolean(),
+  canImport: z.boolean(),
 });
 
 const systemSettingsPayloadSchema = z.object({ values: z.record(z.string()) });

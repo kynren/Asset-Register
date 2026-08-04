@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ColumnDef } from "@tanstack/react-table";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
+import { DataTable } from "../../components/DataTable";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Icon } from "../../components/Icon";
 import { PermissionGate } from "../../auth/PermissionGate";
@@ -35,6 +37,7 @@ export function TeamsTab() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => axiosClient.delete(`/teams/${id}`),
+    meta: { successMessage: "Team deleted" },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["teams"] }); setDeletingTeam(null); setSelectedTeamId(null); },
   });
 
@@ -42,71 +45,71 @@ export function TeamsTab() {
     queryClient.invalidateQueries({ queryKey: ["teams"] });
   }
 
+  const teamColumns: ColumnDef<Team, any>[] = [
+    { header: "Name", accessorKey: "name", meta: { cardTitle: true } },
+    { header: "Members", accessorFn: (t) => t.members.length },
+    {
+      header: "",
+      id: "actions",
+      cell: ({ row }) => (
+        <div className="row gap-1">
+          <PermissionGate module="admin" action="edit">
+            <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={(e) => { e.stopPropagation(); setEditingTeam(row.original); }}>
+              <Icon name="edit" size={13} />
+            </button>
+          </PermissionGate>
+          <PermissionGate module="admin" action="delete">
+            <button className="btn btn-danger btn-sm btn-icon" title="Delete" onClick={(e) => { e.stopPropagation(); setDeletingTeam(row.original); }}>
+              <Icon name="trash" size={13} />
+            </button>
+          </PermissionGate>
+        </div>
+      ),
+    },
+  ];
+
+  const memberColumns: ColumnDef<TeamMemberRow, any>[] = [
+    { header: "Member", accessorFn: (m) => `${m.user.firstName} ${m.user.lastName}`, meta: { cardTitle: true } },
+  ];
+
   if (isLoading || !teams) return <p className="muted">Loading teams...</p>;
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: "220px 1fr", gap: 16 }}>
-      <div className="card" style={{ padding: 10 }}>
-        <div className="row" style={{ justifyContent: "space-between", padding: "4px 6px 10px" }}>
-          <strong style={{ fontSize: 13 }}>Teams</strong>
+    <div className="stack gap-3">
+      <div className="card">
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div>
+            <h3 className="mt-0 mb-0">Teams</h3>
+            <p className="muted" style={{ margin: "2px 0 0" }}>Assignable as a group on Helpdesk tickets. Click a team to view its members below.</p>
+          </div>
           <PermissionGate module="admin" action="create">
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowCreate(true)}>+ New</button>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>+ New Team</button>
           </PermissionGate>
         </div>
-        {teams.length === 0 && <p className="muted" style={{ fontSize: 12, padding: "0 6px" }}>No teams yet.</p>}
-        {teams.map((t) => (
-          <div
-            key={t.id}
-            onClick={() => setSelectedTeamId(t.id)}
-            style={{
-              padding: "8px 10px",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 13,
-              background: (selectedTeam?.id === t.id) ? "var(--color-primary-soft)" : "transparent",
-              color: (selectedTeam?.id === t.id) ? "var(--color-primary)" : "inherit",
-              fontWeight: (selectedTeam?.id === t.id) ? 600 : 400,
-            }}
-          >
-            {t.name} <span className="muted" style={{ fontWeight: 400 }}>({t.members.length})</span>
-          </div>
-        ))}
+        <DataTable
+          tableId="admin.teams"
+          exportModule="admin"
+          importUrl="/teams/import"
+          onImported={() => queryClient.invalidateQueries({ queryKey: ["teams"] })}
+          columns={teamColumns}
+          data={teams}
+          clientPageSize={10}
+          emptyMessage="No teams yet."
+          onRowClick={(t) => setSelectedTeamId(t.id)}
+        />
       </div>
 
       {selectedTeam && (
         <div className="card">
-          <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
-            <div>
-              <h3 className="mt-0 mb-0">{selectedTeam.name}</h3>
-              <p className="muted" style={{ margin: "2px 0 0" }}>{selectedTeam.members.length} member{selectedTeam.members.length === 1 ? "" : "s"} — assignable as a group on Helpdesk tickets.</p>
-            </div>
-            <PermissionGate module="admin" action="edit">
-              <div className="row gap-1">
-                <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={() => setEditingTeam(selectedTeam)}>
-                  <Icon name="edit" size={12} />
-                </button>
-                <PermissionGate module="admin" action="delete">
-                  <button className="btn btn-danger btn-sm btn-icon" title="Delete" onClick={() => setDeletingTeam(selectedTeam)}>
-                    <Icon name="trash" size={12} />
-                  </button>
-                </PermissionGate>
-              </div>
-            </PermissionGate>
-          </div>
-
-          <table className="data-table">
-            <thead>
-              <tr><th>Member</th></tr>
-            </thead>
-            <tbody>
-              {selectedTeam.members.map((m) => (
-                <tr key={m.id}><td>{m.user.firstName} {m.user.lastName}</td></tr>
-              ))}
-              {selectedTeam.members.length === 0 && (
-                <tr><td className="muted">No members yet — edit this team to add some.</td></tr>
-              )}
-            </tbody>
-          </table>
+          <h3 className="mt-0">{selectedTeam.name} — Members</h3>
+          <DataTable
+            tableId="admin.team-members"
+            exportModule="admin"
+            columns={memberColumns}
+            data={selectedTeam.members}
+            clientPageSize={10}
+            emptyMessage="No members yet — edit this team to add some."
+          />
         </div>
       )}
 

@@ -19,10 +19,12 @@ export function isNavGroup(entry: NavEntry): entry is NavGroup {
   return "children" in entry;
 }
 
-// "Controls" groups the physical/site-control modules (video, doors, lighting) under one
-// collapsible section rather than three flat top-level items — kept as its own array (not
-// spliced into systemConsoleNav) so Sidebar can render it distinctly and hide the whole group
-// when the signed-in user has view access to none of its children.
+// "Controls" used to be a collapsible sidebar group containing NVRs & Cameras / Access Control /
+// Lighting as indented sub-links. It's now a single top-level link to a /controls landing page
+// (a grid of preview cards for each, see ControlsPage) with those three as real top-level pages —
+// `children` is kept here only so Sidebar can decide whether to show the single "Controls" link
+// at all (hidden when the user has view access to none of them) and so ControlsSubNav/ControlsPage
+// share the same module list instead of redefining it.
 export const controlsNavGroup: NavGroup = {
   label: "Controls",
   icon: "sliders",
@@ -30,8 +32,11 @@ export const controlsNavGroup: NavGroup = {
     { label: "NVRs & Cameras", path: "/nvr", icon: "nvr", module: "nvr" },
     { label: "Access Control", path: "/access-control", icon: "key", module: "access-control" },
     { label: "Lighting", path: "/lighting", icon: "bulb", module: "lighting" },
+    { label: "Gates", path: "/gates", icon: "door", module: "gates" },
   ],
 };
+
+export const controlsNavItem: NavItem = { label: "Controls", path: "/controls", icon: "sliders" };
 
 export const systemConsoleNav: NavItem[] = [
   { label: "Dashboard", path: "/", icon: "dashboard", module: "dashboard" },

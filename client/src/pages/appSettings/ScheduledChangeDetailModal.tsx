@@ -72,8 +72,8 @@ function BackupDiff({ before, after }: { before: any; after: any }) {
   );
 }
 
-const PERM_ACTIONS = ["canView", "canCreate", "canEdit", "canDelete", "canExport"] as const;
-const PERM_LABELS: Record<string, string> = { canView: "V", canCreate: "C", canEdit: "E", canDelete: "D", canExport: "X" };
+const PERM_ACTIONS = ["canView", "canCreate", "canEdit", "canDelete", "canExport", "canImport"] as const;
+const PERM_LABELS: Record<string, string> = { canView: "V", canCreate: "C", canEdit: "E", canDelete: "D", canExport: "X", canImport: "I" };
 
 function RolePermissionsDiff({ before, after }: { before: any[] | undefined; after: any[] }) {
   const modules = Array.from(new Set([...(before ?? []).map((p) => p.module), ...after.map((p) => p.module)])).sort();

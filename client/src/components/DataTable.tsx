@@ -1,8 +1,11 @@
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { ColumnDef, ColumnSizingState, Row, SortingState, flexRender, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
 import { Icon } from "./Icon";
+import { CsvImportButton } from "./CsvButtons";
 import { SkeletonCard, SkeletonTableRows } from "./Skeleton";
 import { useUserPreference } from "../hooks/useUserPreference";
+import { useAuth } from "../auth/AuthContext";
+import { ModuleName } from "../lib/permissions";
 
 interface SelectionProps<T> {
   selectedIds: Set<number>;
@@ -47,6 +50,23 @@ interface DataTableProps<T> {
   defaultViewMode?: ViewMode;
   /** Bespoke card renderer for grid mode. Omit to fall back to an auto-generated card built from `columns`. */
   renderCard?: (row: T, index: number) => ReactNode;
+  /**
+   * RBAC module to check for the "export" action — pass this to show an "Export CSV" button,
+   * gated the same way Create/Edit/Delete buttons on the same page already are. Omit to leave
+   * export off entirely (e.g. tables of live/transient data with nothing meaningful to export).
+   */
+  exportModule?: ModuleName;
+  /** Filename for the CSV download (".csv" appended if missing). Defaults to `${tableId}.csv`. */
+  exportFilename?: string;
+  /**
+   * Endpoint to POST an uploaded CSV to for bulk-creating rows — pass this to show an "Import CSV"
+   * button next to Export, gated by the same `exportModule`'s "create" permission. Omit to leave
+   * import off (e.g. resources with relations or validation too complex for a flat CSV row).
+   */
+  importUrl?: string;
+  /** Called after a successful import with the server's {created, errors} summary, so the caller
+   *  can refetch its list query and surface the result. */
+  onImported?: (result: { created: number; errors: string[] }) => void;
 }
 
 function getColumnRawValue<T>(row: T, col: ColumnDef<T, any>): unknown {
@@ -56,6 +76,38 @@ function getColumnRawValue<T>(row: T, col: ColumnDef<T, any>): unknown {
     return anyCol.accessorKey.split(".").reduce((acc: any, key: string) => acc?.[key], row);
   }
   return undefined;
+}
+
+function csvCell(value: unknown): string {
+  const str = value === null || value === undefined ? "" : String(value);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+// Exports every row currently matching search/column filters (not just the visible page) as a
+// CSV, using each column's own header label and the same accessor DataTable already uses for
+// search/filtering — so "what you filtered to" is exactly "what you get", regardless of pagination.
+function exportRowsToCsv<T>(rows: T[], columns: ColumnDef<T, any>[], filename: string) {
+  const exportable = columns.filter((c) => getColumnId(c) !== undefined || typeof (c as any).accessorFn === "function");
+  const headers = exportable.map((c) => (typeof c.header === "string" ? c.header : getColumnId(c) ?? ""));
+  const lines = [
+    headers.map(csvCell).join(","),
+    ...rows.map((row) =>
+      exportable
+        .map((col) => {
+          const val = getColumnRawValue(row, col);
+          if (val === null || val === undefined || typeof val === "object") return "";
+          return csvCell(val);
+        })
+        .join(",")
+    ),
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // Same id tanstack itself derives when a ColumnDef has no explicit `id` — needed so the filter
@@ -95,7 +147,12 @@ export function DataTable<T>({
   tableId,
   defaultViewMode = "grid",
   renderCard,
+  exportModule,
+  exportFilename,
+  importUrl,
+  onImported,
 }: DataTableProps<T>) {
+  const { hasPermission } = useAuth();
   const [clientPage, setClientPage] = useState(1);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [internalSearch, setInternalSearch] = useState("");
@@ -180,6 +237,13 @@ export function DataTable<T>({
   const displayTotalPages = isServerPaginated ? totalPages! : clientTotalPages;
   const handlePageChange = isServerPaginated ? onPageChange : setClientPage;
 
+  // Server-paginated tables only ever hold the current page in `data` — `filteredData` already
+  // reduces to exactly that page for them (see above), so export still works, it just covers the
+  // current page rather than every row matching the filters. The button label makes that explicit
+  // rather than silently producing a partial file under a name that implies "everything".
+  const canExport = !!exportModule && hasPermission(exportModule, "export");
+  const canImport = !!importUrl && !!exportModule && hasPermission(exportModule, "import");
+
   return (
     <div>
       <div className="row gap-2" style={{ marginBottom: 10, alignItems: "center" }}>
@@ -208,6 +272,17 @@ export function DataTable<T>({
           </button>
         )}
         <div className="flex-1" />
+        {canExport && (
+          <button
+            type="button"
+            className="btn btn-sm btn-secondary"
+            title={isServerPaginated ? "Export the current page to CSV" : "Export the currently filtered rows to CSV"}
+            onClick={() => exportRowsToCsv(filteredData, columns, exportFilename ?? tableId)}
+          >
+            <Icon name="download" size={13} /> {isServerPaginated ? "Export Page" : "Export CSV"}
+          </button>
+        )}
+        {canImport && <CsvImportButton url={importUrl!} onImported={onImported ?? (() => undefined)} />}
         <div className="row gap-1">
           <button
             type="button"

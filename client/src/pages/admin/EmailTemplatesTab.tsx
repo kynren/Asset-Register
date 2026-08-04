@@ -136,6 +136,7 @@ export function EmailTemplatesTab() {
 
       <DataTable
         tableId="admin.emailTemplates"
+        exportModule="admin"
         columns={columns}
         data={templates ?? []}
         isLoading={isLoading}

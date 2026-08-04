@@ -10,6 +10,7 @@ export const MODULES = [
   "nvr",
   "access-control",
   "lighting",
+  "gates",
   "virtual-assistant",
   "docs",
   "reports",
@@ -21,5 +22,5 @@ export const MODULES = [
 
 export type ModuleName = (typeof MODULES)[number];
 
-export const ACTIONS = ["view", "create", "edit", "delete", "export"] as const;
+export const ACTIONS = ["view", "create", "edit", "delete", "export", "import"] as const;
 export type ActionName = (typeof ACTIONS)[number];

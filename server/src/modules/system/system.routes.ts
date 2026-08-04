@@ -38,7 +38,11 @@ router.get("/agent-log", requirePermission("app-settings", "view"), async (_req,
 router.get("/client-info", async (req, res) => {
   const ownedAssets = await prisma.asset.findMany({
     where: { assignedToId: req.user!.id, deviceId: { not: null } },
-    select: { device: { select: { ipAddresses: true, hostname: true, lastSeen: true } } },
+    select: {
+      device: {
+        select: { ipAddresses: true, hostname: true, lastSeen: true, subnetMask: true, defaultGateway: true, dnsServers: true },
+      },
+    },
   });
   const agentDevice = ownedAssets
     .map((a) => a.device)
@@ -51,6 +55,9 @@ router.get("/client-info", async (req, res) => {
       source: "agent",
       deviceHostname: agentDevice.hostname,
       deviceLastSeen: agentDevice.lastSeen,
+      subnetMask: agentDevice.subnetMask,
+      defaultGateway: agentDevice.defaultGateway,
+      dnsServers: agentDevice.dnsServers,
       appVersion: "1.0.0",
       serverTime: new Date().toISOString(),
     });

@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { TopNavBar } from "./TopNavBar";
 import { FloatingAssistant } from "./FloatingAssistant";
 import { ThemeSync } from "../theme/ThemeSync";
+import { useAuth } from "../auth/AuthContext";
 import { settingsNav, systemConsoleNav } from "./navConfig";
 
 const allNav = [...systemConsoleNav, ...settingsNav];
@@ -20,6 +22,8 @@ function titleForPath(pathname: string) {
 export function AppShell() {
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { activeTheme } = useAuth();
+  const useTopNav = activeTheme?.navPosition === "topbar";
 
   // A route change always means the user picked a destination — close the drawer so the next
   // page isn't hidden behind it on a phone-width viewport.
@@ -30,10 +34,11 @@ export function AppShell() {
   return (
     <div className={`app-shell${mobileNavOpen ? " mobile-nav-open" : ""}`}>
       <ThemeSync />
-      <Sidebar pageTitle={titleForPath(location.pathname)} />
+      {!useTopNav && <Sidebar pageTitle={titleForPath(location.pathname)} />}
       {mobileNavOpen && <div className="mobile-nav-backdrop" onClick={() => setMobileNavOpen(false)} />}
       <div className="main-area">
         <Topbar onToggleMobileNav={() => setMobileNavOpen((v) => !v)} />
+        {useTopNav && <TopNavBar />}
         <div className="page-content">
           <Outlet />
         </div>

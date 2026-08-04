@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import { Readable } from "stream";
 import { isNetworkRelayEnabled } from "../modules/network/scan.service";
-import { enqueueVideoJob, requestStop } from "./relayVideoJobs";
+import { enqueueVideoJob, getVideoJobStatus, requestStop } from "./relayVideoJobs";
 
 export const SESSION_ROOT = path.join(__dirname, "..", "..", "uploads", "stream-sessions");
 fs.mkdirSync(SESSION_ROOT, { recursive: true });
@@ -113,16 +113,32 @@ export async function startStreamSession(streamUrl: string): Promise<string> {
   });
 
   proc.once("exit", (code) => {
+    clearTimeout(connectTimeout);
     if (session.status !== "ready" && code !== 0) {
       session.status = "failed";
       session.error = session.error ?? `ffmpeg exited unexpectedly (code ${code}). ${session.stderrTail.trim().split("\n").slice(-2).join(" ")}`.trim();
     }
   });
 
+  // ffmpeg's own `-timeout` only bounds I/O stalls *after* the RTSP socket connects — when a
+  // camera IP is unreachable (dropped packets, no RST/ICMP reply, wrong subnet) the initial TCP
+  // connect() itself can hang for the OS's default connect timeout (tens of seconds on Windows),
+  // well past what a "why won't this camera connect" click deserves to wait, and without ever
+  // triggering the exit handler above. This watchdog kills a still-"starting" process after 15s
+  // and reports a clear, specific reason instead of leaving the client to time out at 35s with
+  // no explanation.
+  const connectTimeout = setTimeout(() => {
+    if (session.status === "starting") {
+      session.status = "failed";
+      session.error = "Could not connect to the camera within 15 seconds. Check that the stream URL is correct and that this server has network access to the camera (use the Network Relay Agent if the camera is on a different network).";
+      proc.kill("SIGKILL");
+    }
+  }, 15000);
+
   return id;
 }
 
-export function getSessionStatus(id: string): { status: SessionStatus | "not_found"; error: string | null } {
+export async function getSessionStatus(id: string): Promise<{ status: SessionStatus | "not_found"; error: string | null }> {
   const session = sessions.get(id);
   if (!session) return { status: "not_found", error: "Stream session not found or has expired." };
 
@@ -136,6 +152,23 @@ export function getSessionStatus(id: string): { status: SessionStatus | "not_fou
       }
     } catch {
       // playlist may be mid-write; treat as still starting
+    }
+  }
+
+  // Relay-backed sessions have no local process to report failure — the agent posts it into the
+  // RelayVideoJob row instead (no agent ever claiming the job counts too, since it just never
+  // leaves PENDING/RUNNING). Without this check a failed relay job left the session stuck in
+  // "starting" forever with no error, so the client only ever saw its own generic 35s timeout
+  // message instead of the real reason (e.g. "no relay agent connected", ffmpeg failure on the
+  // agent's machine).
+  if (session.status === "starting" && session.relayBacked) {
+    const job = await getVideoJobStatus(id);
+    if (job?.status === "FAILED") {
+      session.status = "failed";
+      session.error = job.errorMessage ?? "Live feed failed on the relay agent.";
+    } else if (!job) {
+      session.status = "failed";
+      session.error = "Relay video job not found — it may have been cleaned up.";
     }
   }
 

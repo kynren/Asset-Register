@@ -116,6 +116,10 @@ export function DashboardTab() {
     mutationFn: ({ id, on }: { id: number; on: boolean }) => axiosClient.post(`/lighting/devices/${id}/power`, { on }),
     onSuccess: invalidateDevices,
   });
+  const groupPowerMutation = useMutation({
+    mutationFn: ({ groupId, on }: { groupId: number; on: boolean }) => axiosClient.post(`/lighting/groups/${groupId}/power`, { on }),
+    onSuccess: invalidateDevices,
+  });
   const brightnessMutation = useMutation({
     mutationFn: ({ id, value }: { id: number; value: number }) => axiosClient.post(`/lighting/devices/${id}/brightness`, { value }),
     onSuccess: invalidateDevices,
@@ -408,6 +412,7 @@ export function DashboardTab() {
                       group={group}
                       devices={devicesByGroup.get(group.id) ?? []}
                       onToggleDevice={(id, on) => powerMutation.mutate({ id, on })}
+                      onToggleAll={(on) => groupPowerMutation.mutate({ groupId: group.id, on })}
                       onPickIcon={(current) => setPickingIconFor({ kind: "group", id: group.id, current })}
                       onPickDeviceIcon={(deviceId, current) => setPickingIconFor({ kind: "device", id: deviceId, current })}
                       onRename={() => setRenamingGroup(group)}
@@ -553,6 +558,7 @@ function GroupCard({
   group,
   devices,
   onToggleDevice,
+  onToggleAll,
   onPickIcon,
   onPickDeviceIcon,
   onRename,
@@ -561,6 +567,7 @@ function GroupCard({
   group: LightingGroup;
   devices: LightingDevice[];
   onToggleDevice: (id: number, on: boolean) => void;
+  onToggleAll: (on: boolean) => void;
   onPickIcon: (current: string | null) => void;
   onPickDeviceIcon: (deviceId: number, current: string | null) => void;
   onRename: () => void;
@@ -569,6 +576,8 @@ function GroupCard({
   const sortable = useSortable({ id: `group-${group.id}` });
   const droppable = useDroppable({ id: `group-drop-${group.id}` });
   const style = { transform: sortable.transform ? CSS.Transform.toString(sortable.transform) : undefined, transition: sortable.transition };
+  const controllableDevices = devices.filter((d) => d.status !== "OFFLINE");
+  const allOn = controllableDevices.length > 0 && controllableDevices.every((d) => d.isOn);
 
   return (
     <div ref={sortable.setNodeRef} style={style} className="card">
@@ -579,7 +588,20 @@ function GroupCard({
           </button>
           <strong style={{ fontSize: 13 }}>{group.name}</strong>
         </div>
-        <div className="row gap-1" onPointerDown={(e) => e.stopPropagation()}>
+        <div className="row gap-2" style={{ alignItems: "center" }} onPointerDown={(e) => e.stopPropagation()}>
+          <label
+            className="form-toggle-switch"
+            style={{ cursor: controllableDevices.length === 0 ? "default" : "pointer" }}
+            title={`Turn all devices in "${group.name}" ${allOn ? "off" : "on"}`}
+          >
+            <input
+              type="checkbox"
+              checked={allOn}
+              disabled={controllableDevices.length === 0}
+              onChange={(e) => onToggleAll(e.target.checked)}
+            />
+            <span className="form-toggle-switch-track" />
+          </label>
           <PermissionGate module="lighting" action="edit">
             <button className="btn-icon" onClick={onRename} title="Rename"><Icon name="edit" size={12} /></button>
           </PermissionGate>

@@ -139,6 +139,13 @@ export function ClientInfoModal({ onClose }: ClientInfoModalProps) {
             <Field label="CPU Threads" value={`${navigator.hardwareConcurrency ?? "—"} Logical CPU Threads`} tone="amber" />
             <Field label="Screen & Display" value={`${screen.width} x ${screen.height} (${dpr}x DPR)`} />
             <Field label="Timezone & Locale" value={`${timezone} · ${locale}`} />
+            {serverInfo?.source === "agent" && (
+              <>
+                <Field label="Subnet Mask" value={serverInfo.subnetMask ?? "—"} mono />
+                <Field label="Default Gateway" value={serverInfo.defaultGateway ?? "—"} mono />
+                <Field label="DNS Servers" value={serverInfo.dnsServers ?? "—"} mono />
+              </>
+            )}
           </div>
           {serverInfo?.source === "connection" && (
             <p style={{ margin: "10px 0 0", fontSize: 11.5, color: "var(--color-text-muted)" }}>

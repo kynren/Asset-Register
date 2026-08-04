@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ControlsSubNav } from "../controls/ControlsSubNav";
 import { ZigbeeScaffoldTab } from "../../components/ZigbeeScaffoldTab";
 import { DevicesDoorsTab } from "./DevicesDoorsTab";
 import { DoorStatusTab } from "./DoorStatusTab";
@@ -27,6 +28,7 @@ export function AccessControlPage() {
       <div className="page-header-sticky">
         <div className="page-header-content">
           <div>
+            <ControlsSubNav />
             <h1 className="page-title">Access Control</h1>
             <p className="page-subtitle">Door controllers, persons, access groups, remote door control, credentials, and the access event log — over Hikvision ISAPI.</p>
           </div>

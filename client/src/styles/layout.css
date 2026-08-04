@@ -20,7 +20,10 @@
     @apply px-4 py-[18px] border-b border-white/[8%] whitespace-nowrap overflow-hidden shrink-0;
   }
   .sidebar-brand {
-    @apply flex items-center gap-2.5 font-bold text-sm text-white;
+    @apply flex items-center gap-2.5 font-bold text-sm text-white no-underline;
+  }
+  .sidebar-brand:hover {
+    @apply text-white;
   }
   .sidebar-brand-mark {
     @apply w-[30px] h-[30px] min-w-[30px] rounded-lg bg-white/20 text-white flex items-center justify-center font-extrabold;
@@ -80,6 +83,79 @@
   }
   .sidebar-collapse-btn:hover {
     @apply bg-sidebar-hover;
+  }
+
+  /* Alternative to the left Sidebar (see TopNavBar.tsx) — reuses the same --color-sidebar-*
+     vars as the sidebar so an AppearanceTheme's color choices carry over regardless of which
+     layout the user picked. */
+  .top-nav-bar {
+    @apply flex items-center justify-between gap-3 px-4 py-2 flex-wrap flex-shrink-0 z-20;
+    background: var(--color-sidebar-bg);
+  }
+  .top-nav-groups {
+    @apply flex items-center gap-1 flex-wrap;
+  }
+  .top-nav-brand {
+    @apply flex items-center gap-2 no-underline text-white text-[14px] font-semibold whitespace-nowrap shrink-0;
+  }
+  .top-nav-brand-mark {
+    @apply flex items-center justify-center rounded-lg overflow-hidden shrink-0;
+    width: 26px;
+    height: 26px;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-size: 13px;
+  }
+  .top-nav-link {
+    @apply flex items-center gap-1.5 px-3.5 py-[7px] rounded-full no-underline text-sidebar-text text-[13px] whitespace-nowrap;
+  }
+  .top-nav-link:hover {
+    @apply bg-sidebar-hover text-white;
+  }
+  .top-nav-link.active {
+    @apply bg-white text-primary shadow-sm;
+  }
+  .top-nav-divider {
+    @apply w-px h-5 mx-1.5 bg-white/15 shrink-0;
+  }
+  .top-nav-dropdown {
+    @apply relative shrink-0;
+  }
+  .top-nav-dropdown-trigger {
+    @apply flex items-center gap-1.5 px-3.5 py-[7px] rounded-full border-none cursor-pointer text-sidebar-text text-[13px] whitespace-nowrap bg-transparent;
+  }
+  .top-nav-dropdown-trigger:hover,
+  .top-nav-dropdown-trigger.open {
+    @apply bg-sidebar-hover text-white;
+  }
+  .top-nav-dropdown-trigger.has-active {
+    @apply bg-white text-primary shadow-sm;
+  }
+  .top-nav-dropdown-menu {
+    @apply absolute left-0 mt-1.5 py-1.5 rounded-xl shadow-md flex flex-col z-30;
+    top: 100%;
+    min-width: 220px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+  .top-nav-dropdown-item {
+    @apply flex items-center gap-2 px-3.5 py-2 no-underline text-text text-[13px] whitespace-nowrap;
+  }
+  .top-nav-dropdown-item:hover {
+    @apply bg-bg;
+  }
+  .top-nav-dropdown-item.active {
+    @apply text-primary font-semibold;
+  }
+  .top-nav-battery {
+    @apply flex items-center gap-1.5 text-white text-[12px] shrink-0;
+  }
+  @keyframes top-nav-battery-bar-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  .animated-battery-bar {
+    animation: top-nav-battery-bar-pulse 1.2s ease-in-out infinite;
   }
 
   .topbar {

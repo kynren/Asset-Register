@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ColumnDef } from "@tanstack/react-table";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
+import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/FormModal";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
@@ -69,6 +71,63 @@ export function CredentialsTab() {
     onSuccess: invalidate,
   });
 
+  const columns: ColumnDef<Credential, any>[] = [
+    {
+      header: "Person",
+      accessorFn: (c) => c.person.name,
+      meta: { cardTitle: true },
+      cell: ({ row }) => (
+        <>
+          {row.original.person.name}
+          <div className="muted" style={{ fontSize: 11 }}>{row.original.person.personId}</div>
+        </>
+      ),
+    },
+    { header: "Card", accessorFn: (c) => c.cardNumber ?? "—", cell: ({ getValue }) => <span style={{ fontFamily: "monospace" }}>{getValue()}</span> },
+    { header: "PIN", accessorFn: (c) => (c.hasPin ? "Yes" : "—") },
+    {
+      header: "Door Access",
+      id: "doorAccess",
+      accessorFn: (c) => (c.doorRights.length === 0 ? "Controller default" : c.doorRights.map((r) => `${r.door.name} (plan ${r.planTemplateNo})`).join(", ")),
+      cell: ({ getValue }) => <span className="muted" style={{ fontSize: 12 }}>{getValue()}</span>,
+    },
+    {
+      header: "Valid",
+      id: "valid",
+      accessorFn: (c) => (c.validFrom || c.validTo ? `${c.validFrom ? dayjs(c.validFrom).format("DD MMM YYYY") : "…"} – ${c.validTo ? dayjs(c.validTo).format("DD MMM YYYY") : "…"}` : "No expiry"),
+      cell: ({ getValue }) => <span className="muted" style={{ fontSize: 12 }}>{getValue()}</span>,
+    },
+    {
+      header: "Status",
+      accessorKey: "status",
+      cell: ({ row }) => {
+        const c = row.original;
+        return (
+          <PermissionGate module="access-control" action="edit" fallback={<span className={`badge ${c.status === "ACTIVE" ? "badge-success" : "badge-neutral"}`}>{c.status}</span>}>
+            <button
+              className={`badge ${c.status === "ACTIVE" ? "badge-success" : "badge-neutral"}`}
+              style={{ border: "none", cursor: "pointer" }}
+              onClick={(e) => { e.stopPropagation(); toggleStatusMutation.mutate({ id: c.id, status: c.status === "ACTIVE" ? "DISABLED" : "ACTIVE" }); }}
+            >
+              {c.status}
+            </button>
+          </PermissionGate>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => (
+        <PermissionGate module="access-control" action="delete">
+          <button className="btn btn-danger btn-sm btn-icon" onClick={(e) => { e.stopPropagation(); setDeleting(row.original); }} title="Revoke and remove">
+            <Icon name="trash" size={12} />
+          </button>
+        </PermissionGate>
+      ),
+    },
+  ];
+
   return (
     <div className="stack gap-3">
       {isLoading && <Skeleton height={140} />}
@@ -85,48 +144,14 @@ export function CredentialsTab() {
             </PermissionGate>
           </div>
 
-          {device.credentials.length === 0 ? (
-            <div className="muted" style={{ fontSize: 13 }}>No credentials enrolled on this device yet.</div>
-          ) : (
-            <table className="data-table">
-              <thead><tr><th>Person</th><th>Card</th><th>PIN</th><th>Door Access</th><th>Valid</th><th>Status</th><th></th></tr></thead>
-              <tbody>
-                {device.credentials.map((c) => (
-                  <tr key={c.id}>
-                    <td>{c.person.name}<div className="muted" style={{ fontSize: 11 }}>{c.person.personId}</div></td>
-                    <td style={{ fontFamily: "monospace" }}>{c.cardNumber ?? "—"}</td>
-                    <td>{c.hasPin ? "Yes" : "—"}</td>
-                    <td className="muted" style={{ fontSize: 12 }}>
-                      {c.doorRights.length === 0
-                        ? "Controller default"
-                        : c.doorRights.map((r) => `${r.door.name} (plan ${r.planTemplateNo})`).join(", ")}
-                    </td>
-                    <td className="muted" style={{ fontSize: 12 }}>
-                      {c.validFrom || c.validTo
-                        ? `${c.validFrom ? dayjs(c.validFrom).format("DD MMM YYYY") : "…"} – ${c.validTo ? dayjs(c.validTo).format("DD MMM YYYY") : "…"}`
-                        : "No expiry"}
-                    </td>
-                    <td>
-                      <PermissionGate module="access-control" action="edit" fallback={<span className={`badge ${c.status === "ACTIVE" ? "badge-success" : "badge-neutral"}`}>{c.status}</span>}>
-                        <button
-                          className={`badge ${c.status === "ACTIVE" ? "badge-success" : "badge-neutral"}`}
-                          style={{ border: "none", cursor: "pointer" }}
-                          onClick={() => toggleStatusMutation.mutate({ id: c.id, status: c.status === "ACTIVE" ? "DISABLED" : "ACTIVE" })}
-                        >
-                          {c.status}
-                        </button>
-                      </PermissionGate>
-                    </td>
-                    <td>
-                      <PermissionGate module="access-control" action="delete">
-                        <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleting(c)} title="Revoke and remove"><Icon name="trash" size={12} /></button>
-                      </PermissionGate>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <DataTable
+            tableId="accessControl.credentials"
+            exportModule="access-control"
+            columns={columns}
+            data={device.credentials}
+            clientPageSize={10}
+            emptyMessage="No credentials enrolled on this device yet."
+          />
         </div>
       ))}
 

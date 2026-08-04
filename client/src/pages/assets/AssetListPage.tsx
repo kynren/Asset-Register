@@ -282,7 +282,7 @@ export function AssetListPage() {
         <PermissionGate module="assets" action="export">
           <CsvExportButton url="/assets/export" filename="assets.csv" />
         </PermissionGate>
-        <PermissionGate module="assets" action="create">
+        <PermissionGate module="assets" action="import">
           <button className="btn btn-secondary" onClick={() => setShowImportWizard(true)}>
             <Icon name="upload" size={14} /> Import CSV
           </button>

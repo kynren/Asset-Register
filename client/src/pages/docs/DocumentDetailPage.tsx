@@ -6,9 +6,13 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { PermissionGate } from "../../auth/PermissionGate";
+import { AccessGrant, ManageAccessModal, canDeleteRecord, canEditRecord, canManageRecordAccess } from "../../components/AccessControl";
+import { useAuth } from "../../auth/AuthContext";
 import { SectionsView } from "./SectionsView";
 import { DocumentFormModal } from "./DocumentFormModal";
 import { DOC_TYPE_FIELDS, DOC_TYPE_LABELS, DocType } from "./docsConstants";
+import { useBranding } from "../../theme/BrandingContext";
+import { watermarkPositionStyle } from "../../lib/watermarkPosition";
 
 interface Attachment {
   id: number;
@@ -28,8 +32,10 @@ interface DocumentFull {
   tags: string[];
   isPublished: boolean;
   reviewDueDate: string | null;
+  createdById: number;
   createdBy: { firstName: string; lastName: string } | null;
   attachments: Attachment[];
+  access: AccessGrant[];
   createdAt: string;
   updatedAt: string;
 }
@@ -38,14 +44,19 @@ export function DocumentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user, myTeamIds } = useAuth();
+  const { docsWatermarkUrl, docsWatermarkPosition } = useBranding();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [managingAccess, setManagingAccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: doc, isLoading } = useQuery({
     queryKey: ["doc", id],
     queryFn: async () => (await axiosClient.get(`/docs/${id}`)).data as DocumentFull,
   });
+  const { data: users } = useQuery({ queryKey: ["users-directory"], queryFn: async () => (await axiosClient.get("/users/directory")).data });
+  const { data: teams } = useQuery({ queryKey: ["teams-directory"], queryFn: async () => (await axiosClient.get("/teams/directory")).data });
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["doc", id] });
@@ -92,9 +103,22 @@ export function DocumentDetailPage() {
     window.URL.revokeObjectURL(url);
   }
 
+  async function exportDocument(format: "pdf" | "docx") {
+    const res = await axiosClient.get(`/docs/${id}/export`, { params: { format }, responseType: "blob" });
+    const url = window.URL.createObjectURL(res.data);
+    const a = window.document.createElement("a");
+    a.href = url;
+    a.download = `${(doc?.title ?? "document").replace(/[^a-z0-9-_]+/gi, "_")}.${format}`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
   if (isLoading || !doc) return <div className="ad-shell"><div style={{ padding: 22 }}>Loading...</div></div>;
 
   const reviewOverdue = doc.reviewDueDate && dayjs(doc.reviewDueDate).isBefore(dayjs());
+  const canEdit = !!user && canEditRecord(doc.createdById, doc.access, user.id, user.roleName, myTeamIds);
+  const canDelete = !!user && canDeleteRecord(doc.createdById, doc.access, user.id, user.roleName, myTeamIds);
+  const canManageAccess = !!user && canManageRecordAccess(doc.createdById, user.id, user.roleName);
 
   return (
     <div className="ad-shell">
@@ -126,23 +150,47 @@ export function DocumentDetailPage() {
         </div>
       </div>
 
-      <div style={{ padding: 22 }}>
+      <div style={{ padding: 22, position: "relative" }}>
+        {docsWatermarkUrl && (
+          <img
+            src={docsWatermarkUrl}
+            alt=""
+            aria-hidden="true"
+            style={{ ...watermarkPositionStyle(docsWatermarkPosition), maxWidth: 220, maxHeight: 140, opacity: 0.08, zIndex: 0, pointerEvents: "none" }}
+          />
+        )}
+        <div style={{ position: "relative", zIndex: 1 }}>
         <div className="row gap-2" style={{ marginBottom: 16, justifyContent: "flex-end" }}>
-          <PermissionGate module="docs" action="edit">
-            <button className="ad-btn ad-btn-primary" onClick={() => setEditing(true)}>
-              <Icon name="edit" size={13} /> Edit
+          {canManageAccess && (
+            <button className="ad-btn" title="Manage Access" onClick={() => setManagingAccess(true)}>
+              <Icon name="profile" size={13} /> Access ({doc.access.length})
             </button>
-          </PermissionGate>
+          )}
+          {canEdit && (
+            <PermissionGate module="docs" action="edit">
+              <button className="ad-btn ad-btn-primary" onClick={() => setEditing(true)}>
+                <Icon name="edit" size={13} /> Edit
+              </button>
+            </PermissionGate>
+          )}
+          <button className="ad-btn" title="Export as PDF" onClick={() => exportDocument("pdf")}>
+            <Icon name="download" size={13} /> PDF
+          </button>
+          <button className="ad-btn" title="Export as Word document" onClick={() => exportDocument("docx")}>
+            <Icon name="download" size={13} /> Word
+          </button>
           <PermissionGate module="docs" action="create">
             <button className="ad-btn" title="Duplicate" onClick={() => duplicateMutation.mutate()}>
               <Icon name="paperclip" size={13} /> Duplicate
             </button>
           </PermissionGate>
-          <PermissionGate module="docs" action="delete">
-            <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(true)}>
-              <Icon name="trash" size={13} /> Delete
-            </button>
-          </PermissionGate>
+          {canDelete && (
+            <PermissionGate module="docs" action="delete">
+              <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(true)}>
+                <Icon name="trash" size={13} /> Delete
+              </button>
+            </PermissionGate>
+          )}
         </div>
 
         {doc.summary && <p className="muted" style={{ marginTop: 0 }}>{doc.summary}</p>}
@@ -157,6 +205,7 @@ export function DocumentDetailPage() {
         <div className="ad-panel" style={{ marginTop: 18 }}>
           <div className="row gap-2" style={{ justifyContent: "space-between" }}>
             <div className="ad-panel-title" style={{ margin: 0 }}>Attachments</div>
+            {canEdit && (
             <PermissionGate module="docs" action="edit">
               <input
                 ref={fileInputRef}
@@ -172,6 +221,7 @@ export function DocumentDetailPage() {
                 <Icon name="upload" size={12} /> {uploadMutation.isPending ? "Uploading..." : "Add Attachment"}
               </button>
             </PermissionGate>
+            )}
           </div>
 
           {doc.attachments.length === 0 ? (
@@ -189,14 +239,17 @@ export function DocumentDetailPage() {
                   </div>
                   <div className="row gap-1">
                     <button className="ad-btn" onClick={() => downloadAttachment(a.id, a.fileName)}><Icon name="download" size={12} /></button>
-                    <PermissionGate module="docs" action="edit">
-                      <button className="ad-btn ad-btn-danger" onClick={() => deleteAttachmentMutation.mutate(a.id)}><Icon name="trash" size={12} /></button>
-                    </PermissionGate>
+                    {canEdit && (
+                      <PermissionGate module="docs" action="edit">
+                        <button className="ad-btn ad-btn-danger" onClick={() => deleteAttachmentMutation.mutate(a.id)}><Icon name="trash" size={12} /></button>
+                      </PermissionGate>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
 
@@ -216,6 +269,19 @@ export function DocumentDetailPage() {
           loading={deleteMutation.isPending}
           onCancel={() => setDeleting(false)}
           onConfirm={() => deleteMutation.mutate()}
+        />
+      )}
+
+      {managingAccess && (
+        <ManageAccessModal
+          title={doc.title}
+          apiBasePath={`/docs/${doc.id}`}
+          access={doc.access}
+          createdById={doc.createdById}
+          users={users ?? []}
+          teams={teams ?? []}
+          queryKey={["doc", id]}
+          onClose={() => setManagingAccess(false)}
         />
       )}
     </div>

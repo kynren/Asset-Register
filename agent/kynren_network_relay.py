@@ -824,6 +824,30 @@ def snmp_get_topology(ip: str, community: str, port: int) -> dict:
 
 # ───────────────────────── Job queue protocol ─────────────────────────
 
+def perform_handshake(api_base_url: str, api_key: str, logger: logging.Logger) -> bool:
+    """Called once at startup, before any worker thread or the poll loop starts. A bad/revoked key
+    or a typo'd API base URL would otherwise only surface as a wall of repeated 401s/connection
+    errors from whichever loop happens to poll first — this fails fast with one clear message, and
+    tells the operator which organization's data this agent is about to relay traffic for."""
+    url = f"{api_base_url.rstrip('/')}/api/network-relay/handshake"
+    try:
+        response = requests.get(url, headers={"X-Agent-Key": api_key}, timeout=10)
+    except requests.RequestException as exc:
+        logger.error(f"Could not reach {api_base_url} ({exc}). Check API_BASE_URL and network connectivity.")
+        return False
+
+    if response.status_code == 401:
+        logger.error("Agent key was rejected (401). Check AGENT_API_KEY in .env against the key issued in App Settings.")
+        return False
+    if response.status_code != 200:
+        logger.error(f"Handshake failed: {response.status_code} {response.text[:200]}")
+        return False
+
+    org_name = response.json().get("organizationName") or "(unknown organization)"
+    logger.info(f"Connected to organization: {org_name}")
+    return True
+
+
 def fetch_next_job(api_base_url: str, api_key: str, logger: logging.Logger) -> dict | None:
     url = f"{api_base_url.rstrip('/')}/api/network-relay/next-job"
     try:
@@ -1315,6 +1339,10 @@ def run_loop(api_base_url: str, api_key: str, logger: logging.Logger, stop_event
     between cycles via `stop_event` (a threading.Event) instead of relying on KeyboardInterrupt,
     which a Windows service never receives. `stop_event=None` (the console/Task-Scheduler case)
     behaves exactly as before — only Ctrl+C or an unhandled exception ends the loop."""
+    if not perform_handshake(api_base_url, api_key, logger):
+        logger.error("Handshake failed — not starting worker threads or the poll loop. Fix the issue above and restart.")
+        return
+
     try:
         subnets = discover_local_subnets()
         if subnets:
@@ -1395,6 +1423,8 @@ def main() -> int:
         return 1
 
     logger.info(f"Kynren Network Relay Agent v{AGENT_VERSION} — polling {api_base_url} every {POLL_INTERVAL_SECONDS}s")
+    if not perform_handshake(api_base_url, api_key, logger):
+        return 1
     run_loop(api_base_url, api_key, logger, log_buffer=log_buffer)
     return 0
 

@@ -361,6 +361,7 @@ export function IpRangeScannerTab() {
       <div className="ips-table-wrap">
         <DataTable
           tableId="network.scanResults"
+          exportModule="network"
           defaultViewMode="list"
           columns={resultColumns}
           data={scan ? results : []}

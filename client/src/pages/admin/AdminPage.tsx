@@ -9,6 +9,7 @@ import { EmailTemplatesTab } from "./EmailTemplatesTab";
 import { ToastSettingsTab } from "./ToastSettingsTab";
 import { HelpdeskConfigTab } from "./HelpdeskConfigTab";
 import { BrandingTab } from "../appSettings/BrandingTab";
+import { DocsImportLimitCard } from "../docs/DocsImportLimitCard";
 
 const TABS = [
   { key: "users", label: "Users" },
@@ -20,6 +21,7 @@ const TABS = [
   { key: "email-templates", label: "Email Templates" },
   { key: "toasts", label: "Toast Designer" },
   { key: "branding", label: "Branding" },
+  { key: "docs-settings", label: "Docs & SOPs" },
   { key: "audit", label: "Audit Log" },
 ] as const;
 
@@ -56,6 +58,7 @@ export function AdminPage() {
       {tab === "email-templates" && <EmailTemplatesTab />}
       {tab === "toasts" && <ToastSettingsTab />}
       {tab === "branding" && <BrandingTab />}
+      {tab === "docs-settings" && <DocsImportLimitCard />}
       {tab === "audit" && <AuditLogTab />}
     </div>
   );

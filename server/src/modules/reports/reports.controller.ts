@@ -9,6 +9,7 @@ import { hasPermission } from "../../middleware/rbac";
 import { toCsv } from "../../lib/csv";
 import { sendEmail } from "../../lib/email";
 import { runQuery, SOURCES, QuerySpec, QueryResult, FilterSpec, SourceDef } from "../dashboard/dataExplorer";
+import { RECORD_ACCESS_BYPASS_ROLE_NAMES } from "../../lib/recordAccess";
 
 async function myTeamIds(userId: number): Promise<number[]> {
   const memberships = await prisma.teamMember.findMany({ where: { userId }, select: { teamId: true } });
@@ -240,8 +241,12 @@ export async function updateReport(req: Request, res: Response) {
 
 export async function deleteReport(req: Request, res: Response) {
   const id = Number(req.params.id);
-  const { isOwner } = await loadReportWithAccess(id, req.user!.id);
-  if (!isOwner) throw new ApiError(403, "Only the owner can delete this report");
+  const report = await prisma.report.findUnique({ where: { id } });
+  if (!report) throw new ApiError(404, "Report not found");
+
+  const isOwner = report.ownerId === req.user!.id;
+  const isAdmin = RECORD_ACCESS_BYPASS_ROLE_NAMES.includes(req.user!.roleName);
+  if (!isOwner && !isAdmin) throw new ApiError(403, "Only the owner or a System/Super Admin can delete this report");
 
   await prisma.report.delete({ where: { id } });
   res.json({ ok: true });

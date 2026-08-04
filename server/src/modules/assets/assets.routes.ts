@@ -32,8 +32,8 @@ router.post("/:id/checkout", requirePermission("assets", "edit"), validateBody(c
 router.post("/:id/checkin", requirePermission("assets", "edit"), validateBody(checkinSchema), controller.checkinAsset);
 router.get("/:id", requireAssetOrHarnessPermission("view"), controller.getOne);
 router.post("/", requireAssetOrHarnessPermission("create"), validateBody(createAssetSchema), controller.create);
-router.post("/import/preview", requirePermission("assets", "create"), upload.single("file"), controller.importPreview);
-router.post("/import", requirePermission("assets", "create"), upload.single("file"), controller.importCsv);
+router.post("/import/preview", requirePermission("assets", "import"), upload.single("file"), controller.importPreview);
+router.post("/import", requirePermission("assets", "import"), upload.single("file"), controller.importCsv);
 router.post("/:id/duplicate", requirePermission("assets", "create"), controller.duplicate);
 router.patch("/:id", requireAssetOrHarnessPermission("edit"), validateBody(updateAssetSchema), controller.update);
 router.delete("/:id", requireAssetOrHarnessPermission("delete"), controller.remove);

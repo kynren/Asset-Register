@@ -24,6 +24,7 @@ function padPermissions<T extends { permissions: { module: string }[] }>(role: T
     canEdit: false,
     canDelete: false,
     canExport: false,
+    canImport: false,
     scopeAssignedOnly: false,
   }));
   return { ...role, permissions: [...role.permissions, ...missing] };
@@ -64,7 +65,7 @@ export async function create(req: Request, res: Response) {
     data: {
       name,
       description,
-      permissions: { create: MODULES.map((module) => ({ module, canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false })) },
+      permissions: { create: MODULES.map((module) => ({ module, canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false })) },
     },
     include: { permissions: true },
   });
@@ -93,6 +94,7 @@ export type RolePermissionInput = {
   canEdit: boolean;
   canDelete: boolean;
   canExport: boolean;
+  canImport: boolean;
   scopeAssignedOnly?: boolean;
 };
 
@@ -112,7 +114,7 @@ export async function applyRolePermissions(roleId: number, permissions: RolePerm
   // except System Admin (see client RolesTab.tsx), but that's just presentation — this is the
   // actual enforcement, so a direct API call can't grant it either.
   const grantsAppSettings = permissions.some(
-    (p) => p.module === APP_SETTINGS_MODULE && (p.canView || p.canCreate || p.canEdit || p.canDelete || p.canExport)
+    (p) => p.module === APP_SETTINGS_MODULE && (p.canView || p.canCreate || p.canEdit || p.canDelete || p.canExport || p.canImport)
   );
   if (grantsAppSettings) throw new ApiError(400, "App Settings can only be granted to the System Admin role.");
 

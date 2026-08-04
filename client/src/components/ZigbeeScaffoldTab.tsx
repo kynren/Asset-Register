@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ColumnDef } from "@tanstack/react-table";
 import dayjs from "dayjs";
 import { axiosClient } from "../api/axiosClient";
 import { Icon } from "./Icon";
+import { DataTable } from "./DataTable";
 import { PermissionGate } from "../auth/PermissionGate";
 import { ModuleName } from "../lib/permissions";
 
@@ -59,6 +61,13 @@ export function ZigbeeScaffoldTab({ apiBase, module }: { apiBase: string; module
 
   const currentPort = serialPort ?? coordinator?.serialPort ?? "";
 
+  const deviceColumns: ColumnDef<ZigbeeDevice, any>[] = [
+    { header: "Name", accessorKey: "friendlyName", meta: { cardTitle: true } },
+    { header: "IEEE Address", accessorKey: "ieeeAddress", cell: ({ getValue }) => <span style={{ fontFamily: "monospace" }}>{getValue()}</span> },
+    { header: "Type", accessorKey: "deviceType" },
+    { header: "Last Seen", accessorFn: (d) => (d.lastSeenAt ? dayjs(d.lastSeenAt).format("DD MMM, HH:mm") : "—") },
+  ];
+
   return (
     <div className="stack gap-3">
       <div className="card">
@@ -94,23 +103,13 @@ export function ZigbeeScaffoldTab({ apiBase, module }: { apiBase: string; module
           <strong style={{ fontSize: 14 }}>Paired Devices</strong>
           <span className="muted" style={{ fontSize: 12 }}>{coordinator ? `Last checked ${dayjs(coordinator.updatedAt).format("HH:mm:ss")}` : ""}</span>
         </div>
-        {(!devices || devices.length === 0) ? (
-          <p className="muted" style={{ fontSize: 13 }}>No devices paired yet — connect a coordinator to permit joining and discover devices.</p>
-        ) : (
-          <table className="data-table">
-            <thead><tr><th>Name</th><th>IEEE Address</th><th>Type</th><th>Last Seen</th></tr></thead>
-            <tbody>
-              {devices.map((d) => (
-                <tr key={d.id}>
-                  <td>{d.friendlyName}</td>
-                  <td style={{ fontFamily: "monospace" }}>{d.ieeeAddress}</td>
-                  <td>{d.deviceType}</td>
-                  <td className="muted">{d.lastSeenAt ? dayjs(d.lastSeenAt).format("DD MMM, HH:mm") : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable
+          tableId={`${apiBase}.zigbee-devices`}
+          columns={deviceColumns}
+          data={devices ?? []}
+          clientPageSize={10}
+          emptyMessage="No devices paired yet — connect a coordinator to permit joining and discover devices."
+        />
       </div>
     </div>
   );

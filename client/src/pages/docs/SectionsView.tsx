@@ -1,5 +1,6 @@
 import { FieldSpec } from "./docsConstants";
 
+
 function isBlank(value: unknown): boolean {
   if (value == null) return true;
   if (typeof value === "string") return value.trim() === "";
@@ -12,7 +13,8 @@ function isBlank(value: unknown): boolean {
 // entirely rather than shown as blank headings.
 export function SectionsView({ fields, sections }: { fields: FieldSpec[]; sections: Record<string, any> }) {
   const populated = fields.filter((f) => !isBlank(sections[f.key]));
-  if (populated.length === 0) {
+  const hasAdditionalNotes = !isBlank(sections.additionalNotes);
+  if (populated.length === 0 && !hasAdditionalNotes) {
     return <div className="empty-state">This document has no content yet.</div>;
   }
 
@@ -33,7 +35,11 @@ export function SectionsView({ fields, sections }: { fields: FieldSpec[]; sectio
                     row[itemField.key] ? (
                       <div key={itemField.key}>
                         {field.itemFields.length > 1 && <span className="muted" style={{ fontSize: 11, textTransform: "uppercase", marginRight: 6 }}>{itemField.label}:</span>}
-                        <span style={{ whiteSpace: "pre-wrap" }}>{row[itemField.key]}</span>
+                        {itemField.kind === "textarea" ? (
+                          <div className="doc-prose" dangerouslySetInnerHTML={{ __html: row[itemField.key] }} />
+                        ) : (
+                          <span style={{ whiteSpace: "pre-wrap" }}>{row[itemField.key]}</span>
+                        )}
                       </div>
                     ) : null
                   )}
@@ -43,6 +49,12 @@ export function SectionsView({ fields, sections }: { fields: FieldSpec[]; sectio
           )}
         </div>
       ))}
+      {hasAdditionalNotes && (
+        <div className="ad-panel">
+          <div className="ad-panel-title">Additional Notes</div>
+          <div className="doc-prose" dangerouslySetInnerHTML={{ __html: String(sections.additionalNotes) }} />
+        </div>
+      )}
     </div>
   );
 }

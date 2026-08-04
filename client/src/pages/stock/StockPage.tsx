@@ -118,7 +118,7 @@ export function StockPage() {
             </label>
           </FilterBar>
           <div className="card">
-            <DataTable tableId="stock.items" columns={columns} data={data?.items ?? []} isLoading={isLoading} page={data?.page} totalPages={data?.totalPages} onPageChange={setPage} />
+            <DataTable tableId="stock.items" columns={columns} data={data?.items ?? []} isLoading={isLoading} page={data?.page} totalPages={data?.totalPages} onPageChange={setPage} exportModule="stock" />
           </div>
         </>
       ) : tab === "analytics" ? (

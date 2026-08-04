@@ -97,6 +97,7 @@ export function UsersTab() {
       <div className="card">
         <DataTable
           tableId="admin.users"
+          exportModule="admin"
           columns={columns}
           data={data?.items ?? []}
           isLoading={isLoading}

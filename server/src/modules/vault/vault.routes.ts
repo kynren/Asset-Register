@@ -65,6 +65,19 @@ router.delete("/:id", requirePermission("password", "delete"), async (req, res) 
   res.json({ ok: true });
 });
 
+// How long a decrypted password is allowed to sit revealed on screen before the client
+// auto-re-encrypts it — read by every vault user (not just admins) so their reveal modal knows
+// when to auto-close; only System Admins can change it (via app-settings-gated PUT /settings,
+// same as every other system setting).
+const DEFAULT_VAULT_DECRYPT_TIMEOUT_SECONDS = 60;
+
+router.get("/settings", requirePermission("password", "view"), async (_req, res) => {
+  const setting = await prisma.systemSetting.findUnique({ where: { key: "vaultDecryptTimeoutSeconds" } });
+  const parsed = setting ? Number(setting.value) : NaN;
+  const decryptTimeoutSeconds = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_VAULT_DECRYPT_TIMEOUT_SECONDS;
+  res.json({ decryptTimeoutSeconds });
+});
+
 router.post("/:id/reveal", requirePermission("password", "view"), async (req, res) => {
   const id = Number(req.params.id);
   const entry = await prisma.vaultEntry.findUnique({ where: { id } });

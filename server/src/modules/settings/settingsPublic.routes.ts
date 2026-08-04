@@ -4,7 +4,7 @@ import { DEFAULT_LOGIN_PAGE_DESIGN } from "./loginDesign.schema";
 
 const router = Router();
 
-const PUBLIC_KEYS = ["companyName", "appIconUrl", "faviconUrl", "brandPrimaryColor", "brandSecondaryColor"];
+const PUBLIC_KEYS = ["companyName", "appIconUrl", "faviconUrl", "brandPrimaryColor", "brandSecondaryColor", "docsWatermarkUrl", "docsWatermarkPosition"];
 
 router.get("/", async (_req, res) => {
   const settings = await prisma.systemSetting.findMany({ where: { key: { in: PUBLIC_KEYS } } });

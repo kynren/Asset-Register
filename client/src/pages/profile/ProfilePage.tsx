@@ -7,16 +7,17 @@ import { AvatarGallery } from "./AvatarGallery";
 import { ColorPaletteCard } from "./ColorPaletteCard";
 import { CurrentDeviceCard } from "./CurrentDeviceCard";
 import { PasswordInput } from "../../components/PasswordInput";
-import { McpConnectionCard } from "./McpConnectionCard";
 import { MfaCard } from "../password/MfaCard";
 import { PinCard } from "../password/PinCard";
 import { SessionsCard } from "../password/SessionsCard";
 import { NotificationsTab } from "./NotificationsTab";
 import { ContactEmailsCard } from "./ContactEmailsCard";
 import { AuthorizedSubstitutesCard } from "./AuthorizedSubstitutesCard";
+import { AppearanceTab } from "./AppearanceTab";
 
 const TABS = [
   { key: "general", label: "General" },
+  { key: "appearance", label: "Appearance" },
   { key: "account", label: "Account" },
   { key: "notifications", label: "Notifications" },
   { key: "settings", label: "Settings" },
@@ -138,12 +139,18 @@ export function ProfilePage() {
             </div>
             <div className="card">
               <h3 className="mt-0">Accent Color</h3>
+              <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
+                A simple personal accent color. For full color palettes, layout, and shareable themes, see the
+                Appearance tab.
+              </p>
               <ColorPaletteCard selected={user.accentColor} onSelect={(color) => updateMutation.mutate({ accentColor: color })} />
             </div>
           </div>
           <CurrentDeviceCard />
         </div>
       )}
+
+      {tab === "appearance" && <AppearanceTab />}
 
       {tab === "account" && (
         <div className="card" style={{ maxWidth: 480 }}>
@@ -177,8 +184,6 @@ export function ProfilePage() {
           <MfaCard />
 
           <SessionsCard />
-
-          <McpConnectionCard />
 
           <ContactEmailsCard />
 

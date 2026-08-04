@@ -4,6 +4,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { LoginPageDesigner } from "./LoginPageDesigner";
+import { WATERMARK_POSITION_OPTIONS } from "../../lib/watermarkPosition";
 
 const HEX_COLOR_PATTERN = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
@@ -38,7 +39,16 @@ function HexColorField({ value, onChange }: { value: string; onChange: (hex: str
   );
 }
 
-function BrandingUploader({ type, label, currentUrl }: { type: "appIcon" | "favicon"; label: string; currentUrl: string | null }) {
+function BrandingUploader({
+  type, label, hint, currentUrl, accept = "image/*", onRemove,
+}: {
+  type: "appIcon" | "favicon" | "docsWatermark";
+  label: string;
+  hint?: string;
+  currentUrl: string | null;
+  accept?: string;
+  onRemove?: () => void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -68,13 +78,16 @@ function BrandingUploader({ type, label, currentUrl }: { type: "appIcon" | "favi
       </div>
       <div className="flex-1">
         <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
-        <div className="muted" style={{ fontSize: 11 }}>PNG, JPEG, or SVG, up to 2MB</div>
+        <div className="muted" style={{ fontSize: 11 }}>{hint ?? "PNG, JPEG, or SVG, up to 2MB"}</div>
       </div>
-      <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleChange} />
+      <input ref={inputRef} type="file" accept={accept} style={{ display: "none" }} onChange={handleChange} />
       <PermissionGate module="branding" action="edit">
         <button className="btn btn-secondary btn-sm" onClick={() => inputRef.current?.click()} disabled={uploadMutation.isPending}>
           {uploadMutation.isPending ? "Uploading..." : "Upload"}
         </button>
+        {currentUrl && onRemove && (
+          <button className="btn btn-secondary btn-sm" onClick={onRemove}>Remove</button>
+        )}
       </PermissionGate>
     </div>
   );
@@ -102,6 +115,25 @@ export function BrandingTab() {
       queryClient.invalidateQueries({ queryKey: ["branding-fields"] });
       queryClient.invalidateQueries({ queryKey: ["branding-public"] });
       setTimeout(() => setSaved(false), 2000);
+    },
+  });
+
+  const [watermarkSaved, setWatermarkSaved] = useState(false);
+  const watermarkPositionMutation = useMutation({
+    mutationFn: (position: string) => axiosClient.put("/settings/branding-fields", { docsWatermarkPosition: position }),
+    onSuccess: () => {
+      setWatermarkSaved(true);
+      queryClient.invalidateQueries({ queryKey: ["branding-fields"] });
+      queryClient.invalidateQueries({ queryKey: ["branding-public"] });
+      setTimeout(() => setWatermarkSaved(false), 2000);
+    },
+  });
+
+  const removeWatermarkMutation = useMutation({
+    mutationFn: () => axiosClient.delete("/settings/branding/docs-watermark"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["branding-fields"] });
+      queryClient.invalidateQueries({ queryKey: ["branding-public"] });
     },
   });
 
@@ -143,6 +175,38 @@ export function BrandingTab() {
             {saveMutation.isPending ? "Please wait..." : "Save"}
           </button>
         </PermissionGate>
+      </div>
+
+      <div className="card" style={{ maxWidth: 480 }}>
+        <h3 className="mt-0">Docs &amp; SOPs Watermark</h3>
+        <p className="muted" style={{ fontSize: 12, marginTop: -6 }}>
+          Shown as a faint watermark behind every document in Docs &amp; SOPs, and embedded on every page of PDF/Word exports.
+        </p>
+        {watermarkSaved && <div className="alert alert-success">Watermark position saved.</div>}
+        <BrandingUploader
+          type="docsWatermark"
+          label="Watermark Image"
+          hint="PNG or JPEG, up to 2MB — a logo with a light or transparent background works best"
+          accept="image/png,image/jpeg"
+          currentUrl={values.docsWatermarkUrl ?? null}
+          onRemove={() => removeWatermarkMutation.mutate()}
+        />
+        <div className="field mt-3">
+          <label>Position</label>
+          <select
+            className="input"
+            value={values.docsWatermarkPosition ?? "center"}
+            onChange={(e) => {
+              const position = e.target.value;
+              setValues((v) => ({ ...v, docsWatermarkPosition: position }));
+              watermarkPositionMutation.mutate(position);
+            }}
+          >
+            {WATERMARK_POSITION_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="card">

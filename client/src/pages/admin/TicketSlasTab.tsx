@@ -111,7 +111,7 @@ export function TicketSlasTab() {
           {editingId != null && <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>Cancel</button>}
         </form>
       </PermissionGate>
-      <DataTable tableId="admin.ticket-slas" columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={10} emptyMessage="No SLAs defined yet." />
+      <DataTable tableId="admin.ticket-slas" exportModule="admin" columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={10} emptyMessage="No SLAs defined yet." />
       {deleting && (
         <ConfirmDialog
           title={`Delete "${deleting.name}"`}

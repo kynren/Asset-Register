@@ -221,6 +221,7 @@ export function ToastSettingsTab() {
 
       <DataTable
         tableId="admin.toast-settings"
+        exportModule="admin"
         columns={columns}
         data={NOTIFICATION_TYPES}
         clientPageSize={20}

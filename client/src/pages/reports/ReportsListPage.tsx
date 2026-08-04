@@ -19,7 +19,8 @@ export function ReportsListPage() {
   const [deletingReport, setDeletingReport] = useState<ReportSummary | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const isBypassAdmin = user?.roleName === "System Admin" || user?.roleName === "Super Admin";
 
   const { data, isLoading } = useQuery<ReportSummary[]>({
     queryKey: ["reports"],
@@ -71,7 +72,7 @@ export function ReportsListPage() {
             {r.isOwner && canEditModule && (
               <button className="btn btn-secondary btn-sm btn-icon" title="Share" onClick={() => setSharingReport(r)}><Icon name="link" size={12} /></button>
             )}
-            {r.isOwner && canDeleteModule && (
+            {(r.isOwner || isBypassAdmin) && canDeleteModule && (
               <button className="btn btn-secondary btn-sm btn-icon" title="Delete" onClick={() => setDeletingReport(r)}><Icon name="trash" size={12} /></button>
             )}
           </div>
@@ -84,6 +85,7 @@ export function ReportsListPage() {
     <div className="card">
       <DataTable
         tableId="reports.list"
+        exportModule="reports"
         columns={columns}
         data={data ?? []}
         isLoading={isLoading}

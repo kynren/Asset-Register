@@ -70,7 +70,11 @@ export function SectionsEditor({ fields, sections, onChange }: SectionsEditorPro
                     itemField.kind === "textarea" ? (
                       <div className="field" key={itemField.key} style={{ marginBottom: 0 }}>
                         <label>{itemField.label}</label>
-                        <textarea className="input" rows={2} value={row[itemField.key] ?? ""} onChange={(e) => updateRow(index, itemField.key, e.target.value)} />
+                        <RichTextEditor
+                          value={row[itemField.key] ?? ""}
+                          onChange={(html) => updateRow(index, itemField.key, html)}
+                          minHeight={90}
+                        />
                       </div>
                     ) : (
                       <div className="field" key={itemField.key} style={{ marginBottom: 0 }}>
@@ -88,6 +92,15 @@ export function SectionsEditor({ fields, sections, onChange }: SectionsEditorPro
           </div>
         );
       })}
+      {sections.additionalNotes !== undefined && (
+        <div className="field">
+          <label>Additional Notes</label>
+          <p className="muted" style={{ fontSize: 11, marginTop: -2, marginBottom: 6 }}>
+            Content imported from headings that didn't match a field above — review and re-file into the right section, or leave here.
+          </p>
+          <RichTextEditor value={sections.additionalNotes ?? ""} onChange={(html) => onChange("additionalNotes", html)} />
+        </div>
+      )}
     </div>
   );
 }
