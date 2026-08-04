@@ -47,6 +47,7 @@ const nvrSelect = {
   notes: true,
   status: true,
   lastCheckedAt: true,
+  lastConnectionLatencyMs: true,
   createdAt: true,
   cameras: {
     select: {
@@ -64,6 +65,7 @@ const nvrSelect = {
       ptzEnabled: true,
       status: true,
       lastCheckedAt: true,
+      lastConnectionLatencyMs: true,
     },
   },
 };
@@ -142,14 +144,28 @@ router.post("/:id/check-status", requirePermission("nvr", "edit"), async (req, r
     data: { status: newStatus, lastCheckedAt: new Date() },
     select: nvrSelect,
   });
+  res.setHeader("Cache-Control", "no-store");
   res.json(updated);
 });
 
-// Stateless — works against whatever host/port/protocol is currently typed into the Add/Edit
-// form, so admins can verify reachability before saving, not just for already-persisted devices.
+// Works against whatever host/port/protocol is currently typed into the Add/Edit form (so admins
+// can verify reachability before saving), but when nvrId/cameraId is present — i.e. testing an
+// already-saved device, not the blank Add form — also persists the outcome onto that row so
+// re-opening the modal (or starting live view) shows the last known state instantly instead of
+// needing a fresh test. Best-effort: a stale/deleted id here never fails the test response itself.
 router.post("/test-connection", requirePermission("nvr", "view"), validateBody(testConnectionSchema), async (req, res) => {
-  const { ipAddress, port, protocol } = req.body;
+  const { ipAddress, port, protocol, nvrId, cameraId } = req.body;
   const result = await testDeviceConnection(ipAddress, port ?? (protocol === "RTSP" ? 554 : 80), protocol);
+
+  const persistData = {
+    status: result.reachable ? "ONLINE" : "OFFLINE",
+    lastCheckedAt: new Date(),
+    lastConnectionLatencyMs: result.latencyMs,
+  } as const;
+  if (nvrId) await prisma.nvr.update({ where: { id: nvrId }, data: persistData }).catch(() => undefined);
+  if (cameraId) await prisma.camera.update({ where: { id: cameraId }, data: persistData }).catch(() => undefined);
+
+  res.setHeader("Cache-Control", "no-store");
   res.json(result);
 });
 
@@ -279,6 +295,7 @@ router.post("/cameras/:cameraId/check-status", requirePermission("nvr", "edit"),
   }
 
   const updated = await prisma.camera.update({ where: { id: camera.id }, data: { status: newStatus, lastCheckedAt: new Date() } });
+  res.setHeader("Cache-Control", "no-store");
   res.json(updated);
 });
 
@@ -288,6 +305,7 @@ router.post("/cameras/:cameraId/check-status", requirePermission("nvr", "edit"),
 router.get("/cameras/:cameraId/live-latency", requirePermission("nvr", "view"), async (req, res) => {
   const camera = await prisma.camera.findUnique({ where: { id: Number(req.params.cameraId) }, select: { ipAddress: true } });
   if (!camera) throw new ApiError(404, "Camera not found");
+  res.setHeader("Cache-Control", "no-store");
   if (!camera.ipAddress) {
     res.json({ alive: false, responseTimeMs: null });
     return;
@@ -461,9 +479,19 @@ router.post("/cameras/:cameraId/motion-watch/stop", requirePermission("nvr", "ed
 // ("get groups") before importing them — mirrors the ONVIF discover-cameras/test-connection
 // routes above.
 
+// Same "persist when testing an already-saved device" behavior as /test-connection above — see
+// its comment. ISAPI's result has no latency reading, so only status/lastCheckedAt are updated.
 router.post("/isapi/test-connection", requirePermission("nvr", "view"), validateBody(isapiConnectionSchema), async (req, res) => {
-  const { ipAddress, port, username, password } = req.body;
+  const { ipAddress, port, username, password, nvrId } = req.body;
   const result = await getDeviceInfo(ipAddress, port ?? undefined, username ?? "", password ?? "");
+
+  if (nvrId) {
+    await prisma.nvr
+      .update({ where: { id: nvrId }, data: { status: result.ok ? "ONLINE" : "OFFLINE", lastCheckedAt: new Date() } })
+      .catch(() => undefined);
+  }
+
+  res.setHeader("Cache-Control", "no-store");
   res.json(result);
 });
 
@@ -483,11 +511,13 @@ router.post("/isapi/channels", requirePermission("nvr", "view"), validateBody(is
 // while adding a camera (before it has been saved) as well as when editing an existing one.
 
 router.post("/stream/sessions", requirePermission("nvr", "view"), validateBody(startStreamSchema), async (req, res) => {
-  const sessionId = await startStreamSession(req.body.streamUrl);
+  const sessionId = await startStreamSession(req.body.streamUrl, req.body.cameraId);
+  res.setHeader("Cache-Control", "no-store");
   res.status(201).json({ sessionId });
 });
 
 router.get("/stream/sessions/:sessionId/status", requirePermission("nvr", "view"), async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   res.json(await getSessionStatus(req.params.sessionId));
 });
 

@@ -44,7 +44,7 @@ export function MatrixTile({
   const tileRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const isRtsp = /^rtsps?:\/\//i.test((camera.streamUrl ?? "").trim());
-  const { status, error, start, stop } = useRtspStream(camera.streamUrl ?? "", videoRef);
+  const { status, error, start, stop } = useRtspStream(camera.streamUrl ?? "", videoRef, camera.id);
 
   useEffect(() => {
     if (isRtsp) start();

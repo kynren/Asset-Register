@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { QuickAddSelect } from "../../components/QuickAddSelect";
-import { TestConnectionButton } from "./TestConnectionButton";
+import { LastKnownConnectionState, TestConnectionButton } from "./TestConnectionButton";
 import { DiscoverCamerasPanel } from "./DiscoverCamerasPanel";
 import { PasswordInput } from "../../components/PasswordInput";
 import { ChipSelect } from "../../components/ChipSelect";
@@ -37,6 +37,7 @@ const emptyValues: NvrFormValues = {
 export function NvrFormModal({
   nvrId,
   initial,
+  lastKnown,
   onClose,
   onSubmit,
   submitting,
@@ -44,6 +45,7 @@ export function NvrFormModal({
 }: {
   nvrId?: number;
   initial?: Partial<NvrFormValues>;
+  lastKnown?: LastKnownConnectionState;
   onClose: () => void;
   onSubmit: (v: NvrFormValues) => void;
   submitting?: boolean;
@@ -88,7 +90,7 @@ export function NvrFormModal({
       </div>
       <p className="muted" style={{ fontSize: 12 }}>Credentials are encrypted at rest and never shown again after saving.</p>
 
-      <TestConnectionButton ipAddress={values.ipAddress} port={values.port} httpPort={values.httpPort} protocol={values.protocol} username={values.username} password={values.password} />
+      <TestConnectionButton ipAddress={values.ipAddress} port={values.port} httpPort={values.httpPort} protocol={values.protocol} username={values.username} password={values.password} nvrId={nvrId} lastKnown={lastKnown} />
 
       {nvrId ? (
         <DiscoverCamerasPanel

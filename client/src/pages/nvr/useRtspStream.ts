@@ -15,7 +15,7 @@ const RECONNECT_DELAY_MS = 2000;
  * health check running so a dropped stream reconnects automatically instead of freezing.
  * Shared by the single-camera live feed modal and the multi-camera video matrix tiles.
  */
-export function useRtspStream(streamUrl: string, videoRef: RefObject<HTMLVideoElement | null>) {
+export function useRtspStream(streamUrl: string, videoRef: RefObject<HTMLVideoElement | null>, cameraId?: number) {
   const hlsRef = useRef<Hls | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const pollRef = useRef<number | null>(null);
@@ -79,7 +79,7 @@ export function useRtspStream(streamUrl: string, videoRef: RefObject<HTMLVideoEl
     setError(null);
     setStatus((prev) => (prev === "reconnecting" ? prev : "starting"));
     try {
-      const res = await axiosClient.post("/nvr/stream/sessions", { streamUrl: streamUrl.trim() });
+      const res = await axiosClient.post("/nvr/stream/sessions", { streamUrl: streamUrl.trim(), cameraId });
       const sessionId = res.data.sessionId as string;
       sessionIdRef.current = sessionId;
 
