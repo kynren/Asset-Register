@@ -54,6 +54,7 @@ IS_WINDOWS = platform.system() == "Windows"
 
 LOG_UPLOAD_INTERVAL_SECONDS = 30    # how often buffered log lines are shipped to the server
 LOG_BUFFER_MAX_LINES = 500          # bounds memory if the server is unreachable for a while
+LOG_UPLOAD_CHUNK_SIZE = 200         # server's network.schema.ts caps the "lines" array per request
 POLL_INTERVAL_SECONDS = 1          # how often to ask "any scans queued?" while idle — was 3s;
                                     # dropped to 1s so a "Run Now" scan/ping submitted through the
                                     # relay doesn't sit in the queue for up to 3 seconds before this
@@ -932,8 +933,14 @@ def log_upload_loop(api_base_url: str, api_key: str, logger: logging.Logger, log
         lines = log_buffer.drain()
         if not lines:
             continue
-        if not upload_logs(api_base_url, api_key, lines, logger):
-            log_buffer.restore(lines)
+        # A busy poll cycle (many concurrent device jobs logging at once) can easily produce more
+        # than LOG_UPLOAD_CHUNK_SIZE lines in one 30s window — split into server-accepted batches
+        # so a single oversized drain doesn't fail (and re-fail forever) as one whole-batch 400.
+        for i in range(0, len(lines), LOG_UPLOAD_CHUNK_SIZE):
+            chunk = lines[i : i + LOG_UPLOAD_CHUNK_SIZE]
+            if not upload_logs(api_base_url, api_key, chunk, logger):
+                log_buffer.restore(lines[i:])
+                break
 
 
 def report_discovery(api_base_url: str, api_key: str, subnets: list[dict], logger: logging.Logger) -> None:
