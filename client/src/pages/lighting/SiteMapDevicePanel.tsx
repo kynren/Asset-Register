@@ -11,11 +11,12 @@ interface Props {
   onSave: (patch: { onIcon?: string | null; offIcon?: string | null; onColor?: string | null; offColor?: string | null; zoneOnColor?: string | null }) => void;
   onClearShape: () => void;
   onStartDrawing: (shapeType: Exclude<SiteMapShapeType, "NONE">) => void;
+  onEditShape: () => void;
   onDelete: () => void;
   saving?: boolean;
 }
 
-export function SiteMapDevicePanel({ placement, onClose, onSave, onClearShape, onStartDrawing, onDelete, saving }: Props) {
+export function SiteMapDevicePanel({ placement, onClose, onSave, onClearShape, onStartDrawing, onEditShape, onDelete, saving }: Props) {
   const [onIcon, setOnIcon] = useState(placement.onIcon ?? "bulb");
   const [offIcon, setOffIcon] = useState(placement.offIcon ?? "bulb");
   const [onColor, setOnColor] = useState(placement.onColor ?? "#f2b705");
@@ -87,7 +88,10 @@ export function SiteMapDevicePanel({ placement, onClose, onSave, onClearShape, o
             <button className="btn btn-secondary btn-sm" onClick={() => onStartDrawing("POLYGON")}>Draw Zone</button>
             <button className="btn btn-secondary btn-sm" onClick={() => onStartDrawing("PATH")}>Draw Path</button>
             {placement.shapeType !== "NONE" && (
-              <button className="btn btn-secondary btn-sm" onClick={onClearShape}>Clear Shape</button>
+              <>
+                <button className="btn btn-secondary btn-sm" onClick={onEditShape}>Edit Shape</button>
+                <button className="btn btn-secondary btn-sm" onClick={onClearShape}>Erase Shape</button>
+              </>
             )}
           </div>
         </div>

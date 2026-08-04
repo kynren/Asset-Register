@@ -4,6 +4,7 @@ export const createNvrSchema = z.object({
   name: z.string().min(1),
   ipAddress: z.string().optional(),
   port: z.number().int().nullable().optional(),
+  httpPort: z.number().int().nullable().optional(),
   protocol: z.string().optional(),
   username: z.string().optional(),
   password: z.string().optional(),
@@ -20,6 +21,7 @@ export const createCameraSchema = z.object({
   locationId: z.number().int().nullable().optional(),
   ipAddress: z.string().optional(),
   port: z.number().int().nullable().optional(),
+  httpPort: z.number().int().nullable().optional(),
   username: z.string().optional(),
   password: z.string().optional(),
   streamUrl: z.string().optional(),
@@ -51,6 +53,9 @@ export const testConnectionSchema = z.object({
 
 export const discoverCamerasSchema = z.object({
   ipAddress: z.string().min(1),
+  // ONVIF's SOAP/HTTP service — typically 80, never the RTSP port (554). Kept optional and
+  // distinct from a stream port so a device already configured with an RTSP `port` doesn't have
+  // that value silently reused for the ONVIF handshake — see Nvr.httpPort's schema comment.
   port: z.number().int().nullable().optional(),
   username: z.string().optional(),
   password: z.string().optional(),
@@ -81,6 +86,8 @@ export const importCamerasSchema = z.object({
 
 export const isapiConnectionSchema = z.object({
   ipAddress: z.string().min(1),
+  // ISAPI's HTTP port — typically 80/443, never the RTSP port (554). See Nvr.httpPort's schema
+  // comment; the frontend sends the form's dedicated HTTP Port field here, not the RTSP `port`.
   port: z.number().int().nullable().optional(),
   username: z.string().optional(),
   password: z.string().optional(),

@@ -19,9 +19,24 @@ export async function requestStop(id: string): Promise<void> {
   await prisma.relayVideoJob.updateMany({ where: { id, status: { in: ["PENDING", "RUNNING"] } }, data: { status: "STOPPING" } });
 }
 
+// A job nobody claims within this window almost always means no relay agent is currently online
+// (rather than a slow one — the agent's own poll loop runs every ~1-3s, see
+// agent/kynren_network_relay.py's POLL_INTERVAL_SECONDS) — failing it fast here lets
+// streamRelay.ts's getSessionStatus() surface that real reason well before the client's 35s
+// hard timeout, instead of leaving the caller to guess from a generic "did not become ready".
+const CLAIM_TIMEOUT_MS = 10_000;
+
 export async function getVideoJobStatus(id: string): Promise<{ status: string; errorMessage: string | null } | null> {
-  const job = await prisma.relayVideoJob.findUnique({ where: { id }, select: { status: true, errorMessage: true } });
-  return job ?? null;
+  const job = await prisma.relayVideoJob.findUnique({ where: { id }, select: { status: true, errorMessage: true, createdAt: true } });
+  if (!job) return null;
+
+  if (job.status === "PENDING" && Date.now() - job.createdAt.getTime() > CLAIM_TIMEOUT_MS) {
+    const errorMessage = "No on-prem relay agent is currently online to handle this request.";
+    const updated = await prisma.relayVideoJob.updateMany({ where: { id, status: "PENDING" }, data: { status: "FAILED", errorMessage } });
+    if (updated.count > 0) return { status: "FAILED", errorMessage };
+  }
+
+  return { status: job.status, errorMessage: job.errorMessage };
 }
 
 // Safety net for jobs an agent claimed but then vanished before ever completing (crash, network

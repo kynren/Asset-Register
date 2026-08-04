@@ -1,0 +1,1 @@
+ALTER TABLE "LightingSiteMap" ADD COLUMN "overlayDensity" INTEGER NOT NULL DEFAULT 0;

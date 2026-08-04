@@ -90,7 +90,7 @@ router.post("/jobs/:id/complete", validateBody(relayCompleteSchema), async (req,
   if (!scan) throw new ApiError(404, "Scan not found");
 
   const { results, snmpResults } = req.body as {
-    results: { ipAddress: string; alive: boolean; hostname: string | null; macAddress: string | null; openPorts: number[]; responseTimeMs: number | null }[];
+    results: { ipAddress: string; alive: boolean; hostname: string | null; macAddress: string | null; openPorts: number[]; responseTimeMs: number | null; ttl?: number | null }[];
     snmpResults: {
       deviceId: number;
       sysDescr: string | null;

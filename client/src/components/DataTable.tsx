@@ -145,7 +145,7 @@ export function DataTable<T>({
   onSearchChange,
   searchPlaceholder = "Search...",
   tableId,
-  defaultViewMode = "grid",
+  defaultViewMode = "list",
   renderCard,
   exportModule,
   exportFilename,

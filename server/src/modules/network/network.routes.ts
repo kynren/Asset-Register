@@ -59,7 +59,7 @@ router.get("/graph", requirePermission("network", "view"), async (_req, res) => 
 
 // Real, known network endpoints for the ICMP Pinger's Quick Device Select — assets with an
 // actual recorded IP (entered manually or auto-filled by the scanner/monitor via
-// fillAssetIpFromHostname), not the manually-plotted topology nodes /graph returns. This is the
+// enrichAssetFromScan), not the manually-plotted topology nodes /graph returns. This is the
 // inventory an admin actually recognizes by name, so picking one here targets exactly the device
 // they mean instead of an arbitrary graph node that may be stale or never linked to an asset.
 router.get("/asset-devices", requirePermission("network", "view"), async (_req, res) => {

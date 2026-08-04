@@ -56,6 +56,7 @@ const relayHostResultSchema = z.object({
   macAddress: z.string().nullable().default(null),
   openPorts: z.array(z.number().int()).default([]),
   responseTimeMs: z.number().nullable().default(null),
+  ttl: z.number().nullable().default(null),
 });
 
 const relaySnmpResultSchema = z.object({

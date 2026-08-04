@@ -79,7 +79,9 @@ export async function relayAwareFetch(url: string, init: RelayAwareFetchInit = {
 export async function relayAwarePing(target: string, timeoutMs = 800, priority = 0): Promise<PingResult> {
   if (!(await isNetworkRelayEnabled())) return pingHost(target, timeoutMs);
 
+  // The relay's PING job protocol doesn't carry TTL over the wire, so a relay-backed ping can't
+  // produce a TTL-based OS guess the way a direct pingHost() call can — null here, not a guess.
   const result = await enqueueAndAwaitPing(target, timeoutMs, priority);
-  if (!result.ok) return { alive: false, responseTimeMs: null };
-  return { alive: result.alive ?? false, responseTimeMs: result.responseTimeMs ?? null };
+  if (!result.ok) return { alive: false, responseTimeMs: null, ttl: null };
+  return { alive: result.alive ?? false, responseTimeMs: result.responseTimeMs ?? null, ttl: null };
 }

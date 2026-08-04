@@ -1,4 +1,6 @@
 import net from "net";
+import { isNetworkRelayEnabled } from "../modules/network/scan.service";
+import { enqueueAndAwaitTcpProbe } from "./relayDeviceJobs";
 
 export interface ConnectionTestResult {
   reachable: boolean;
@@ -12,8 +14,29 @@ export interface ConnectionTestResult {
  * (or the port is the standard RTSP port 554), also sends a real RTSP OPTIONS request and
  * checks for a valid "RTSP/1.0 <code>" response line to confirm the service itself is
  * speaking RTSP, not just that the port is open.
+ *
+ * Relay-aware: when the on-prem Network Relay Agent is enabled, this dispatches the probe to the
+ * agent instead of connecting directly — otherwise a server with no LAN route to the device (the
+ * whole reason the relay exists) always reports "timed out" regardless of whether the device is
+ * actually reachable. See scan.service.ts's isNetworkRelayEnabled() comment for the same reasoning
+ * already applied to scans/pings.
  */
-export function testDeviceConnection(host: string, port: number, protocol?: string, timeoutMs = 4000): Promise<ConnectionTestResult> {
+export async function testDeviceConnection(host: string, port: number, protocol?: string, timeoutMs = 4000): Promise<ConnectionTestResult> {
+  if (await isNetworkRelayEnabled()) {
+    const result = await enqueueAndAwaitTcpProbe(host, port, protocol, timeoutMs);
+    if (!result.ok) return { reachable: false, latencyMs: null, protocolConfirmed: false, message: result.errorMessage ?? "Relay TCP probe failed." };
+    return {
+      reachable: Boolean(result.reachable),
+      latencyMs: result.latencyMs ?? null,
+      protocolConfirmed: Boolean(result.protocolConfirmed),
+      message: result.message ?? (result.reachable ? `TCP port ${port} on ${host} is open.` : `Could not reach ${host}:${port}.`),
+    };
+  }
+
+  return testDeviceConnectionDirect(host, port, protocol, timeoutMs);
+}
+
+function testDeviceConnectionDirect(host: string, port: number, protocol?: string, timeoutMs = 4000): Promise<ConnectionTestResult> {
   const isRtsp = (protocol ?? "").toUpperCase() === "RTSP" || port === 554;
 
   return new Promise((resolve) => {

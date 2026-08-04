@@ -54,10 +54,16 @@ IS_WINDOWS = platform.system() == "Windows"
 
 LOG_UPLOAD_INTERVAL_SECONDS = 30    # how often buffered log lines are shipped to the server
 LOG_BUFFER_MAX_LINES = 500          # bounds memory if the server is unreachable for a while
-POLL_INTERVAL_SECONDS = 3          # how often to ask "any scans queued?" while idle
+POLL_INTERVAL_SECONDS = 1          # how often to ask "any scans queued?" while idle — was 3s;
+                                    # dropped to 1s so a "Run Now" scan/ping submitted through the
+                                    # relay doesn't sit in the queue for up to 3 seconds before this
+                                    # agent even notices it, which read as UI lag
 DEVICE_JOB_WORKERS = 20             # matches server's assetHeartbeat.ts PING_CONCURRENCY so this
                                     # agent can actually keep pace with a full asset-sweep burst
-DEVICE_JOB_IDLE_POLL_SECONDS = 1    # how often each idle device-job worker re-checks the queue
+DEVICE_JOB_IDLE_POLL_SECONDS = 0.5  # how often each idle device-job worker re-checks the queue —
+                                    # was 1s; this is the queue individual relay-routed pings/asset
+                                    # heartbeats/test-connections land in, so it's the interval most
+                                    # directly felt as "did my click just do something"
 VIDEO_JOB_WORKERS = 2                # deliberately modest — unlike PING/HTTP, a claimed video job
                                     # holds a local ffmpeg process (CPU + bandwidth) alive for the
                                     # full duration of a live view or recording, not milliseconds
@@ -138,19 +144,24 @@ def expand_range(start_ip: str, end_ip: str) -> list[str]:
 
 # ───────────────────────── Ping / ARP / port scan (mirrors server/src/lib/ping.ts) ─────────────────────────
 
-def ping_host(ip: str, timeout_ms: int = PING_TIMEOUT_MS) -> tuple[bool, int | None]:
+def ping_host(ip: str, timeout_ms: int = PING_TIMEOUT_MS) -> tuple[bool, int | None, int | None]:
+    """Returns (alive, response_time_ms, ttl). ttl feeds the server's TTL-based OS guess
+    (guessOsFromTtl in ping.ts) — mirrors the same regex the server's own direct-mode pingHost()
+    uses so relay-backed scans/pings get the same best-effort "what kind of thing is this" hint."""
     args = ["ping", "-n", "1", "-w", str(timeout_ms), ip] if IS_WINDOWS else ["ping", "-c", "1", "-W", str(max(1, timeout_ms // 1000)), ip]
     try:
         result = subprocess.run(args, capture_output=True, text=True, timeout=(timeout_ms / 1000) + 1)
         stdout = result.stdout
+        ttl_match = re.search(r"ttl[=:]\s*(\d+)", stdout, re.IGNORECASE)
+        ttl = int(ttl_match.group(1)) if ttl_match else None
         match = re.search(r"time[=<]([\d.]+)\s*ms", stdout, re.IGNORECASE)
         if match:
-            return True, round(float(match.group(1)))
+            return True, round(float(match.group(1))), ttl
         if IS_WINDOWS and re.search(r"Reply from", stdout, re.IGNORECASE):
-            return True, 0
-        return False, None
+            return True, 0, ttl
+        return False, None, None
     except Exception:
-        return False, None
+        return False, None, None
 
 
 def get_arp_mac(ip: str) -> str | None:
@@ -277,7 +288,7 @@ def diagnose_vlans() -> None:
             print("    No default gateway configured on this NIC. That's expected for a secondary")
             print("    per-VLAN NIC (see README) — only your primary/management NIC should have one.")
             continue
-        ok, latency_ms = ping_host(gateway, timeout_ms=1500)
+        ok, latency_ms, _ttl = ping_host(gateway, timeout_ms=1500)
         if ok:
             print(f"    Gateway {gateway} reachable ({latency_ms} ms) — this VLAN looks correctly wired.")
         else:
@@ -385,7 +396,7 @@ def scan_common_ports(ip: str, ports: list[int] = COMMON_PORTS) -> list[int]:
 
 
 def scan_host(ip: str) -> dict:
-    alive, response_time_ms = ping_host(ip)
+    alive, response_time_ms, ttl = ping_host(ip)
     hostname = mac = None
     open_ports: list[int] = []
     if alive:
@@ -399,6 +410,7 @@ def scan_host(ip: str) -> dict:
         "macAddress": mac,
         "openPorts": open_ports,
         "responseTimeMs": response_time_ms,
+        "ttl": ttl,
     }
 
 
@@ -993,10 +1005,58 @@ def run_device_job(job: dict, api_base_url: str, api_key: str, logger: logging.L
 
     if kind == "PING":
         target = job["target"]
-        alive, response_time_ms = ping_host(target, int(timeout_s * 1000))
+        alive, response_time_ms, _ttl = ping_host(target, int(timeout_s * 1000))
         body = base64.b64encode(json.dumps({"alive": alive, "responseTimeMs": response_time_ms}).encode("utf-8")).decode("ascii")
         logger.info(f"Device job {job_id}: PING {target} -> alive={alive} ({response_time_ms}ms)")
         submit_device_job_result(api_base_url, api_key, job_id, {"status": "COMPLETED", "responseBodyBase64": body}, logger)
+        return
+
+    if kind == "TCP_PROBE":
+        target = job["target"]
+        protocol = (job.get("protocolScheme") or "").upper()
+        host, _, port_str = target.rpartition(":")
+        try:
+            port = int(port_str)
+        except ValueError:
+            submit_device_job_result(api_base_url, api_key, job_id, {"status": "FAILED", "errorMessage": f"Invalid TCP_PROBE target: {target}"}, logger)
+            return
+
+        is_rtsp = protocol == "RTSP" or port == 554
+        start = time.monotonic()
+        try:
+            with socket.create_connection((host, port), timeout=timeout_s) as sock:
+                latency_ms = round((time.monotonic() - start) * 1000)
+
+                if not is_rtsp:
+                    result = {"reachable": True, "latencyMs": latency_ms, "protocolConfirmed": False, "message": f"TCP port {port} on {host} is open ({latency_ms}ms)."}
+                else:
+                    sock.settimeout(timeout_s)
+                    sock.sendall(f"OPTIONS rtsp://{host}:{port}/ RTSP/1.0\r\nCSeq: 1\r\n\r\n".encode("ascii"))
+                    try:
+                        data = sock.recv(1024).decode("utf-8", errors="replace")
+                    except (socket.timeout, OSError):
+                        data = ""
+                    status_line = data.split("\r\n", 1)[0] if data else ""
+                    rtsp_ok = bool(re.match(r"^RTSP/1\.0 \d{3}", status_line))
+                    result = {
+                        "reachable": True,
+                        "latencyMs": latency_ms,
+                        "protocolConfirmed": rtsp_ok,
+                        "message": f"RTSP service responded on {host}:{port} ({latency_ms}ms)." if rtsp_ok else f"Port {port} on {host} is open, but did not respond like an RTSP service.",
+                    }
+            body = base64.b64encode(json.dumps(result).encode("utf-8")).decode("ascii")
+            logger.info(f"Device job {job_id}: TCP_PROBE {target} -> reachable=True ({result['latencyMs']}ms)")
+            submit_device_job_result(api_base_url, api_key, job_id, {"status": "COMPLETED", "responseBodyBase64": body}, logger)
+        except (socket.timeout, TimeoutError):
+            reason = f"Connection to {host}:{port} timed out."
+            body = base64.b64encode(json.dumps({"reachable": False, "latencyMs": None, "protocolConfirmed": False, "message": reason}).encode("utf-8")).decode("ascii")
+            logger.info(f"Device job {job_id}: TCP_PROBE {target} -> timed out")
+            submit_device_job_result(api_base_url, api_key, job_id, {"status": "COMPLETED", "responseBodyBase64": body}, logger)
+        except OSError as exc:
+            reason = f"{exc.strerror or exc} ({host}:{port})."
+            body = base64.b64encode(json.dumps({"reachable": False, "latencyMs": None, "protocolConfirmed": False, "message": reason}).encode("utf-8")).decode("ascii")
+            logger.info(f"Device job {job_id}: TCP_PROBE {target} -> {reason}")
+            submit_device_job_result(api_base_url, api_key, job_id, {"status": "COMPLETED", "responseBodyBase64": body}, logger)
         return
 
     if kind == "HTTP":

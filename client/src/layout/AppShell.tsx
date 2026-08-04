@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { TopNavBar } from "./TopNavBar";
 import { FloatingAssistant } from "./FloatingAssistant";
+import { ChangelogModal } from "./ChangelogModal";
 import { ThemeSync } from "../theme/ThemeSync";
 import { useAuth } from "../auth/AuthContext";
 import { settingsNav, systemConsoleNav } from "./navConfig";
@@ -44,6 +45,7 @@ export function AppShell() {
         </div>
       </div>
       <FloatingAssistant />
+      <ChangelogModal />
     </div>
   );
 }

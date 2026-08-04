@@ -7,6 +7,8 @@ import { DataTable } from "../../components/DataTable";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { AssetFormModal, AssetFormValues } from "../assets/AssetFormModal";
 import { useClientInfo } from "../../hooks/useClientInfo";
+import { useUserPreference } from "../../hooks/useUserPreference";
+import { useDebouncedCallback } from "../../hooks/useDebouncedCallback";
 
 interface ScanResult {
   id: number;
@@ -16,6 +18,7 @@ interface ScanResult {
   macAddress: string | null;
   vendor: string | null;
   deviceType: string | null;
+  os: string | null;
   loggedInUser: string | null;
   responseTimeMs: number | null;
   openPorts: number[];
@@ -129,17 +132,41 @@ export function IpRangeScannerTab() {
   const [adopting, setAdopting] = useState<ScanResult | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: clientInfo } = useClientInfo();
+  // Whatever the user last typed/picked here should still be there next visit — restored from
+  // their saved preference before the observed-IP-based /24 default gets a chance to run, so the
+  // "auto-fill my subnet" convenience never clobbers an explicit choice.
+  const { value: savedRange, setValue: saveRangePref, isLoading: rangeLoading } = useUserPreference<{ startIp: string; endIp: string } | null>(
+    "network.ipRangeScanner.range",
+    null
+  );
+  const hydratedRangeRef = useRef(false);
   const defaultRangeSet = useRef(false);
   useEffect(() => {
-    if (defaultRangeSet.current || !clientInfo?.observedIp) return;
+    if (hydratedRangeRef.current || rangeLoading) return;
+    hydratedRangeRef.current = true;
+    if (savedRange?.startIp && savedRange?.endIp) {
+      setStartIp(savedRange.startIp);
+      setEndIp(savedRange.endIp);
+      defaultRangeSet.current = true;
+    }
+  }, [savedRange, rangeLoading]);
+
+  const debouncedSaveRange = useDebouncedCallback((next: { startIp: string; endIp: string }) => saveRangePref(next), 600);
+  useEffect(() => {
+    if (!hydratedRangeRef.current) return;
+    debouncedSaveRange({ startIp, endIp });
+  }, [startIp, endIp, debouncedSaveRange]);
+
+  const { data: clientInfo } = useClientInfo();
+  useEffect(() => {
+    if (defaultRangeSet.current || !clientInfo?.observedIp || rangeLoading) return;
     const range = applyNetmaskToRange(clientInfo.observedIp, 24);
     if (range) {
       setStartIp(range.start);
       setEndIp(range.end);
     }
     defaultRangeSet.current = true;
-  }, [clientInfo]);
+  }, [clientInfo, rangeLoading]);
 
   const { data: history } = useQuery({
     queryKey: ["network-scans"],
@@ -230,6 +257,7 @@ export function IpRangeScannerTab() {
     { header: "Ports", accessorFn: (r) => r.openPorts.length, cell: ({ row }) => (row.original.openPorts.length ? row.original.openPorts.join(", ") : <span className="muted">[n/a]</span>) },
     { header: "MAC Address", enableSorting: false, cell: ({ row }) => <span className="muted" style={{ fontFamily: "monospace", fontSize: 12 }}>{row.original.macAddress ?? "—"}</span> },
     { header: "Vendor / Type", enableSorting: false, accessorFn: (r) => [r.vendor, r.deviceType].filter(Boolean).join(" · ") || "—" },
+    { header: "OS", enableSorting: false, accessorFn: (r) => r.os ?? "—" },
     {
       header: "Logged-in User",
       enableSorting: false,

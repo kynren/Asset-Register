@@ -36,7 +36,7 @@ export function streamPing(host: string, count: number | "continuous", res: Resp
       if (!trimmed) continue;
 
       const winReply = trimmed.match(/Reply from ([\d.a-fA-F:]+): bytes=(\d+) time[=<](\d+)ms TTL=(\d+)/i);
-      const posixReply = trimmed.match(/bytes from ([\d.a-fA-F:]+).*?icmp_seq=(\d+).*?time[=<]?([\d.]+)\s*ms/i);
+      const posixReply = trimmed.match(/bytes from ([\d.a-fA-F:]+).*?icmp_seq=(\d+).*?ttl=(\d+).*?time[=<]?([\d.]+)\s*ms/i);
       const isTimeout = /Request timed out|Destination host unreachable|no answer|100% packet loss/i.test(trimmed);
 
       if (winReply) {
@@ -44,7 +44,7 @@ export function streamPing(host: string, count: number | "continuous", res: Resp
         send({ type: "reply", seq, host: winReply[1], bytes: Number(winReply[2]), timeMs: Number(winReply[3]), ttl: Number(winReply[4]), raw: trimmed });
       } else if (posixReply) {
         seq = Number(posixReply[2]);
-        send({ type: "reply", seq, host: posixReply[1], timeMs: Number(posixReply[3]), raw: trimmed });
+        send({ type: "reply", seq, host: posixReply[1], timeMs: Number(posixReply[4]), ttl: Number(posixReply[3]), raw: trimmed });
       } else if (isTimeout) {
         seq += 1;
         send({ type: "timeout", seq, raw: trimmed });

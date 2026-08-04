@@ -4,6 +4,8 @@ export const createSiteMapSchema = z.object({ name: z.string().min(1) });
 
 export const updateSiteMapSchema = z.object({ name: z.string().min(1).optional() });
 
+export const updateOverlaySchema = z.object({ overlayDensity: z.number().int().min(0).max(100) });
+
 const pointSchema = z.object({ x: z.number(), y: z.number() });
 
 // CIRCLE stores a single radius (anchored to the placement's own x/y); POLYGON/PATH store an

@@ -22,6 +22,7 @@ interface Camera {
   location: { id: number; name: string } | null;
   ipAddress: string | null;
   port: number | null;
+  httpPort: number | null;
   username: string | null;
   streamUrl: string | null;
   ptzEnabled: boolean;
@@ -33,6 +34,7 @@ interface Nvr {
   name: string;
   ipAddress: string | null;
   port: number | null;
+  httpPort: number | null;
   protocol: string | null;
   username: string | null;
   location: { id: number; name: string } | null;
@@ -227,6 +229,7 @@ export function DeviceManagementTab() {
             name: editingNvr.name,
             ipAddress: editingNvr.ipAddress ?? "",
             port: editingNvr.port,
+            httpPort: editingNvr.httpPort,
             protocol: editingNvr.protocol ?? "RTSP",
             username: editingNvr.username ?? "",
             password: "",
@@ -255,6 +258,7 @@ export function DeviceManagementTab() {
             locationId: editingCamera.location?.id ?? null,
             ipAddress: editingCamera.ipAddress ?? "",
             port: editingCamera.port,
+            httpPort: editingCamera.httpPort,
             username: editingCamera.username ?? "",
             password: "",
             streamUrl: editingCamera.streamUrl ?? "",

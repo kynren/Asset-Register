@@ -23,5 +23,6 @@ export interface SiteMapDetail {
   name: string;
   imageUrl: string;
   sortOrder: number;
+  overlayDensity: number;
   devices: SiteMapPlacement[];
 }

@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import PDFDocument from "pdfkit";
+import { drawPdfCopyrightFooter } from "../../lib/docExport";
 import { env } from "../../config/env";
 import { prisma, currentSchemaName } from "../../config/prisma";
 import { registerAccount } from "../../config/controlPlane";
@@ -134,17 +135,18 @@ export async function listCheckouts(req: Request, res: Response) {
 
 // Active heartbeat: pings the asset directly by its recorded static IP when one is set (either
 // entered manually or auto-filled by the IP Range Scanner/monitor when it discovers a device
-// whose hostname matches this asset — see fillAssetIpFromHostname in scan.service.ts), falling
-// back to the asset tag as a hostname guess (real IT estates commonly name machines after their
-// asset tag). No DB write here — this is polled continuously from the inventory table, so
-// persisting every sample would spam the audit trail for no benefit; the frontend keeps its own
-// rolling sample history for the sparkline.
+// whose hostname matches this asset — see enrichAssetFromScan in scan.service.ts), falling
+// back to the asset tag, then the asset name, as hostname guesses (real IT estates commonly name
+// machines after either one — same fallback order enrichAssetFromScan matches against). No DB
+// write here — this is polled continuously from the inventory table, so persisting every sample
+// would spam the audit trail for no benefit; the frontend keeps its own rolling sample history
+// for the sparkline.
 export async function pingAsset(req: Request, res: Response) {
   const id = Number(req.params.id);
-  const asset = await prisma.asset.findUnique({ where: { id }, select: { assetTag: true, staticIpAddress: true } });
+  const asset = await prisma.asset.findUnique({ where: { id }, select: { name: true, assetTag: true, staticIpAddress: true } });
   if (!asset) throw new ApiError(404, "Asset not found");
 
-  const target = asset.staticIpAddress || asset.assetTag;
+  const target = asset.staticIpAddress || asset.assetTag || asset.name;
   const result = await relayAwarePing(target);
   res.json({ ...result, target });
 }
@@ -184,7 +186,7 @@ export async function showStatus(_req: Request, res: Response) {
 
   const results = await Promise.all(
     assets.map(async (asset) => {
-      const result = await relayAwarePing(asset.staticIpAddress || asset.assetTag);
+      const result = await relayAwarePing(asset.staticIpAddress || asset.assetTag || asset.name);
       return { id: asset.id, assetTag: asset.assetTag, name: asset.name, ...result };
     })
   );
@@ -389,10 +391,16 @@ export async function reportPdf(req: Request, res: Response) {
 
   const fmtDate = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "—");
 
+  const companyName = (await prisma.systemSetting.findUnique({ where: { key: "companyName" } }))?.value ?? null;
+
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename=asset-${asset.assetTag}-report.pdf`);
   const doc = new PDFDocument({ margin: 40 });
   doc.pipe(res);
+  if (companyName) {
+    drawPdfCopyrightFooter(doc, companyName);
+    doc.on("pageAdded", () => drawPdfCopyrightFooter(doc, companyName));
+  }
 
   doc.fontSize(18).text(`Asset Report`, { align: "center" });
   doc.fontSize(12).fillColor("gray").text(asset.name, { align: "center" });
@@ -458,11 +466,16 @@ export async function harnessReportPdf(req: Request, res: Response) {
   if (!asset) throw new ApiError(404, "Asset not found");
 
   const f = Object.fromEntries(asset.customFieldValues.map((v) => [v.field.fieldKey, v.value]));
+  const companyName = (await prisma.systemSetting.findUnique({ where: { key: "companyName" } }))?.value ?? null;
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename=harness-${asset.assetTag}-certification.pdf`);
   const doc = new PDFDocument({ margin: 40 });
   doc.pipe(res);
+  if (companyName) {
+    drawPdfCopyrightFooter(doc, companyName);
+    doc.on("pageAdded", () => drawPdfCopyrightFooter(doc, companyName));
+  }
 
   doc.fontSize(18).text("Harness Certification Report", { align: "center" });
   doc.fontSize(12).fillColor("gray").text(asset.name, { align: "center" });

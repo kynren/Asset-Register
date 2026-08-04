@@ -39,6 +39,7 @@ import dashboardRoutes from "./modules/dashboard/dashboard.routes";
 import savedViewsRoutes from "./modules/savedViews/savedViews.routes";
 import reportsRoutes from "./modules/reports/reports.routes";
 import preferencesRoutes from "./modules/preferences/preferences.routes";
+import changelogRoutes from "./modules/changelog/changelog.routes";
 import profileRoutes from "./modules/profile/profile.routes";
 import appearanceRoutes from "./modules/appearance/appearance.routes";
 import auditRoutes from "./modules/audit/audit.routes";
@@ -116,6 +117,7 @@ export function createApp() {
   app.use("/api/saved-views", savedViewsRoutes);
   app.use("/api/reports", reportsRoutes);
   app.use("/api/preferences", preferencesRoutes);
+  app.use("/api/changelog", changelogRoutes);
   app.use("/api/profile", profileRoutes);
   app.use("/api/appearance-themes", appearanceRoutes);
   app.use("/api/audit", auditRoutes);

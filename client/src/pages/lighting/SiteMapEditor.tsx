@@ -4,8 +4,14 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { usePermission } from "../../auth/PermissionGate";
+import { useDebouncedCallback } from "../../hooks/useDebouncedCallback";
 import { SiteMapDevicePanel } from "./SiteMapDevicePanel";
 import { SiteMapDetail, SiteMapPlacement, SiteMapShapeType } from "./siteMapTypes";
+
+// A default "reveal" radius (in the same 0-100 percent-of-width space as everything else on this
+// canvas) used by the dark-overlay mask for a light that has no drawn coverage shape yet — without
+// this, an un-shaped light would never punch a hole in the overlay at all.
+const DEFAULT_REVEAL_RADIUS_PCT = 8;
 
 interface LightingDeviceOption {
   id: number;
@@ -24,6 +30,11 @@ interface DrawingState {
   shapeType: Exclude<SiteMapShapeType, "NONE">;
 }
 
+interface DraftSnapshot {
+  points: { x: number; y: number }[];
+  radius: number | null;
+}
+
 export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack: () => void }) {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [editingPlacement, setEditingPlacement] = useState<SiteMapPlacement | null>(null);
@@ -31,6 +42,12 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
   const [drawing, setDrawing] = useState<DrawingState | null>(null);
   const [draftPoints, setDraftPoints] = useState<{ x: number; y: number }[]>([]);
   const [draftRadius, setDraftRadius] = useState<number | null>(null);
+  // Undo/redo history for the shape currently being drawn or edited — a stack of full draft
+  // snapshots (not per-keystroke deltas) pushed at the start of every discrete edit gesture
+  // (add point, delete point, finish a drag), so one Undo always reverts exactly one gesture.
+  const [pastDrafts, setPastDrafts] = useState<DraftSnapshot[]>([]);
+  const [futureDrafts, setFutureDrafts] = useState<DraftSnapshot[]>([]);
+  const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
   const [dragPos, setDragPos] = useState<{ placementId: number; x: number; y: number; moved: boolean } | null>(null);
   const [flashing, setFlashing] = useState<Set<number>>(new Set());
   const [toggleCounts, setToggleCounts] = useState<Record<number, number>>({});
@@ -100,6 +117,43 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
     mutationFn: (placementId: number) => axiosClient.delete(`/lighting/site-maps/${siteMapId}/devices/${placementId}`),
     onSuccess: () => { invalidate(); setDeletingPlacement(null); setEditingPlacement(null); },
   });
+  const overlayMutation = useMutation({
+    mutationFn: (overlayDensity: number) => axiosClient.patch(`/lighting/site-maps/${siteMapId}/overlay`, { overlayDensity }),
+    onSuccess: invalidate,
+  });
+  const debouncedSaveOverlay = useDebouncedCallback((density: number) => overlayMutation.mutate(density), 400);
+  // Local, immediately-responsive copy of the slider value — mirrors siteMap.overlayDensity but
+  // decoupled from it so mid-drag frames aren't clobbered by the 10s poll re-fetching the
+  // not-yet-saved server value out from under the user's thumb.
+  const [overlayDraft, setOverlayDraft] = useState<number | null>(null);
+
+  // Records the pre-gesture draft state before a discrete edit (add/remove/reposition a point,
+  // finish a circle resize) so Undo has something to revert to; any pending Redo stack is
+  // discarded, matching standard undo/redo semantics.
+  function pushDraftHistory() {
+    setPastDrafts((p) => [...p, { points: draftPoints, radius: draftRadius }]);
+    setFutureDrafts([]);
+  }
+  function undoDraft() {
+    setPastDrafts((past) => {
+      if (past.length === 0) return past;
+      const prev = past[past.length - 1];
+      setFutureDrafts((f) => [...f, { points: draftPoints, radius: draftRadius }]);
+      setDraftPoints(prev.points);
+      setDraftRadius(prev.radius);
+      return past.slice(0, -1);
+    });
+  }
+  function redoDraft() {
+    setFutureDrafts((future) => {
+      if (future.length === 0) return future;
+      const next = future[future.length - 1];
+      setPastDrafts((p) => [...p, { points: draftPoints, radius: draftRadius }]);
+      setDraftPoints(next.points);
+      setDraftRadius(next.radius);
+      return future.slice(0, -1);
+    });
+  }
 
   useEffect(() => {
     if (!containerEl) return;
@@ -133,6 +187,21 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
+
+  // Ctrl/Cmd+Z / Ctrl/Cmd+Shift+Z (or Ctrl+Y) undo/redo while actively drawing or editing a shape
+  // — only bound while `drawing` is set so it never fights the browser's own undo elsewhere.
+  useEffect(() => {
+    if (!drawing) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+      e.preventDefault();
+      if (e.shiftKey) redoDraft();
+      else undoDraft();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawing, draftPoints, draftRadius]);
 
   function toggleFullscreen() {
     if (document.fullscreenElement === cardRef.current) {
@@ -218,7 +287,8 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
     (e.target as Element).setPointerCapture(e.pointerId);
 
     if (drawing?.placementId === placement.id && drawing.shapeType === "CIRCLE") {
-      setDraftRadius(0);
+      pushDraftHistory();
+      setDraftRadius((r) => r ?? 0);
       return;
     }
     if (drawing) return; // mid-polygon/path draw — marker drag is disabled until it's finished
@@ -271,9 +341,33 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
   }
 
   function handleCanvasClick(e: React.MouseEvent) {
-    if (!drawing || drawing.shapeType === "CIRCLE" || !containerRef.current) return;
+    if (!drawing || drawing.shapeType === "CIRCLE" || !containerRef.current || draggingPointIndex !== null) return;
     const { x, y } = clientToPercent(e.clientX, e.clientY);
+    pushDraftHistory();
     setDraftPoints((pts) => [...pts, { x, y }]);
+  }
+
+  // Repositioning an existing draft point (polygon/path edit) — pointer capture on the point
+  // itself routes subsequent move/up events here regardless of where the cursor ends up, same
+  // pattern as the marker drag handlers below.
+  function startDragDraftPoint(e: React.PointerEvent, index: number) {
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    pushDraftHistory();
+    setDraggingPointIndex(index);
+  }
+  function dragDraftPointMove(e: React.PointerEvent) {
+    if (draggingPointIndex === null || !containerRef.current) return;
+    const { x, y } = clientToPercent(e.clientX, e.clientY);
+    setDraftPoints((pts) => pts.map((p, i) => (i === draggingPointIndex ? { x, y } : p)));
+  }
+  function dragDraftPointUp() {
+    setDraggingPointIndex(null);
+  }
+  function removeDraftPoint(e: React.MouseEvent, index: number) {
+    e.stopPropagation();
+    pushDraftHistory();
+    setDraftPoints((pts) => pts.filter((_, i) => i !== index));
   }
 
   function finishDrawing() {
@@ -281,12 +375,43 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
     updatePlacementMutation.mutate({ placementId: drawing.placementId, shapeType: drawing.shapeType, shapeData: { points: draftPoints } });
     setDrawing(null);
     setDraftPoints([]);
+    setPastDrafts([]);
+    setFutureDrafts([]);
   }
 
   function cancelDrawing() {
     setDrawing(null);
     setDraftPoints([]);
     setDraftRadius(null);
+    setPastDrafts([]);
+    setFutureDrafts([]);
+  }
+
+  // Loads an already-drawn shape's points/radius into the draft state and re-enters drawing
+  // mode — the same circle-resize / point-add/drag/delete handlers used for a brand-new shape
+  // work unchanged here, since they only ever operate on draftPoints/draftRadius.
+  function startEditingShape(placement: SiteMapPlacement) {
+    if (placement.shapeType === "NONE" || !placement.shapeData) return;
+    setDrawing({ placementId: placement.id, shapeType: placement.shapeType });
+    if ("radius" in placement.shapeData) {
+      setDraftRadius(placement.shapeData.radius);
+      setDraftPoints([]);
+    } else {
+      setDraftPoints(placement.shapeData.points);
+      setDraftRadius(null);
+    }
+    setPastDrafts([]);
+    setFutureDrafts([]);
+    setEditingPlacement(null);
+  }
+
+  // Erases the whole shape immediately, from within the drawing toolbar (not just the device
+  // panel) — lets a mid-edit user bail out to "no shape" in one click instead of cancelling then
+  // reopening the panel to hit Erase Shape there.
+  function eraseWholeShape() {
+    if (!drawing) return;
+    updatePlacementMutation.mutate({ placementId: drawing.placementId, shapeType: "NONE", shapeData: null });
+    cancelDrawing();
   }
 
   function toPx(pct: number, axis: "x" | "y") {
@@ -295,6 +420,13 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
 
   if (!siteMap) {
     return <div className="empty-state">Loading site map...</div>;
+  }
+
+  const overlayDensityValue = overlayDraft ?? siteMap.overlayDensity;
+
+  function handleOverlayDensityChange(value: number) {
+    setOverlayDraft(value);
+    debouncedSaveOverlay(value);
   }
 
   return (
@@ -323,12 +455,21 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
           <span style={{ fontSize: 12 }}>
             {drawing.shapeType === "CIRCLE"
               ? "Press and drag from the marker to size the coverage circle."
-              : `Click on the map to add points to the ${drawing.shapeType === "POLYGON" ? "zone" : "path"}, then Finish.`}
+              : "Click the map to add points. Drag a point to reposition it, double-click to remove it."}
           </span>
+          <button className="btn-icon" title="Undo (Ctrl+Z)" disabled={pastDrafts.length === 0} onClick={undoDraft}>
+            <Icon name="arrowLeft" size={13} />
+          </button>
+          <button className="btn-icon" title="Redo (Ctrl+Shift+Z)" disabled={futureDrafts.length === 0} onClick={redoDraft}>
+            <Icon name="arrowRight" size={13} />
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={eraseWholeShape}>
+            <Icon name="trash" size={12} /> Erase Shape
+          </button>
           {drawing.shapeType !== "CIRCLE" && (
             <button className="btn btn-primary btn-sm" style={{ marginLeft: "auto" }} disabled={draftPoints.length < 2} onClick={finishDrawing}>Finish</button>
           )}
-          <button className="btn btn-secondary btn-sm" onClick={cancelDrawing}>Cancel</button>
+          <button className="btn btn-secondary btn-sm" style={drawing.shapeType === "CIRCLE" ? { marginLeft: "auto" } : undefined} onClick={cancelDrawing}>Cancel</button>
         </div>
       )}
 
@@ -366,8 +507,8 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             onPointerDown={handleCanvasPanPointerDown}
-            onPointerMove={handleCanvasPanPointerMove}
-            onPointerUp={handleCanvasPanPointerUp}
+            onPointerMove={(e) => { dragDraftPointMove(e); handleCanvasPanPointerMove(e); }}
+            onPointerUp={(e) => { dragDraftPointUp(); handleCanvasPanPointerUp(e); }}
           >
             {/* object-fit: cover — the canvas fills the container edge-to-edge (rather than
                 letterboxing to the image's own aspect ratio), which keeps the SVG/marker overlay's
@@ -426,7 +567,21 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
                 />
               )}
               {drawing && drawing.shapeType !== "CIRCLE" &&
-                draftPoints.map((pt, i) => <circle key={i} cx={toPx(pt.x, "x")} cy={toPx(pt.y, "y")} r={4} fill="var(--color-primary)" />)}
+                draftPoints.map((pt, i) => (
+                  <circle
+                    key={i}
+                    cx={toPx(pt.x, "x")}
+                    cy={toPx(pt.y, "y")}
+                    r={5}
+                    fill="var(--color-primary)"
+                    stroke="var(--color-surface)"
+                    strokeWidth={1.5}
+                    style={{ cursor: "grab", pointerEvents: "auto" }}
+                    onPointerDown={(e) => startDragDraftPoint(e, i)}
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => removeDraftPoint(e, i)}
+                  />
+                ))}
 
               {/* One-shot ripple on toggle */}
               {siteMap.devices.filter((p) => flashing.has(p.id)).map((p) => (
@@ -441,6 +596,70 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
                   style={{ animation: "kynren-pulse-ring 0.7s ease-out", transformOrigin: `${toPx(p.x, "x")}px ${toPx(p.y, "y")}px` }}
                 />
               ))}
+
+              {/* Dark scrim over the whole map, punched through with an animated "cleared" hole
+                  over each ON light's own coverage shape (falling back to a small default circle
+                  around its marker when it has no drawn shape) — see overlayDensity's schema
+                  comment. The mask child elements are always rendered (even for OFF lights, at
+                  r=0 / scale(0)) so the CSS transition on r/transform actually has something to
+                  animate between renders instead of the hole just popping in and out. */}
+              {overlayDensityValue > 0 && (
+                <>
+                  <defs>
+                    <mask id={`sitemap-overlay-mask-${siteMap.id}`} maskUnits="userSpaceOnUse" x={0} y={0} width={size.width} height={size.height}>
+                      <rect x={0} y={0} width={size.width} height={size.height} fill="white" />
+                      {siteMap.devices.map((p) => {
+                        const on = p.device.isOn;
+                        const cx = toPx(p.x, "x");
+                        const cy = toPx(p.y, "y");
+                        if (p.shapeType === "CIRCLE" && p.shapeData && "radius" in p.shapeData) {
+                          return (
+                            <circle
+                              key={`clear-${p.id}`}
+                              cx={cx}
+                              cy={cy}
+                              r={on ? toPx(p.shapeData.radius, "x") : 0}
+                              fill="black"
+                              style={{ transition: "r 700ms ease" }}
+                            />
+                          );
+                        }
+                        if ((p.shapeType === "POLYGON" || p.shapeType === "PATH") && p.shapeData && "points" in p.shapeData) {
+                          const pts = p.shapeData.points.map((pt) => `${toPx(pt.x, "x")},${toPx(pt.y, "y")}`).join(" ");
+                          return (
+                            <g
+                              key={`clear-${p.id}`}
+                              style={{ transformOrigin: `${cx}px ${cy}px`, transform: on ? "scale(1)" : "scale(0)", transition: "transform 700ms ease" }}
+                            >
+                              <polygon points={pts} fill="black" />
+                            </g>
+                          );
+                        }
+                        return (
+                          <circle
+                            key={`clear-${p.id}`}
+                            cx={cx}
+                            cy={cy}
+                            r={on ? toPx(DEFAULT_REVEAL_RADIUS_PCT, "x") : 0}
+                            fill="black"
+                            style={{ transition: "r 700ms ease" }}
+                          />
+                        );
+                      })}
+                    </mask>
+                  </defs>
+                  <rect
+                    x={0}
+                    y={0}
+                    width={size.width}
+                    height={size.height}
+                    fill="black"
+                    fillOpacity={overlayDensityValue / 100}
+                    mask={`url(#sitemap-overlay-mask-${siteMap.id})`}
+                    style={{ pointerEvents: "none" }}
+                  />
+                </>
+              )}
             </svg>
 
             <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
@@ -518,6 +737,35 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
               <Icon name="plus" size={14} />
             </button>
           </div>
+
+          {canEdit && (
+            <div
+              className="row gap-2"
+              style={{
+                position: "absolute",
+                left: 12,
+                bottom: 12,
+                alignItems: "center",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+                padding: "6px 10px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+              }}
+              title="Dark overlay covers the map; each light clears an animated hole over its own coverage area when switched on."
+            >
+              <Icon name="moon" size={13} />
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={overlayDensityValue}
+                onChange={(e) => handleOverlayDensityChange(Number(e.target.value))}
+                style={{ width: 90 }}
+              />
+              <span className="muted" style={{ fontSize: 11, width: 32 }}>{overlayDensityValue}%</span>
+            </div>
+          )}
         </div>
 
         {mode === "edit" && (
@@ -560,8 +808,11 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
             setDrawing({ placementId: editingPlacement.id, shapeType });
             setDraftPoints([]);
             setDraftRadius(null);
+            setPastDrafts([]);
+            setFutureDrafts([]);
             setEditingPlacement(null);
           }}
+          onEditShape={() => startEditingShape(editingPlacement)}
           onDelete={() => { setDeletingPlacement(editingPlacement); }}
         />
       )}
