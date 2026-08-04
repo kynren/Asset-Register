@@ -127,6 +127,9 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
         clientPageSize={5}
         emptyMessage="None added yet."
         selection={{ selectedIds, onSelectedIdsChange: setSelectedIds, getRowId: (r) => r.id }}
+        exportModule="admin"
+        importUrl={`${url}/import`}
+        onImported={() => queryClient.invalidateQueries({ queryKey: [queryKey] })}
       />
 
       {deleting && (

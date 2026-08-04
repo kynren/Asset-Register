@@ -163,6 +163,7 @@ export function TicketListPage() {
       <div className="card">
         <DataTable
           tableId="helpdesk.tickets"
+          exportModule="helpdesk"
           columns={columns}
           data={data?.items ?? []}
           isLoading={isLoading}

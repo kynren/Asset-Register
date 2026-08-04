@@ -178,7 +178,7 @@ export function TicketTemplatesTab() {
           {editingId != null && <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>Cancel</button>}
         </form>
       </PermissionGate>
-      <DataTable tableId="admin.ticket-templates" columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={10} emptyMessage="No templates defined yet." />
+      <DataTable tableId="admin.ticket-templates" columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={10} emptyMessage="No templates defined yet." exportModule="admin" />
       {expanded && (
         <div style={{ borderTop: "1px solid var(--color-border)", marginTop: 10 }}>
           <h4>{expanded.name} — Field Rules</h4>

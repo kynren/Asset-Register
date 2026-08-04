@@ -15,7 +15,9 @@ import { StockPage } from "./pages/stock/StockPage";
 import { TicketListPage } from "./pages/helpdesk/TicketListPage";
 import { TicketDetailPage } from "./pages/helpdesk/TicketDetailPage";
 import { OperationsPage } from "./pages/operations/OperationsPage";
+import { ControlsPage } from "./pages/controls/ControlsPage";
 import { NvrPage } from "./pages/nvr/NvrPage";
+import { GatesPage } from "./pages/gates/GatesPage";
 import { AccessControlPage } from "./pages/accessControl/AccessControlPage";
 import { LightingPage } from "./pages/lighting/LightingPage";
 import { DocsListPage } from "./pages/docs/DocsListPage";
@@ -57,9 +59,11 @@ function App() {
 
           <Route path="/operations" element={<PermissionGate module="operations" redirect><OperationsPage /></PermissionGate>} />
 
+          <Route path="/controls" element={<ControlsPage />} />
           <Route path="/nvr" element={<PermissionGate module="nvr" redirect><NvrPage /></PermissionGate>} />
           <Route path="/access-control" element={<PermissionGate module="access-control" redirect><AccessControlPage /></PermissionGate>} />
           <Route path="/lighting" element={<PermissionGate module="lighting" redirect><LightingPage /></PermissionGate>} />
+          <Route path="/gates" element={<PermissionGate module="gates" redirect><GatesPage /></PermissionGate>} />
 
           <Route path="/docs" element={<PermissionGate module="docs" redirect><DocsListPage /></PermissionGate>} />
           <Route path="/docs/:id" element={<PermissionGate module="docs" redirect><DocumentDetailPage /></PermissionGate>} />

@@ -7,9 +7,15 @@ import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { getPagination, paginatedResponse } from "../../lib/pagination";
 import { syncDocumentToGit } from "../../lib/docsGitSync";
-import { DocTypeValue, SECTIONS_SCHEMA_BY_TYPE } from "./docs.schema";
+import { RECORD_ACCESS_BYPASS_ROLE_NAMES, grantRecordAccess, hasRecordAccess, listRecordAccess, listRecordAccessBatch, revokeRecordAccess } from "../../lib/recordAccess";
+import { buildDocDocxBuffer, buildDocPdfBuffer, WatermarkAsset, WatermarkPosition } from "../../lib/docExport";
+import { readImageDimensions } from "../../lib/imageDimensions";
+import { convertUploadToHtml, convertDocxToSections } from "../../lib/docImport";
+import { buildDocTemplateBuffer } from "../../lib/docTemplate";
+import { DocTypeValue, SECTIONS_SCHEMA_BY_TYPE, docTypeSchema } from "./docs.schema";
 
 const UPLOAD_ROOT = path.join(__dirname, "..", "..", "..", "uploads", "docs");
+const ENTITY_TYPE = "Document";
 
 const listSelect = {
   id: true,
@@ -24,6 +30,7 @@ const listSelect = {
   reviewDueDate: true,
   createdAt: true,
   updatedAt: true,
+  createdById: true,
   createdBy: { select: { id: true, firstName: true, lastName: true } },
 };
 
@@ -88,7 +95,14 @@ export async function list(req: Request, res: Response) {
     ]);
     const creatorMap = new Map(creators.map((c) => [c.id, c]));
     const collectionMap = new Map(collections.map((c) => [c.id, c]));
-    const items = rows.map(({ createdById, ...r }) => ({ ...r, createdBy: creatorMap.get(createdById) ?? null, collection: collectionMap.get(r.collectionId) ?? null }));
+    const accessByDoc = await listRecordAccessBatch(ENTITY_TYPE, rows.map((r) => r.id));
+    const items = rows.map(({ createdById, ...r }) => ({
+      ...r,
+      createdById,
+      createdBy: creatorMap.get(createdById) ?? null,
+      collection: collectionMap.get(r.collectionId) ?? null,
+      access: accessByDoc.get(r.id) ?? [],
+    }));
 
     return res.json(paginatedResponse(items, total, page, pageSize));
   }
@@ -103,7 +117,8 @@ export async function list(req: Request, res: Response) {
     prisma.document.findMany({ where, select: listSelect, orderBy: { updatedAt: "desc" }, skip, take }),
     prisma.document.count({ where }),
   ]);
-  res.json(paginatedResponse(items, total, page, pageSize));
+  const accessByDoc = await listRecordAccessBatch(ENTITY_TYPE, items.map((d) => d.id));
+  res.json(paginatedResponse(items.map((d) => ({ ...d, access: accessByDoc.get(d.id) ?? [] })), total, page, pageSize));
 }
 
 // Feeds the Netflix-style library dashboard: a flat, unpaginated list (capped well above any
@@ -115,17 +130,18 @@ export async function libraryFeed(_req: Request, res: Response) {
     orderBy: { updatedAt: "desc" },
     take: 500,
   });
-  res.json(items);
+  const accessByDoc = await listRecordAccessBatch(ENTITY_TYPE, items.map((d) => d.id));
+  res.json(items.map((d) => ({ ...d, access: accessByDoc.get(d.id) ?? [] })));
 }
 
 export async function getOne(req: Request, res: Response) {
   const doc = await prisma.document.findUnique({ where: { id: Number(req.params.id) }, include: detailInclude });
   if (!doc) throw new ApiError(404, "Document not found");
-  res.json(doc);
+  res.json({ ...doc, access: await listRecordAccess(ENTITY_TYPE, doc.id) });
 }
 
 export async function create(req: Request, res: Response) {
-  const { title, docType, category, collectionId, summary, sections, tags, isPublished, reviewDueDate } = req.body;
+  const { title, docType, category, collectionId, summary, sections, tags, isPublished, reviewDueDate, access } = req.body;
 
   const sectionsSchema = SECTIONS_SCHEMA_BY_TYPE[docType as DocTypeValue];
   const parsedSections = sectionsSchema.parse(sections ?? {});
@@ -146,15 +162,26 @@ export async function create(req: Request, res: Response) {
     },
     include: detailInclude,
   });
+  for (const grant of (access ?? []) as { userId?: number; teamId?: number; level: "EDIT" | "DELETE" }[]) {
+    const target = grant.userId != null ? { userId: grant.userId } : { teamId: grant.teamId! };
+    await grantRecordAccess(ENTITY_TYPE, doc.id, target, grant.level, req.user!.id);
+  }
   await logAudit({ userId: req.user!.id, action: "docs.create", entityType: "Document", entityId: doc.id });
-  res.status(201).json(doc);
+  res.status(201).json({ ...doc, access: await listRecordAccess(ENTITY_TYPE, doc.id) });
   void syncDocumentToGit(doc.id, "create");
 }
 
+// Editing/deleting is restricted to the creator, System/Super Admin, and anyone explicitly
+// granted EDIT/DELETE access (see server/src/lib/recordAccess.ts) — requirePermission("docs",
+// "edit"/"delete") still gates whether the user's role can touch documents at all, not whether
+// they may touch *this* one.
 export async function update(req: Request, res: Response) {
   const id = Number(req.params.id);
   const existing = await prisma.document.findUnique({ where: { id } });
   if (!existing) throw new ApiError(404, "Document not found");
+
+  const canEdit = await hasRecordAccess(ENTITY_TYPE, id, existing, req.user!.id, req.user!.roleName, "EDIT");
+  if (!canEdit) throw new ApiError(403, "Only the document's creator or someone they've granted edit access to can update it");
 
   const { title, category, collectionId, summary, sections, tags, isPublished, reviewDueDate } = req.body;
 
@@ -181,15 +208,53 @@ export async function update(req: Request, res: Response) {
     include: detailInclude,
   });
   await logAudit({ userId: req.user!.id, action: "docs.update", entityType: "Document", entityId: id });
-  res.json(doc);
+  res.json({ ...doc, access: await listRecordAccess(ENTITY_TYPE, id) });
   void syncDocumentToGit(doc.id, "update");
 }
 
 export async function remove(req: Request, res: Response) {
   const id = Number(req.params.id);
+  const existing = await prisma.document.findUnique({ where: { id } });
+  if (!existing) throw new ApiError(404, "Document not found");
+
+  const canDelete = await hasRecordAccess(ENTITY_TYPE, id, existing, req.user!.id, req.user!.roleName, "DELETE");
+  if (!canDelete) throw new ApiError(403, "Only the document's creator, someone they've granted delete access to, or a System/Super Admin can delete it");
+
+  await prisma.recordAccessGrant.deleteMany({ where: { entityType: ENTITY_TYPE, entityId: id } });
   await prisma.document.delete({ where: { id } });
   await logAudit({ userId: req.user!.id, action: "docs.delete", entityType: "Document", entityId: id });
   res.json({ ok: true });
+}
+
+// ───────────────────────── Access grants (creator-only grant/revoke, EDIT or DELETE) ─────────────────────────
+
+export async function grantAccess(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const doc = await prisma.document.findUnique({ where: { id } });
+  if (!doc) throw new ApiError(404, "Document not found");
+  if (doc.createdById !== req.user!.id && !RECORD_ACCESS_BYPASS_ROLE_NAMES.includes(req.user!.roleName)) {
+    throw new ApiError(403, "Only the document's creator can grant access");
+  }
+  const { userId, teamId, level } = req.body as { userId?: number; teamId?: number; level: "EDIT" | "DELETE" };
+  const target = userId != null ? { userId } : { teamId: teamId! };
+  await grantRecordAccess(ENTITY_TYPE, id, target, level, req.user!.id);
+  await logAudit({ userId: req.user!.id, action: "docs.access.grant", entityType: "Document", entityId: id, metadata: { userId, teamId, level } });
+  res.json(await listRecordAccess(ENTITY_TYPE, id));
+}
+
+export async function revokeAccess(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const targetId = Number(req.params.targetId);
+  const level = req.params.level === "DELETE" ? "DELETE" : "EDIT";
+  const target = req.params.kind === "team" ? { teamId: targetId } : { userId: targetId };
+  const doc = await prisma.document.findUnique({ where: { id } });
+  if (!doc) throw new ApiError(404, "Document not found");
+  if (doc.createdById !== req.user!.id && !RECORD_ACCESS_BYPASS_ROLE_NAMES.includes(req.user!.roleName)) {
+    throw new ApiError(403, "Only the document's creator can revoke access");
+  }
+  await revokeRecordAccess(ENTITY_TYPE, id, target, level);
+  await logAudit({ userId: req.user!.id, action: "docs.access.revoke", entityType: "Document", entityId: id, metadata: { ...target, level } });
+  res.json(await listRecordAccess(ENTITY_TYPE, id));
 }
 
 // Created unpublished (and never git-synced, since externalKey stays null) — a duplicate is a
@@ -321,4 +386,138 @@ export async function removeCollection(req: Request, res: Response) {
   await prisma.docCollection.delete({ where: { id } });
   await logAudit({ userId: req.user!.id, action: "docs.collection_delete", entityType: "DocCollection", entityId: id });
   res.json({ ok: true });
+}
+
+// ───────────────────────── Export (PDF/Word) + Import (PDF/Word) ─────────────────────────
+
+// Reads the org-wide watermark image + position straight off disk rather than through
+// docsGitSync-style export helpers, matching how buildDocTemplateBuffer/docExport.ts stay
+// pure/IO-free — the file lives under the same uploads/branding directory + static mount that
+// settings.routes.ts's appIcon/favicon uploads already use.
+async function loadDocsWatermark(): Promise<WatermarkAsset | null> {
+  const settings = await prisma.systemSetting.findMany({ where: { key: { in: ["docsWatermarkUrl", "docsWatermarkPosition"] } } });
+  const url = settings.find((s) => s.key === "docsWatermarkUrl")?.value;
+  if (!url) return null;
+  const position = (settings.find((s) => s.key === "docsWatermarkPosition")?.value as WatermarkPosition | undefined) ?? "center";
+
+  const filename = path.basename(url);
+  const filePath = path.join(__dirname, "..", "..", "..", "uploads", "branding", filename);
+  if (!fs.existsSync(filePath)) return null;
+
+  const buffer = fs.readFileSync(filePath);
+  const dims = readImageDimensions(buffer);
+  if (!dims) return null;
+
+  const docxType: WatermarkAsset["docxType"] = path.extname(filename).toLowerCase() === ".png" ? "png" : "jpg";
+  return { buffer, width: dims.width, height: dims.height, position, docxType };
+}
+
+export async function exportDocument(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const format = req.query.format === "docx" ? "docx" : "pdf";
+  const doc = await prisma.document.findUnique({ where: { id } });
+  if (!doc) throw new ApiError(404, "Document not found");
+
+  const exportable = {
+    title: doc.title,
+    docType: doc.docType as DocTypeValue,
+    category: doc.category,
+    summary: doc.summary,
+    sections: doc.sections as Record<string, unknown>,
+    tags: doc.tags,
+    updatedAt: doc.updatedAt,
+  };
+  const safeName = doc.title.replace(/[^a-z0-9-_]+/gi, "_");
+  const watermark = await loadDocsWatermark();
+
+  await logAudit({ userId: req.user!.id, action: "docs.export", entityType: "Document", entityId: id, metadata: { format } });
+
+  if (format === "docx") {
+    const buffer = await buildDocDocxBuffer(exportable, watermark);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}.docx"`);
+    res.send(buffer);
+  } else {
+    const buffer = await buildDocPdfBuffer(exportable, watermark);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}.pdf"`);
+    res.send(buffer);
+  }
+}
+
+// Always lands as a GENERAL document — see docImport.ts for why a converted PDF/Word file can't be
+// reliably mapped onto a typed docType's structured sections.
+const DOCS_IMPORT_MAX_FILES_KEY = "docsImportMaxFiles";
+const DEFAULT_IMPORT_MAX_FILES = 5;
+
+// A single per-org SystemSetting (see settings.routes.ts's identical key/value pattern), editable
+// from two admin surfaces — Admin & Setup (Super Admin) and App Settings (System Admin) — both
+// hitting this same docs-scoped route rather than the generic /api/settings one, since that's
+// gated to "app-settings" edit which Super Admin is deliberately excluded from.
+export async function getImportSettings(_req: Request, res: Response) {
+  const setting = await prisma.systemSetting.findUnique({ where: { key: DOCS_IMPORT_MAX_FILES_KEY } });
+  res.json({ maxFiles: setting ? Number(setting.value) : DEFAULT_IMPORT_MAX_FILES });
+}
+
+export async function updateImportSettings(req: Request, res: Response) {
+  const maxFiles = Number(req.body.maxFiles);
+  if (!Number.isInteger(maxFiles) || maxFiles < 1 || maxFiles > 50) throw new ApiError(400, "maxFiles must be a whole number between 1 and 50");
+  await prisma.systemSetting.upsert({
+    where: { key: DOCS_IMPORT_MAX_FILES_KEY },
+    update: { value: String(maxFiles) },
+    create: { key: DOCS_IMPORT_MAX_FILES_KEY, value: String(maxFiles) },
+  });
+  await logAudit({ userId: req.user!.id, action: "docs.import_settings.update", metadata: { maxFiles } });
+  res.json({ maxFiles });
+}
+
+export async function downloadTemplate(req: Request, res: Response) {
+  const docType = docTypeSchema.parse(req.params.docType);
+  const buffer = await buildDocTemplateBuffer(docType);
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  res.setHeader("Content-Disposition", `attachment; filename="${docType.toLowerCase()}_template.docx"`);
+  res.send(buffer);
+}
+
+export async function importDocument(req: Request, res: Response) {
+  if (!req.file) throw new ApiError(400, "No file uploaded");
+  const collectionId = Number(req.body.collectionId);
+  if (!collectionId) throw new ApiError(400, "collectionId is required");
+
+  const isDocx = req.file.mimetype.includes("wordprocessingml") || /\.docx$/i.test(req.file.originalname);
+  const requestedDocType = docTypeSchema.safeParse(req.body.docType);
+  const title = req.file.originalname.replace(/\.(docx|pdf)$/i, "") || "Imported Document";
+
+  let docType: DocTypeValue = "GENERAL";
+  let sections: Record<string, unknown>;
+  let unmatchedHeadings: string[] = [];
+
+  if (isDocx && requestedDocType.success) {
+    docType = requestedDocType.data;
+    const result = await convertDocxToSections(req.file.buffer, docType);
+    sections = result.sections;
+    unmatchedHeadings = result.unmatchedHeadings;
+  } else {
+    const html = await convertUploadToHtml(req.file.buffer, req.file.mimetype, req.file.originalname);
+    sections = { body: html };
+  }
+
+  const doc = await prisma.document.create({
+    data: {
+      title,
+      docType,
+      category: "Imported",
+      collectionId,
+      summary: null,
+      sections: sections as Prisma.InputJsonValue,
+      tags: [],
+      isPublished: false,
+      searchText: buildSearchText({ title, summary: null, sections, tags: [] }),
+      createdById: req.user!.id,
+    },
+    include: detailInclude,
+  });
+  await logAudit({ userId: req.user!.id, action: "docs.import", entityType: "Document", entityId: doc.id, metadata: { fileName: req.file.originalname, docType, unmatchedHeadings } });
+  res.status(201).json({ ...doc, access: await listRecordAccess(ENTITY_TYPE, doc.id), unmatchedHeadings });
+  void syncDocumentToGit(doc.id, "create");
 }

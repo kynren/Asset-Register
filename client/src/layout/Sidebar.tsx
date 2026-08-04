@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, Link } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../auth/AuthContext";
 import { useBranding } from "../theme/BrandingContext";
 import { useBattery } from "../hooks/useBattery";
 import { useClientInfo } from "../hooks/useClientInfo";
 import { useUserPreference } from "../hooks/useUserPreference";
-import { NavItem, controlsNavGroup, settingsNav, systemConsoleNav } from "./navConfig";
+import { NavItem, controlsNavGroup, controlsNavItem, settingsNav, systemConsoleNav } from "./navConfig";
 
 function readCollapsed() {
   return localStorage.getItem("sidebar:collapsed") === "true";
@@ -25,48 +25,6 @@ function SidebarLink({ item, collapsed, indent }: { item: NavItem; collapsed: bo
       <Icon name={item.icon} size={18} />
       {!collapsed && <span>{item.label}</span>}
     </NavLink>
-  );
-}
-
-// Renders as a collapsible section header + indented children when the sidebar itself is
-// expanded; when the sidebar is collapsed to icon-only, the grouping header wouldn't mean
-// anything so the children just render as flat icon links like every other top-level item.
-//
-// Defaults closed on every page — it only auto-opens while the active route is one of its own
-// children, never remembered across navigation. A manual click can still expand/collapse it for
-// browsing, but that override is dropped the moment the route changes, so the next page load (or
-// next unrelated page visited) starts closed again rather than "sticking" open.
-function SidebarGroup({ label, icon, items, collapsed }: { label: string; icon: string; items: NavItem[]; collapsed: boolean }) {
-  const location = useLocation();
-  const isChildActive = items.some((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
-  const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
-  const expanded = manualExpanded ?? isChildActive;
-
-  useEffect(() => {
-    setManualExpanded(null);
-  }, [location.pathname]);
-
-  if (items.length === 0) return null;
-
-  if (collapsed) {
-    return (
-      <>
-        {items.map((item) => (
-          <SidebarLink key={item.path} item={item} collapsed={collapsed} />
-        ))}
-      </>
-    );
-  }
-
-  return (
-    <>
-      <button type="button" className="sidebar-link sidebar-group-toggle" onClick={() => setManualExpanded(!expanded)}>
-        <Icon name={icon} size={18} />
-        <span className="flex-1">{label}</span>
-        <Icon name={expanded ? "chevronDown" : "chevronRight"} size={14} />
-      </button>
-      {expanded && items.map((item) => <SidebarLink key={item.path} item={item} collapsed={collapsed} indent />)}
-    </>
   );
 }
 
@@ -174,12 +132,12 @@ export function Sidebar({ pageTitle }: { pageTitle: string }) {
   return (
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
       <div className="sidebar-brand-block">
-        <div className="sidebar-brand">
+        <Link to="/" className="sidebar-brand" title="Go to homepage">
           <div className="sidebar-brand-mark">
             {branding.appIconUrl ? <img src={branding.appIconUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} /> : branding.companyName[0]}
           </div>
           {!collapsed && <span>{branding.companyName}</span>}
-        </div>
+        </Link>
         {!collapsed && <div className="sidebar-page-title">{pageTitle.toUpperCase()}</div>}
       </div>
 
@@ -188,7 +146,7 @@ export function Sidebar({ pageTitle }: { pageTitle: string }) {
         {consoleBeforeControls.map((item) => (
           <SidebarLink key={item.path} item={item} collapsed={collapsed} />
         ))}
-        <SidebarGroup label={controlsNavGroup.label} icon={controlsNavGroup.icon} items={visibleControls} collapsed={collapsed} />
+        {visibleControls.length > 0 && <SidebarLink item={controlsNavItem} collapsed={collapsed} />}
         {consoleAfterControls.map((item) => (
           <SidebarLink key={item.path} item={item} collapsed={collapsed} />
         ))}

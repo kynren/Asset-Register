@@ -27,7 +27,7 @@ export async function captureBeforeSnapshot(changeType: ScheduledChangeType, tar
       if (targetId === null) throw new ApiError(400, "targetId is required for ROLE_PERMISSIONS");
       const role = await prisma.role.findUnique({ where: { id: targetId }, include: { permissions: true } });
       if (!role) throw new ApiError(404, "Role not found");
-      return { roleName: role.name, permissions: role.permissions.map((p) => ({ module: p.module, canView: p.canView, canCreate: p.canCreate, canEdit: p.canEdit, canDelete: p.canDelete, canExport: p.canExport })) };
+      return { roleName: role.name, permissions: role.permissions.map((p) => ({ module: p.module, canView: p.canView, canCreate: p.canCreate, canEdit: p.canEdit, canDelete: p.canDelete, canExport: p.canExport, canImport: p.canImport })) };
     }
   }
 }

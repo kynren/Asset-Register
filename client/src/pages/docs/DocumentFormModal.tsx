@@ -6,6 +6,7 @@ import { SectionsEditor } from "./SectionsEditor";
 import { CollectionsManageModal, DocCollectionItem } from "./CollectionsManageModal";
 import { DOC_CATEGORIES, DOC_TYPES, DOC_TYPE_DESCRIPTIONS, DOC_TYPE_FIELDS, DOC_TYPE_LABELS, DocType, emptySections } from "./docsConstants";
 import { ChipSelect } from "../../components/ChipSelect";
+import { AccessGrantPicker, AccessLevel } from "../../components/AccessControl";
 
 interface DocumentFull {
   id: number;
@@ -42,6 +43,10 @@ export function DocumentFormModal({
   const [isPublished, setIsPublished] = useState(document?.isPublished ?? true);
   const [sections, setSections] = useState<Record<string, any>>(document?.sections ?? emptySections("SOP"));
   const [showManageCollections, setShowManageCollections] = useState(false);
+  const [newAccess, setNewAccess] = useState<{ userId?: string; teamId?: string; level: AccessLevel }[]>([]);
+
+  const { data: users } = useQuery({ queryKey: ["users-directory"], queryFn: async () => (await axiosClient.get("/users/directory")).data });
+  const { data: teams } = useQuery({ queryKey: ["teams-directory"], queryFn: async () => (await axiosClient.get("/teams/directory")).data });
 
   const { data: existingCategories } = useQuery({
     queryKey: ["docs-categories"],
@@ -57,6 +62,23 @@ export function DocumentFormModal({
   function handleDocTypeChange(next: DocType) {
     setDocType(next);
     setSections(emptySections(next));
+  }
+
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+
+  async function downloadTemplate() {
+    setDownloadingTemplate(true);
+    try {
+      const res = await axiosClient.get(`/docs/template/${docType}`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(res.data);
+      const a = window.document.createElement("a");
+      a.href = url;
+      a.download = `${docType.toLowerCase()}_template.docx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } finally {
+      setDownloadingTemplate(false);
+    }
   }
 
   function updateSection(key: string, value: any) {
@@ -78,7 +100,7 @@ export function DocumentFormModal({
     mutationFn: async () =>
       document
         ? (await axiosClient.patch(`/docs/${document.id}`, payload)).data as DocumentFull
-        : (await axiosClient.post("/docs", { ...payload, docType })).data as DocumentFull,
+        : (await axiosClient.post("/docs", { ...payload, docType, access: newAccess.map((a) => (a.userId != null ? { userId: Number(a.userId), level: a.level } : { teamId: Number(a.teamId), level: a.level })) })).data as DocumentFull,
     onSuccess: (doc) => {
       queryClient.invalidateQueries({ queryKey: ["docs"] });
       queryClient.invalidateQueries({ queryKey: ["doc", doc.id] });
@@ -110,7 +132,19 @@ export function DocumentFormModal({
               onChange={(v) => handleDocTypeChange(v as DocType)}
               options={DOC_TYPES.map((t) => ({ value: t, label: DOC_TYPE_LABELS[t] }))}
             />
-            <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>{DOC_TYPE_DESCRIPTIONS[docType]}</p>
+            <div className="row gap-2" style={{ alignItems: "flex-start", justifyContent: "space-between", marginTop: 4 }}>
+              <p className="muted" style={{ fontSize: 12, margin: 0 }}>{DOC_TYPE_DESCRIPTIONS[docType]}</p>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+                onClick={downloadTemplate}
+                disabled={downloadingTemplate}
+                title="Download a blank Word template for this document type, to fill in offline and import back"
+              >
+                {downloadingTemplate ? "Downloading..." : "Download Template"}
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -171,6 +205,13 @@ export function DocumentFormModal({
       <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "0 0 16px" }} />
 
       <SectionsEditor fields={DOC_TYPE_FIELDS[docType]} sections={sections} onChange={updateSection} />
+
+      {!document && (
+        <>
+          <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "16px 0" }} />
+          <AccessGrantPicker users={users ?? []} teams={teams ?? []} value={newAccess} onChange={setNewAccess} />
+        </>
+      )}
 
       {showManageCollections && <CollectionsManageModal onClose={() => setShowManageCollections(false)} />}
     </FormModal>

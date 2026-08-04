@@ -16,6 +16,7 @@ interface RolePermission {
   canEdit: boolean;
   canDelete: boolean;
   canExport: boolean;
+  canImport: boolean;
   scopeAssignedOnly?: boolean;
 }
 interface Role {
@@ -26,9 +27,9 @@ interface Role {
   permissions: RolePermission[];
 }
 
-type PermAction = "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport";
-const ACTIONS: PermAction[] = ["canView", "canCreate", "canEdit", "canDelete", "canExport"];
-const ACTION_LABELS: Record<string, string> = { canView: "View", canCreate: "Create", canEdit: "Edit", canDelete: "Delete", canExport: "Export" };
+type PermAction = "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport" | "canImport";
+const ACTIONS: PermAction[] = ["canView", "canCreate", "canEdit", "canDelete", "canExport", "canImport"];
+const ACTION_LABELS: Record<string, string> = { canView: "View", canCreate: "Create", canEdit: "Edit", canDelete: "Delete", canExport: "Export", canImport: "Import" };
 
 // Every feature area gated behind each module, kept in sync as new functionality lands —
 // several modules cover more than their name implies since newer features (Licenses,
@@ -46,6 +47,7 @@ const MODULE_INFO: Record<ModuleName, { label: string; description: string }> = 
   nvr: { label: "NVRs & Cameras", description: "Device management, live view, event log, ONVIF PTZ control, recording & retention, motion detection alerts." },
   "access-control": { label: "Access Control", description: "Doors, credentials, Person/Organization directory, Access Groups." },
   lighting: { label: "Lighting", description: "Devices, Rooms dashboard, Scenes, Automations, ZigBee scaffold." },
+  gates: { label: "Gates", description: "Paxton Net2 server discovery and manual registration." },
   "virtual-assistant": { label: "Virtual Assistant", description: "In-app assistant chat and quick actions." },
   docs: { label: "Docs & SOPs", description: "Manuals, SOPs, runbooks, and other documents — collections, full-text search, attachments." },
   reports: { label: "Reports", description: "Report Builder, saved/shared reports, CSV/PDF export, print, email delivery, and the Reports dashboard." },
@@ -114,7 +116,7 @@ export function RolesTab({
   });
 
   function buildFullMatrix(perms: RolePermission[]): RolePermission[] {
-    return MODULES.map((m) => perms.find((p) => p.module === m) ?? { module: m, canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false, scopeAssignedOnly: false });
+    return MODULES.map((m) => perms.find((p) => p.module === m) ?? { module: m, canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false, scopeAssignedOnly: false });
   }
 
   const isSystemAdminRole = selectedRole?.name === "System Admin";

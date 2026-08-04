@@ -2,7 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useState } fr
 import { axiosClient } from "../api/axiosClient";
 import { setAccessToken, setUnauthorizedHandler } from "../api/tokenStore";
 import { getViewingOrgId, setViewingOrgId } from "../api/viewingOrgStore";
-import { applyAccentColor } from "../lib/color";
+import { applyAccentColor, applyAppearanceOverrides } from "../lib/color";
 import { queryClient } from "../lib/queryClient";
 import { useBranding } from "../theme/BrandingContext";
 import { ActionName, ModulePermission, ModuleName, PermissionMap } from "../lib/permissions";
@@ -28,8 +28,28 @@ export interface ViewingOrganization {
   schemaName: string;
 }
 
+// The user's currently-applied appearance (their own theme, or one shared with them) — see
+// theme/AppearanceContext.tsx for how this gets turned into CSS vars, and pages/profile/AppearanceTab.tsx
+// for where it's created/edited/shared.
+export interface ActiveAppearanceTheme {
+  id: number;
+  name: string;
+  navPosition: "sidebar" | "topbar";
+  primaryColor: string;
+  sidebarBgColor: string | null;
+  sidebarTextColor: string | null;
+  pageBgColor: string | null;
+  isDark: boolean;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
+  /** Team ids the current user belongs to — lets team-based record-access checks run client-side
+   *  without a round trip per record (see components/AccessControl.tsx). */
+  myTeamIds: number[];
+  activeTheme: ActiveAppearanceTheme | null;
+  /** Called by the Appearance tab after activate/deactivate so the new look applies immediately. */
+  setActiveTheme: (theme: ActiveAppearanceTheme | null) => void;
   permissions: PermissionMap;
   organization: ViewingOrganization | null;
   loading: boolean;
@@ -51,11 +71,14 @@ const actionKey: Record<ActionName, keyof ModulePermission> = {
   edit: "canEdit",
   delete: "canDelete",
   export: "canExport",
+  import: "canImport",
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const branding = useBranding();
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [myTeamIds, setMyTeamIds] = useState<number[]>([]);
+  const [activeTheme, setActiveTheme] = useState<ActiveAppearanceTheme | null>(null);
   const [permissions, setPermissions] = useState<PermissionMap>({});
   const [organization, setOrganization] = useState<ViewingOrganization | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await axiosClient.post("/auth/refresh", { viewingOrganizationId: getViewingOrgId() });
       setAccessToken(res.data.accessToken);
       setUser(res.data.user);
+      setMyTeamIds(res.data.myTeamIds ?? []);
+      setActiveTheme(res.data.activeTheme ?? null);
       setPermissions(res.data.permissions);
       setOrganization(res.data.organization ?? null);
       setViewingOrgId(res.data.organization?.id ?? null);
@@ -78,6 +103,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setAccessToken(null);
       setUser(null);
+      setMyTeamIds([]);
+      setActiveTheme(null);
       setPermissions({});
       setOrganization(null);
       setViewingOrgId(null);
@@ -99,16 +126,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // A user's personal accent color wins when set; otherwise fall back to the org-wide brand
-    // primary color set in Branding, rather than clearing the CSS var entirely.
-    applyAccentColor(user?.accentColor ?? branding.brandPrimaryColor ?? null);
-  }, [user?.accentColor, branding.brandPrimaryColor]);
+    // An active AppearanceTheme's primary color wins first, then the user's personal accent
+    // color, then the org-wide brand primary color set in Branding, rather than clearing the CSS
+    // var entirely.
+    applyAccentColor(activeTheme?.primaryColor ?? user?.accentColor ?? branding.brandPrimaryColor ?? null);
+    applyAppearanceOverrides(activeTheme);
+  }, [activeTheme, user?.accentColor, branding.brandPrimaryColor]);
 
   async function login(email: string, credential: { password: string } | { pin: string }, mfaToken?: string) {
     const res = await axiosClient.post("/auth/login", { email, ...credential, mfaToken });
     if (res.data.mfaRequired) return { mfaRequired: true };
     setAccessToken(res.data.accessToken);
     setUser(res.data.user);
+    setMyTeamIds(res.data.myTeamIds ?? []);
+    setActiveTheme(res.data.activeTheme ?? null);
     setPermissions(res.data.permissions);
     setOrganization(res.data.organization ?? null);
     setViewingOrgId(res.data.organization?.id ?? null);
@@ -121,6 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await axiosClient.post("/auth/magic-login", { token });
     setAccessToken(res.data.accessToken);
     setUser(res.data.user);
+    setMyTeamIds(res.data.myTeamIds ?? []);
+    setActiveTheme(res.data.activeTheme ?? null);
     setPermissions(res.data.permissions);
     setOrganization(res.data.organization ?? null);
     setViewingOrgId(res.data.organization?.id ?? null);
@@ -132,6 +165,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await axiosClient.post("/auth/logout").catch(() => undefined);
     setAccessToken(null);
     setUser(null);
+    setMyTeamIds([]);
+    setActiveTheme(null);
     setPermissions({});
     setOrganization(null);
     setViewingOrgId(null);
@@ -142,6 +177,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function refreshSession() {
     const res = await axiosClient.get("/auth/me");
     setUser(res.data.user);
+    setMyTeamIds(res.data.myTeamIds ?? []);
+    setActiveTheme(res.data.activeTheme ?? null);
     setPermissions(res.data.permissions);
     setOrganization(res.data.organization ?? null);
     setOrgSwitchConfirmedOrgId(res.data.orgSwitchConfirmedOrgId ?? null);
@@ -180,8 +217,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const value = useMemo(
-    () => ({ user, permissions, organization, loading, login, magicLogin, logout, refreshSession, hasPermission, switchOrganization, isOrgSwitchConfirmed }),
-    [user, permissions, organization, loading, orgSwitchConfirmedOrgId, orgSwitchConfirmedUntil]
+    () => ({ user, myTeamIds, activeTheme, setActiveTheme, permissions, organization, loading, login, magicLogin, logout, refreshSession, hasPermission, switchOrganization, isOrgSwitchConfirmed }),
+    [user, myTeamIds, activeTheme, permissions, organization, loading, orgSwitchConfirmedOrgId, orgSwitchConfirmedUntil]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,10 +1,12 @@
 import { Router } from "express";
+import multer from "multer";
 import { prisma } from "../../config/prisma";
 import { verifyJwt } from "../../middleware/auth";
 import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
+import { importCsvRows } from "../../lib/csvImport";
 import {
   createPurchaseOrderSchema,
   receivePurchaseOrderSchema,
@@ -14,6 +16,7 @@ import {
 
 const router = Router();
 router.use(verifyJwt);
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // ───────────────────────── Suppliers ─────────────────────────
 
@@ -40,6 +43,27 @@ router.delete("/suppliers/:id", requirePermission("stock", "delete"), async (req
   await prisma.supplier.delete({ where: { id } });
   await logAudit({ userId: req.user!.id, action: "supplier.delete", entityType: "Supplier", entityId: id });
   res.json({ ok: true });
+});
+
+// CSV columns: Name (required), Contact Name, Email, Phone, Address, Notes (all optional).
+router.post("/suppliers/import", requirePermission("stock", "import"), upload.single("file"), async (req, res) => {
+  if (!req.file) throw new ApiError(400, "No file uploaded");
+  const result = await importCsvRows(req.file.buffer, async (row) => {
+    const name = (row.Name ?? row.name ?? "").trim();
+    if (!name) throw new Error("Missing Name");
+    const supplier = await prisma.supplier.create({
+      data: {
+        name,
+        contactName: (row["Contact Name"] ?? row.contactName ?? "").trim() || undefined,
+        email: (row.Email ?? row.email ?? "").trim() || undefined,
+        phone: (row.Phone ?? row.phone ?? "").trim() || undefined,
+        address: (row.Address ?? row.address ?? "").trim() || undefined,
+        notes: (row.Notes ?? row.notes ?? "").trim() || undefined,
+      },
+    });
+    await logAudit({ userId: req.user!.id, action: "supplier.create", entityType: "Supplier", entityId: supplier.id });
+  });
+  res.json(result);
 });
 
 router.post("/suppliers/:id/duplicate", requirePermission("stock", "create"), async (req, res) => {

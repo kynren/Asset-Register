@@ -19,4 +19,7 @@ export const agentIngestSchema = z.object({
   batteryPresent: z.boolean().optional(),
   batteryPercent: z.number().min(0).max(100).optional(),
   batteryCharging: z.boolean().optional(),
+  subnetMask: z.string().optional(),
+  defaultGateway: z.string().optional(),
+  dnsServers: z.string().optional(),
 });

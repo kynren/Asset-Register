@@ -54,6 +54,7 @@ export function DevicesTab() {
       <div className="card">
         <DataTable
           tableId="network.devices"
+          exportModule="network"
           columns={columns}
           data={data?.items ?? []}
           isLoading={isLoading}

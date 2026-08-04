@@ -106,6 +106,7 @@ const SAMPLE_VARIABLES: Record<EmailEventType, Record<string, string>> = {
   DEVICE_ONLINE: { deviceName: "core-switch-01 (192.168.1.10)", ipAddress: "192.168.1.10", deviceType: "Network Switching / Routing", sinceTime: "12 Jul 2026, 14:47", monitorUrl: "https://app-assets.kynren.com/network" },
   MAGIC_LOGIN_LINK: { firstName: "Jordan", magicUrl: "https://app-assets.kynren.com/magic-login/sample-token" },
   TICKET_ASSIGNED: { firstName: "Jordan", ticketNumber: "TCK-00142", ticketTitle: "Printer on 3rd floor not responding", priority: "HIGH", ticketUrl: "https://app-assets.kynren.com/helpdesk/142" },
+  PROJECT_UPDATED: { editorName: "Jordan Ellis", projectTitle: "Lake Projector Calibration", projectUrl: "https://app-assets.kynren.com/operations" },
 };
 
 export async function sendTest(req: Request, res: Response) {

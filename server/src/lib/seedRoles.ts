@@ -1,11 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import { MODULES } from "../constants/modules";
 
-type PermSet = Partial<Record<(typeof MODULES)[number], { canView?: boolean; canCreate?: boolean; canEdit?: boolean; canDelete?: boolean; canExport?: boolean }>>;
+type PermSet = Partial<Record<(typeof MODULES)[number], { canView?: boolean; canCreate?: boolean; canEdit?: boolean; canDelete?: boolean; canExport?: boolean; canImport?: boolean }>>;
 
-const ALL_TRUE = { canView: true, canCreate: true, canEdit: true, canDelete: true, canExport: true };
-const VIEW_ONLY = { canView: true, canCreate: false, canEdit: false, canDelete: false, canExport: false };
-const NO_ACCESS = { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false };
+const ALL_TRUE = { canView: true, canCreate: true, canEdit: true, canDelete: true, canExport: true, canImport: true };
+const VIEW_ONLY = { canView: true, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false };
+const NO_ACCESS = { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false };
 
 // Shared by prisma/seed.ts (the original install) and tenantProvisioning.ts (every new
 // organization signed up afterwards) so the two never drift out of sync with each other.
@@ -39,11 +39,12 @@ export const ROLE_DEFS: { name: string; description: string; isSystem: boolean; 
       assets: ALL_TRUE,
       network: ALL_TRUE,
       stock: VIEW_ONLY,
-      helpdesk: { canView: true, canCreate: true, canEdit: true, canDelete: false, canExport: true },
+      helpdesk: { canView: true, canCreate: true, canEdit: true, canDelete: false, canExport: true, canImport: true },
       operations: ALL_TRUE,
       nvr: ALL_TRUE,
       "access-control": ALL_TRUE,
       lighting: ALL_TRUE,
+      gates: ALL_TRUE,
       "virtual-assistant": VIEW_ONLY,
       docs: ALL_TRUE,
       admin: NO_ACCESS,
@@ -65,7 +66,7 @@ export const ROLE_DEFS: { name: string; description: string; isSystem: boolean; 
       "access-control": NO_ACCESS,
       lighting: NO_ACCESS,
       "virtual-assistant": VIEW_ONLY,
-      docs: { canView: true, canCreate: true, canEdit: true, canDelete: false, canExport: false },
+      docs: { canView: true, canCreate: true, canEdit: true, canDelete: false, canExport: false, canImport: true },
       admin: NO_ACCESS,
       password: ALL_TRUE,
     },
@@ -85,7 +86,7 @@ export const ROLE_DEFS: { name: string; description: string; isSystem: boolean; 
       "access-control": NO_ACCESS,
       lighting: NO_ACCESS,
       "virtual-assistant": VIEW_ONLY,
-      docs: { canView: true, canCreate: true, canEdit: true, canDelete: false, canExport: false },
+      docs: { canView: true, canCreate: true, canEdit: true, canDelete: false, canExport: false, canImport: true },
       admin: NO_ACCESS,
       password: ALL_TRUE,
     },
@@ -104,6 +105,7 @@ export const ROLE_DEFS: { name: string; description: string; isSystem: boolean; 
       nvr: VIEW_ONLY,
       "access-control": VIEW_ONLY,
       lighting: VIEW_ONLY,
+      gates: VIEW_ONLY,
       "virtual-assistant": VIEW_ONLY,
       docs: VIEW_ONLY,
       admin: NO_ACCESS,

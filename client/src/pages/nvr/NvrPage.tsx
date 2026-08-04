@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ControlsSubNav } from "../controls/ControlsSubNav";
 import { LiveVideoMatrixTab } from "./LiveVideoMatrixTab";
 import { NvrPlaybackCenterTab } from "./NvrPlaybackCenterTab";
 import { DiscoveryProtocolTab } from "./DiscoveryProtocolTab";
@@ -23,6 +24,7 @@ export function NvrPage() {
       <div className="page-header-sticky">
         <div className="page-header-content">
           <div>
+            <ControlsSubNav />
             <h1 className="page-title">NVRs & Cameras</h1>
             <p className="page-subtitle">Live video matrix, playback, discovery, and device configuration — modeled on Hikvision iVMS workflows.</p>
           </div>

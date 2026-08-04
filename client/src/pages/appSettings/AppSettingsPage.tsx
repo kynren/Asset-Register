@@ -6,6 +6,8 @@ import { SystemStatusTab } from "./SystemStatusTab";
 import { ChangeManagementTab } from "./ChangeManagementTab";
 import { AgentLogTab } from "./AgentLogTab";
 import { BrandingTab } from "./BrandingTab";
+import { McpConnectionCard } from "./McpConnectionCard";
+import { DocsImportLimitCard } from "../docs/DocsImportLimitCard";
 import { RolesTab } from "../admin/RolesTab";
 import { UsersTab } from "../admin/UsersTab";
 import { Icon } from "../../components/Icon";
@@ -19,6 +21,7 @@ const TABS = [
   { key: "backups", label: "Backups" },
   { key: "settings", label: "System Settings" },
   { key: "branding", label: "Branding" },
+  { key: "integrations", label: "Integrations" },
   { key: "status", label: "System Status" },
   { key: "changeManagement", label: "Change Management" },
   { key: "agentLog", label: "Agent Log" },
@@ -127,12 +130,16 @@ export function AppSettingsPage() {
         />
       )}
       {activeTab === "settings" && (
-        <SystemSettingsTab
-          editingScheduledChange={editingChange?.changeType === "SYSTEM_SETTINGS" ? editingChange : null}
-          onDoneEditingScheduledChange={() => setEditingChange(null)}
-        />
+        <div className="stack gap-3">
+          <SystemSettingsTab
+            editingScheduledChange={editingChange?.changeType === "SYSTEM_SETTINGS" ? editingChange : null}
+            onDoneEditingScheduledChange={() => setEditingChange(null)}
+          />
+          <DocsImportLimitCard />
+        </div>
       )}
       {activeTab === "branding" && <BrandingTab />}
+      {activeTab === "integrations" && <McpConnectionCard />}
       {activeTab === "status" && <SystemStatusTab />}
       {activeTab === "changeManagement" && <ChangeManagementTab onEdit={handleEditScheduledChange} />}
       {activeTab === "agentLog" && <AgentLogTab />}

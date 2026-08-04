@@ -85,6 +85,10 @@ export const SECTIONS_SCHEMA_BY_TYPE: Record<DocTypeValue, z.ZodTypeAny> = {
   GENERAL: generalSections,
 };
 
+export const accessGrantSchema = z
+  .object({ userId: z.number().int().optional(), teamId: z.number().int().optional(), level: z.enum(["EDIT", "DELETE"]) })
+  .refine((v) => (v.userId != null) !== (v.teamId != null), { message: "Provide exactly one of userId or teamId" });
+
 export const createDocumentSchema = z.object({
   title: z.string().min(1),
   docType: docTypeSchema,
@@ -95,6 +99,7 @@ export const createDocumentSchema = z.object({
   tags: z.array(z.string()).default([]),
   isPublished: z.boolean().default(true),
   reviewDueDate: z.string().datetime().nullable().optional(),
+  access: z.array(accessGrantSchema).optional(),
 });
 
 // docType is fixed at creation — changing it would orphan the sections shape a document was

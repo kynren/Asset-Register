@@ -10,6 +10,8 @@ interface Branding {
   faviconUrl: string | null;
   brandPrimaryColor: string | null;
   brandSecondaryColor: string | null;
+  docsWatermarkUrl: string | null;
+  docsWatermarkPosition: string;
   loginDesign: LoginPageDesignConfig;
 }
 
@@ -19,6 +21,8 @@ const DEFAULT_BRANDING: Branding = {
   faviconUrl: null,
   brandPrimaryColor: null,
   brandSecondaryColor: null,
+  docsWatermarkUrl: null,
+  docsWatermarkPosition: "center",
   loginDesign: DEFAULT_LOGIN_DESIGN,
 };
 
@@ -43,6 +47,8 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     faviconUrl: data?.faviconUrl || null,
     brandPrimaryColor: data?.brandPrimaryColor || null,
     brandSecondaryColor: data?.brandSecondaryColor || null,
+    docsWatermarkUrl: data?.docsWatermarkUrl || null,
+    docsWatermarkPosition: data?.docsWatermarkPosition || "center",
     loginDesign: loginDesignData ?? DEFAULT_LOGIN_DESIGN,
   };
 

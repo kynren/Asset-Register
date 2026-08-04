@@ -49,8 +49,8 @@ export function CsvImportButton({ url, onImported }: { url: string; onImported: 
   return (
     <>
       <input ref={inputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleFile} />
-      <button className="btn btn-secondary" onClick={() => inputRef.current?.click()} disabled={loading}>
-        <Icon name="upload" size={14} /> {loading ? "Importing..." : "Import CSV"}
+      <button className="btn btn-sm btn-secondary" onClick={() => inputRef.current?.click()} disabled={loading}>
+        <Icon name="upload" size={13} /> {loading ? "Importing..." : "Import CSV"}
       </button>
     </>
   );

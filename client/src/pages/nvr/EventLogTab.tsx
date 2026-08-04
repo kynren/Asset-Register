@@ -36,7 +36,7 @@ export function EventLogTab() {
 
   return (
     <div className="card">
-      <DataTable tableId="nvr.eventLog" defaultViewMode="list" columns={columns} data={events ?? []} isLoading={isLoading} clientPageSize={10} emptyMessage="No events recorded yet." />
+      <DataTable tableId="nvr.eventLog" defaultViewMode="list" columns={columns} data={events ?? []} isLoading={isLoading} clientPageSize={10} emptyMessage="No events recorded yet." exportModule="nvr" />
     </div>
   );
 }

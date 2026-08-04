@@ -96,6 +96,7 @@ export function OrganizationsTab({ strictActiveDisable }: { strictActiveDisable?
       <div className="card">
         <DataTable
           tableId="appSettings.organizations"
+          exportModule="app-settings"
           columns={columns}
           data={data ?? []}
           isLoading={isLoading}

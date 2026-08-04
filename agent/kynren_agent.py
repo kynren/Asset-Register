@@ -137,6 +137,47 @@ def get_windows_hardware_info() -> dict[str, str | None]:
         return {"manufacturer": None, "model": None, "serialNumber": None}
 
 
+def get_network_settings() -> dict[str, str | None]:
+    """Subnet mask / default gateway / DNS servers for the adapter matching get_primary_ip(),
+    Windows only. Same feature-detected try/except-to-None shape as get_windows_hardware_info()."""
+    empty = {"subnetMask": None, "defaultGateway": None, "dnsServers": None}
+    if platform.system() != "Windows":
+        return empty
+
+    primary_ip = get_primary_ip()
+
+    try:
+        import wmi  # type: ignore
+
+        conn = wmi.WMI()
+        adapters = conn.Win32_NetworkAdapterConfiguration(IPEnabled=True)
+        if not adapters:
+            return empty
+
+        adapter = adapters[0]
+        if primary_ip:
+            for candidate in adapters:
+                if primary_ip in (candidate.IPAddress or []):
+                    adapter = candidate
+                    break
+
+        ip_addresses = adapter.IPAddress or []
+        subnet_masks = adapter.IPSubnet or []
+        index = ip_addresses.index(primary_ip) if primary_ip in ip_addresses else 0
+        subnet_mask = subnet_masks[index] if index < len(subnet_masks) else (subnet_masks[0] if subnet_masks else None)
+
+        gateways = adapter.DefaultIPGateway or []
+        dns_servers = adapter.DNSServerSearchOrder or []
+
+        return {
+            "subnetMask": subnet_mask,
+            "defaultGateway": gateways[0] if gateways else None,
+            "dnsServers": ", ".join(dns_servers) if dns_servers else None,
+        }
+    except Exception:
+        return empty
+
+
 def get_battery_info() -> dict[str, bool | int | None]:
     """Real battery state via psutil.sensors_battery() — returns batteryPresent=False on
     desktops/servers with no battery rather than fabricating a level. Not available on every
@@ -250,8 +291,8 @@ def build_payload() -> dict:
         "installedSoftware": get_installed_software(),
     }
 
-    # Omit rather than send null — the API's battery fields are optional, not nullable.
-    for key, value in get_battery_info().items():
+    # Omit rather than send null — the API's battery/network fields are optional, not nullable.
+    for key, value in {**get_battery_info(), **get_network_settings()}.items():
         if value is not None:
             payload[key] = value
 

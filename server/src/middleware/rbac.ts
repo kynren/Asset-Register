@@ -2,12 +2,13 @@ import { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prisma";
 import { ActionName, ModuleName } from "../constants/modules";
 
-const actionColumn: Record<ActionName, "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport"> = {
+const actionColumn: Record<ActionName, "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport" | "canImport"> = {
   view: "canView",
   create: "canCreate",
   edit: "canEdit",
   delete: "canDelete",
   export: "canExport",
+  import: "canImport",
 };
 
 export async function hasPermission(roleId: number, module: ModuleName, action: ActionName): Promise<boolean> {

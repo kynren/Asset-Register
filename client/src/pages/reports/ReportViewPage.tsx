@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { ColumnDef } from "@tanstack/react-table";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { KpiCard } from "../../components/KpiCard";
+import { DataTable } from "../../components/DataTable";
 import { SimpleBarChart, SimpleLineChart, SimplePieChart } from "../../components/ChartWrapper";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { getSource } from "../dashboard/dataExplorerConfig";
@@ -55,6 +57,16 @@ export function ReportViewPage() {
   });
 
   const source = report ? getSource(report.source) : undefined;
+
+  const tableColumns: ColumnDef<Record<string, unknown>, any>[] = useMemo(() => {
+    if (!result || result.kind !== "table") return [];
+    return result.columns.map((c, i) => ({
+      header: source?.availableColumns.find((ac) => ac.value === c)?.label ?? c,
+      accessorKey: c,
+      cell: ({ getValue }) => formatCell(getValue()),
+      meta: i === 0 ? { cardTitle: true } : undefined,
+    }));
+  }, [result, source]);
 
   async function downloadFile(kind: "csv" | "pdf") {
     const res = await axiosClient.get(`/reports/${reportId}/export.${kind}`, { responseType: "blob" });
@@ -119,21 +131,14 @@ export function ReportViewPage() {
           ) : (
             <SimpleBarChart data={result.data} xKey="label" yKey="count" glow />
           )
-        ) : result.rows.length === 0 ? (
-          <div className="empty-state">No matching records.</div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="data-table">
-              <thead>
-                <tr>{result.columns.map((c) => <th key={c}>{source?.availableColumns.find((ac) => ac.value === c)?.label ?? c}</th>)}</tr>
-              </thead>
-              <tbody>
-                {result.rows.map((row, i) => (
-                  <tr key={i}>{result.columns.map((c) => <td key={c}>{formatCell(row[c])}</td>)}</tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            tableId="reports.run-result"
+            columns={tableColumns}
+            data={result.rows}
+            clientPageSize={25}
+            emptyMessage="No matching records."
+          />
         )}
       </div>
 

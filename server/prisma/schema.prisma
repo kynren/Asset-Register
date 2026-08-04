@@ -30,6 +30,7 @@ model RolePermission {
   canEdit   Boolean @default(false)
   canDelete Boolean @default(false)
   canExport Boolean @default(false)
+  canImport Boolean @default(false)
   // Only consulted for module="helpdesk" today: when true, a holder of this role only sees tickets
   // they're assigned to or requested, instead of every ticket canView would otherwise grant.
   scopeAssignedOnly Boolean @default(false)
@@ -87,6 +88,10 @@ model User {
 
   projectCardsAssigned ProjectCard[]      @relation("ProjectCardAssignee")
   projectCardsCreated  ProjectCard[]      @relation("ProjectCardCreator")
+  projectCardAttachmentsUploaded ProjectCardAttachment[] @relation("ProjectCardAttachmentUploader")
+  recordAccessGrantsReceived RecordAccessGrant[] @relation("RecordAccessGrantUser")
+  recordAccessGrantsGiven    RecordAccessGrant[] @relation("RecordAccessGrantGrantedBy")
+  net2ServersCreated         Net2Server[]
   knowledgeArticles    KnowledgeArticle[]
   assetBookings        AssetBooking[]
   savedQueries         SavedQuery[]
@@ -123,6 +128,14 @@ model User {
   ticketApprovalsTargeted  TicketApproval[]  @relation("TicketApprovalTargetUser")
   ticketApprovalsAnswered  TicketApproval[]  @relation("TicketApprovalAnswerer")
   ticketRecurrencesOwned   TicketRecurrence[] @relation("TicketRecurrenceRequester")
+
+  // Personal appearance (color palette + sidebar/topbar layout) — a user picks one saved
+  // AppearanceTheme (their own, or one shared with them) as "active"; null means the app's
+  // default look. See AppearanceTheme below.
+  activeThemeId               Int?
+  activeTheme                 AppearanceTheme?        @relation("UserActiveTheme", fields: [activeThemeId], references: [id], onDelete: SetNull)
+  appearanceThemesCreated     AppearanceTheme[]       @relation("AppearanceThemeCreatedBy")
+  appearanceThemeSharesReceived AppearanceThemeShare[] @relation("AppearanceThemeShareUser")
 }
 
 model RefreshSession {
@@ -673,6 +686,9 @@ model Device {
   hostname          String
   macAddress        String    @unique
   ipAddresses       String[]
+  subnetMask        String?
+  defaultGateway    String?
+  dnsServers        String?
   os                String?
   osVersion         String?
   cpu               String?
@@ -1180,6 +1196,7 @@ model Team {
   dashboardShares   DashboardShare[]
   savedViewShares   SavedViewShare[]
   reportShares      ReportShare[]
+  recordAccessGrants RecordAccessGrant[]
   createdAt         DateTime             @default(now())
 }
 
@@ -1594,6 +1611,27 @@ enum DoorState {
 enum AccessCredentialStatus {
   ACTIVE
   DISABLED
+}
+
+// A registered Paxton Net2 access-control server. Net2's real door/credential control requires
+// the customer's own Net2 API licence (ClientID + OAuth2 credentials issued by their Net2
+// install) which this app cannot obtain on its own — so today this only tracks connection
+// details and reachability, mirroring how NVR/AccessControlDevice track a device before deeper
+// protocol support exists. See Gates.routes.ts for the discovery/test-connection logic.
+model Net2Server {
+  id                Int          @id @default(autoincrement())
+  name              String
+  ipAddress         String
+  port              Int          @default(8443)
+  clientId          String?
+  username          String?
+  encryptedPassword String?
+  notes             String?
+  status            CameraStatus @default(UNKNOWN)
+  lastCheckedAt     DateTime?
+  createdById       Int
+  createdBy         User         @relation(fields: [createdById], references: [id])
+  createdAt         DateTime     @default(now())
 }
 
 model AccessControlDevice {
@@ -2128,6 +2166,7 @@ enum NotificationEventKind {
   LOW_STOCK
   MAINTENANCE_DUE
   DEVICE_OFFLINE
+  PROJECT_UPDATED
 }
 
 // Per-user, per-event-kind opt-out toggle. A missing row for a (userId, kind) pair means
@@ -2154,6 +2193,7 @@ enum EmailEventType {
   DEVICE_ONLINE
   MAGIC_LOGIN_LINK
   TICKET_ASSIGNED
+  PROJECT_UPDATED
 }
 
 // Blocks is an ordered array of { id, type, ...type-specific fields } — rendered to HTML by
@@ -2274,6 +2314,63 @@ model ProjectCard {
   createdBy   User              @relation("ProjectCardCreator", fields: [createdById], references: [id])
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+
+  attachments ProjectCardAttachment[]
+}
+
+enum ProjectAttachmentKind {
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+}
+
+model ProjectCardAttachment {
+  id            Int                   @id @default(autoincrement())
+  projectCardId Int
+  projectCard   ProjectCard           @relation(fields: [projectCardId], references: [id], onDelete: Cascade)
+  kind          ProjectAttachmentKind
+  fileName      String
+  url           String
+  mimeType      String?
+  sizeBytes     Int?
+  uploadedById  Int
+  uploadedBy    User                  @relation("ProjectCardAttachmentUploader", fields: [uploadedById], references: [id])
+  createdAt     DateTime              @default(now())
+}
+
+enum RecordAccessLevel {
+  EDIT
+  DELETE
+}
+
+// App-wide creator/editor/delete-access grant system: any creator-owned record type (identified
+// by a plain string `entityType` tag rather than a typed Prisma relation, since a real relation
+// per entity would mean a near-identical join table per module — see the now-retired
+// ProjectCardEditor this replaces) can grant EDIT and/or DELETE access to specific users on top
+// of the record's own creator. A grant's absence is not a denial by itself — callers combine this
+// with their own "is the creator" / "is System Admin" checks (see server/src/lib/recordAccess.ts).
+// Exactly one of userId/teamId is set per row (enforced at the application layer in
+// server/src/lib/recordAccess.ts, same convention as ReportShare's sharedWithUserId/
+// sharedWithTeamId) — a team grant applies to every current member of that team, resolved at
+// check-time via TeamMember rather than fanned out into one row per member, so adding someone to
+// a team retroactively picks up every record already shared with it.
+model RecordAccessGrant {
+  id          Int               @id @default(autoincrement())
+  entityType  String
+  entityId    Int
+  userId      Int?
+  user        User?             @relation("RecordAccessGrantUser", fields: [userId], references: [id], onDelete: Cascade)
+  teamId      Int?
+  team        Team?             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  level       RecordAccessLevel
+  grantedById Int
+  grantedBy   User              @relation("RecordAccessGrantGrantedBy", fields: [grantedById], references: [id])
+  createdAt   DateTime          @default(now())
+
+  @@unique([entityType, entityId, userId, level])
+  @@unique([entityType, entityId, teamId, level])
+  @@index([entityType, entityId])
 }
 
 model RssFeedSource {
@@ -2320,6 +2417,16 @@ model SavedQuery {
 model ResourceSchedule {
   id            Int      @id @default(autoincrement())
   resourceName  String
+  // Role/crew label shown under the resource's name in the dispatch grid (e.g. "Lead Stage
+  // Tech") and the section it's grouped under (e.g. "Technicians & Crews" vs "Hardware &
+  // Equipment") — denormalized onto every booking row rather than a separate Resource table
+  // since resourceName was already free text with no roster entity behind it; the grid derives
+  // its resource roster from the distinct (resourceName, role, groupLabel) seen across all
+  // bookings ever made, so a resource "exists" the first time it's scheduled.
+  role          String?
+  groupLabel    String   @default("Technicians & Crews")
+  title         String?
+  color         String?
   scheduledById Int
   scheduledBy   User     @relation(fields: [scheduledById], references: [id])
   startAt       DateTime
@@ -2604,4 +2711,44 @@ model BackupRunDestination {
   message         String?
 
   @@index([runId])
+}
+
+// A named, shareable bundle of app appearance choices — color palette plus the primary nav's
+// position (sidebar or a horizontal bar under the header). Deliberately bundles both rather than
+// two separate mechanisms: "change the look of the app" (colors) and "change the menu position"
+// (layout) are both facets of one thing a user picks and can hand to a colleague, same as GLPI's
+// palette selector but extended to also carry the layout choice. A user's `User.activeThemeId`
+// points at whichever Theme (their own, or one shared with them) is currently applied; null means
+// the app's built-in default look.
+model AppearanceTheme {
+  id                Int      @id @default(autoincrement())
+  name              String
+  createdById       Int
+  createdBy         User     @relation("AppearanceThemeCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  navPosition       String   @default("sidebar") // "sidebar" | "topbar"
+  primaryColor      String   @default("#1d4ed8")
+  // Null = inherit the app's built-in default for that slot instead of overriding it (so a theme
+  // can customize just the accent color and leave the sidebar/page background alone, for instance).
+  sidebarBgColor    String?
+  sidebarTextColor  String?
+  pageBgColor       String?
+  isDark            Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  shares        AppearanceThemeShare[]
+  activeForUsers User[]                @relation("UserActiveTheme")
+
+  @@index([createdById])
+}
+
+model AppearanceThemeShare {
+  id               Int             @id @default(autoincrement())
+  themeId          Int
+  theme            AppearanceTheme @relation(fields: [themeId], references: [id], onDelete: Cascade)
+  sharedWithUserId Int
+  sharedWithUser   User            @relation("AppearanceThemeShareUser", fields: [sharedWithUserId], references: [id], onDelete: Cascade)
+  createdAt        DateTime        @default(now())
+
+  @@unique([themeId, sharedWithUserId])
 }

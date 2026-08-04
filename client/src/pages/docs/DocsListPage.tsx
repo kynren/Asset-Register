@@ -12,6 +12,7 @@ import { DocumentFormModal } from "./DocumentFormModal";
 import { DocsLibrary } from "./DocsLibrary";
 import { DocBookCard } from "./DocBookCard";
 import { CollectionsManageModal, DocCollectionItem } from "./CollectionsManageModal";
+import { ImportDocsWizardModal } from "./ImportDocsWizardModal";
 import { ModuleDashboardTab } from "../dashboard/ModuleDashboardTab";
 import { DOCS_WIDGET_CATALOG, DEFAULT_DOCS_DASHBOARD_LAYOUT } from "./docsDashboardWidgets";
 import { ChipSelect } from "../../components/ChipSelect";
@@ -40,6 +41,7 @@ export function DocsListPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showManageCollections, setShowManageCollections] = useState(false);
   const [view, setView] = useState<"library" | "table" | "dashboard">("dashboard");
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const navigate = useNavigate();
 
   const { data: collections } = useQuery({
@@ -95,11 +97,18 @@ export function DocsListPage() {
           <h1 className="page-title">Docs & SOPs</h1>
           <p className="page-subtitle">Standard operating procedures, work instructions, runbooks, checklists, and reference material.</p>
         </div>
-        <PermissionGate module="docs" action="create">
-          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-            <Icon name="plus" size={14} /> New Document
-          </button>
-        </PermissionGate>
+        <div className="row gap-2">
+          <PermissionGate module="docs" action="import">
+            <button className="btn btn-secondary" title="Import a PDF or Word file" onClick={() => setShowImportWizard(true)}>
+              <Icon name="upload" size={14} /> Import PDF/Word
+            </button>
+          </PermissionGate>
+          <PermissionGate module="docs" action="create">
+            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+              <Icon name="plus" size={14} /> New Document
+            </button>
+          </PermissionGate>
+        </div>
       </div>
 
       <div className="row gap-2 flex-wrap" style={{ alignItems: "center" }}>
@@ -181,6 +190,7 @@ export function DocsListPage() {
         <div className="card">
           <DataTable
             tableId="docs.list"
+            exportModule="docs"
             defaultViewMode="list"
             columns={columns}
             data={data?.items ?? []}
@@ -196,6 +206,7 @@ export function DocsListPage() {
 
       {showCreate && <DocumentFormModal onClose={() => setShowCreate(false)} onCreated={(doc) => { setShowCreate(false); navigate(`/docs/${doc.id}`); }} />}
       {showManageCollections && <CollectionsManageModal onClose={() => setShowManageCollections(false)} />}
+      {showImportWizard && <ImportDocsWizardModal onClose={() => setShowImportWizard(false)} />}
     </div>
   );
 }

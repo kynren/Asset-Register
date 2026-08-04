@@ -292,6 +292,7 @@ export function BackupsTab({
         <h3 className="mt-0">Run History</h3>
         <DataTable
           tableId="appSettings.backupRuns"
+          exportModule="app-settings"
           defaultViewMode="list"
           columns={runColumns}
           data={runsPage?.runs ?? []}

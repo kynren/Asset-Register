@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { verifyJwt } from "../../middleware/auth";
@@ -6,9 +7,11 @@ import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import { logAudit } from "../../lib/auditLogger";
 import { ApiError } from "../../middleware/errorHandler";
+import { importCsvRows } from "../../lib/csvImport";
 
 const router = Router();
 router.use(verifyJwt);
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const schema = z.object({ name: z.string().min(1), address: z.string().optional() });
 
@@ -47,6 +50,19 @@ router.delete("/:id", requirePermission("admin", "delete"), async (req, res) => 
   await prisma.location.delete({ where: { id } });
   await logAudit({ userId: req.user!.id, action: "location.delete", entityType: "Location", entityId: id });
   res.json({ ok: true });
+});
+
+// CSV columns: Name (required), Address (optional). One "location.create" audit entry per row
+// rather than per import, matching how the CSV wizard's created records read in Recent Activity.
+router.post("/import", requirePermission("admin", "import"), upload.single("file"), async (req, res) => {
+  if (!req.file) throw new ApiError(400, "No file uploaded");
+  const result = await importCsvRows(req.file.buffer, async (row) => {
+    const name = (row.Name ?? row.name ?? "").trim();
+    if (!name) throw new Error("Missing Name");
+    const location = await prisma.location.create({ data: { name, address: (row.Address ?? row.address ?? "").trim() || undefined } });
+    await logAudit({ userId: req.user!.id, action: "location.create", entityType: "Location", entityId: location.id });
+  });
+  res.json(result);
 });
 
 router.post("/:id/duplicate", requirePermission("admin", "create"), async (req, res) => {

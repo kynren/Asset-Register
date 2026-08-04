@@ -171,7 +171,7 @@ export function TicketRulesTab() {
         </div>
       </PermissionGate>
 
-      <DataTable tableId="admin.ticket-rules" columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={10} emptyMessage="No business rules defined yet." />
+      <DataTable tableId="admin.ticket-rules" exportModule="admin" columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={10} emptyMessage="No business rules defined yet." />
 
       {deleting && (
         <ConfirmDialog

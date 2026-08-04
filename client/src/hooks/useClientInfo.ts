@@ -6,6 +6,9 @@ export interface ClientInfo {
   source: "agent" | "connection";
   deviceHostname?: string;
   deviceLastSeen?: string;
+  subnetMask?: string | null;
+  defaultGateway?: string | null;
+  dnsServers?: string | null;
   protocol?: string;
   host?: string;
   appVersion: string;

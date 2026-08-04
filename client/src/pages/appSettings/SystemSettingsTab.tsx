@@ -113,6 +113,7 @@ export function SystemSettingsTab({
           <div className="field"><label>Minimum Password Length</label><input className="input" type="number" value={values.passwordMinLength ?? ""} onChange={(e) => setValues((v) => ({ ...v, passwordMinLength: e.target.value }))} /></div>
           <div className="field"><label>Device Offline Threshold (minutes)</label><input className="input" type="number" value={values.deviceOfflineThresholdMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, deviceOfflineThresholdMinutes: e.target.value }))} /></div>
           <div className="field"><label>Camera Recording Retention (days)</label><input className="input" type="number" value={values.cameraRetentionDays ?? ""} onChange={(e) => setValues((v) => ({ ...v, cameraRetentionDays: e.target.value }))} /></div>
+          <div className="field"><label>Decrypted Password Auto-Lock (seconds)</label><input className="input" type="number" value={values.vaultDecryptTimeoutSeconds ?? ""} onChange={(e) => setValues((v) => ({ ...v, vaultDecryptTimeoutSeconds: e.target.value }))} /></div>
           <PermissionGate module="app-settings" action="edit">
             <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
               {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}
@@ -192,7 +193,7 @@ export function SystemSettingsTab({
             </div>
           </div>
         )}
-        <DataTable tableId="appSettings.agentKeys" defaultViewMode="list" columns={agentKeyColumns} data={agentKeys ?? []} clientPageSize={5} />
+        <DataTable tableId="appSettings.agentKeys" defaultViewMode="list" columns={agentKeyColumns} data={agentKeys ?? []} clientPageSize={5} exportModule="app-settings" />
       </div>
 
       {showPublishModal && (

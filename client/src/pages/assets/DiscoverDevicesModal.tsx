@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ColumnDef } from "@tanstack/react-table";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
+import { DataTable } from "../../components/DataTable";
 import { AssetFormModal, AssetFormValues } from "./AssetFormModal";
 
 interface DiscoveredDevice {
@@ -53,6 +55,37 @@ export function DiscoverDevicesModal({ onClose }: { onClose: () => void }) {
 
   const devices: DiscoveredDevice[] = data?.items ?? [];
 
+  const columns: ColumnDef<DiscoveredDevice, any>[] = [
+    { header: "Hostname", accessorKey: "hostname", meta: { cardTitle: true }, cell: ({ getValue }) => <span style={{ fontWeight: 600 }}>{getValue()}</span> },
+    { header: "IP Address", accessorFn: (d) => d.ipAddresses?.[0] ?? "—" },
+    { header: "MAC Address", accessorKey: "macAddress" },
+    { header: "Logged-in User", accessorFn: (d) => d.loggedInUser ?? "—" },
+    { header: "OS", accessorFn: (d) => (d.os ? `${d.os}${d.osVersion ? " " + d.osVersion : ""}` : "—") },
+    {
+      header: "Software",
+      id: "software",
+      cell: ({ row }) => {
+        const d = row.original;
+        return d.installedSoftware && d.installedSoftware.length > 0 ? (
+          <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); setExpandedSoftware(expandedSoftware === d.id ? null : d.id); }}>
+            {d.installedSoftware.length} apps
+          </button>
+        ) : (
+          <span className="muted">—</span>
+        );
+      },
+    },
+    { header: "Last Login", accessorFn: (d) => (d.lastLoginAt ? timeAgo(d.lastLoginAt) : "—") },
+    { header: "Last Scanned", accessorFn: (d) => timeAgo(d.lastSeen) },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => (
+        <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); setRegistering(row.original); }}>Register as Asset</button>
+      ),
+    },
+  ];
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 1000, width: "95%" }} onClick={(e) => e.stopPropagation()}>
@@ -75,46 +108,7 @@ export function DiscoverDevicesModal({ onClose }: { onClose: () => void }) {
           <div className="empty-state">No unregistered devices found. Every reporting agent is already linked to an asset.</div>
         ) : (
           <div style={{ maxHeight: 480, overflow: "auto" }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Hostname</th>
-                  <th>IP Address</th>
-                  <th>MAC Address</th>
-                  <th>Logged-in User</th>
-                  <th>OS</th>
-                  <th>Software</th>
-                  <th>Last Login</th>
-                  <th>Last Scanned</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {devices.map((d) => (
-                  <tr key={d.id}>
-                    <td style={{ fontWeight: 600 }}>{d.hostname}</td>
-                    <td>{d.ipAddresses?.[0] ?? "—"}</td>
-                    <td className="muted">{d.macAddress}</td>
-                    <td>{d.loggedInUser ?? "—"}</td>
-                    <td className="muted">{d.os ? `${d.os}${d.osVersion ? " " + d.osVersion : ""}` : "—"}</td>
-                    <td>
-                      {d.installedSoftware && d.installedSoftware.length > 0 ? (
-                        <button className="btn btn-secondary btn-sm" onClick={() => setExpandedSoftware(expandedSoftware === d.id ? null : d.id)}>
-                          {d.installedSoftware.length} apps
-                        </button>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
-                    <td className="muted">{d.lastLoginAt ? timeAgo(d.lastLoginAt) : "—"}</td>
-                    <td className="muted">{timeAgo(d.lastSeen)}</td>
-                    <td>
-                      <button className="btn btn-primary btn-sm" onClick={() => setRegistering(d)}>Register as Asset</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable tableId="assets.discovered-devices" columns={columns} data={devices} clientPageSize={10} emptyMessage="No unregistered devices found." />
             {expandedSoftware !== null && (
               <div className="card" style={{ marginTop: 10, padding: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 12 }}>Installed Software</div>

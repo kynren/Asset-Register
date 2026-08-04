@@ -35,7 +35,24 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
   const [flashing, setFlashing] = useState<Set<number>>(new Set());
   const [toggleCounts, setToggleCounts] = useState<Record<number, number>>({});
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const panRef = useRef<{ pointerId: number; startClientX: number; startClientY: number; originPan: { x: number; y: number } } | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  const MIN_ZOOM = 0.5;
+  const MAX_ZOOM = 4;
+
+  function resetView() {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }
+
+  // A separate map (and re-opening the same map) always starts from a known, centered view rather
+  // than carrying over wherever the previous map happened to be panned/zoomed to.
+  useEffect(() => {
+    resetView();
+  }, [siteMapId]);
 
   // A callback ref (not a plain ref + []-effect) because the container div only mounts once the
   // `siteMap` query resolves — an effect with an empty dependency array would fire once while the
@@ -92,6 +109,21 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
     });
     obs.observe(containerEl);
     return () => obs.disconnect();
+  }, [containerEl]);
+
+  // Attached as a real (non-passive) DOM listener rather than React's onWheel — React 17+
+  // registers wheel handlers as passive by default, which silently ignores preventDefault() and
+  // lets the page itself scroll underneath while the map is meant to be zooming instead.
+  useEffect(() => {
+    if (!containerEl) return;
+    function onWheel(e: WheelEvent) {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      setZoom((z) => clamp(z * factor, MIN_ZOOM, MAX_ZOOM));
+    }
+    containerEl.addEventListener("wheel", onWheel, { passive: false });
+    return () => containerEl.removeEventListener("wheel", onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containerEl]);
 
   useEffect(() => {
@@ -159,6 +191,27 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
     addDeviceMutation.mutate({ deviceId, x, y });
   }
 
+  // Click-and-drag-to-pan on the empty canvas background — gated on the pointerdown not having
+  // originated on a marker button (those have their own click/drag handling) and on not currently
+  // mid-drawing a shape (where clicks are meant to place polygon/path points instead).
+  function handleCanvasPanPointerDown(e: React.PointerEvent) {
+    if (drawing) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    panRef.current = { pointerId: e.pointerId, startClientX: e.clientX, startClientY: e.clientY, originPan: pan };
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+  }
+
+  function handleCanvasPanPointerMove(e: React.PointerEvent) {
+    if (!panRef.current || panRef.current.pointerId !== e.pointerId) return;
+    const dx = e.clientX - panRef.current.startClientX;
+    const dy = e.clientY - panRef.current.startClientY;
+    setPan({ x: panRef.current.originPan.x + dx, y: panRef.current.originPan.y + dy });
+  }
+
+  function handleCanvasPanPointerUp(e: React.PointerEvent) {
+    if (panRef.current?.pointerId === e.pointerId) panRef.current = null;
+  }
+
   function handleMarkerPointerDown(e: React.PointerEvent, placement: SiteMapPlacement) {
     if (mode !== "edit") return;
     e.stopPropagation();
@@ -201,13 +254,20 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
     if (dragPos?.placementId === placement.id) {
       if (dragPos.moved) {
         updatePlacementMutation.mutate({ placementId: placement.id, x: dragPos.x, y: dragPos.y });
-      } else if (mode === "edit") {
-        setEditingPlacement(placement);
       } else {
-        powerMutation.mutate({ id: placement.deviceId, on: !placement.device.isOn });
+        setEditingPlacement(placement);
       }
       setDragPos(null);
     }
+  }
+
+  // View-mode marker click: toggles the device's power. A plain onClick rather than folding this
+  // into the pointer down/up pair above, since dragPos (and pointer capture) is only ever set in
+  // edit mode — outside of it a marker isn't draggable, so there's nothing for a pointer-capture
+  // dance to disambiguate from a click.
+  function handleMarkerClick(placement: SiteMapPlacement) {
+    if (mode === "edit") return;
+    powerMutation.mutate({ id: placement.deviceId, on: !placement.device.isOn });
   }
 
   function handleCanvasClick(e: React.MouseEvent) {
@@ -277,19 +337,37 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
           ref={cardRef}
           className="card"
           style={{
+            position: "relative",
             padding: 0,
             flex: 1,
             overflow: "hidden",
             height: isFullscreen ? "100vh" : "calc(100vh - 260px)",
             minHeight: 420,
-            background: "var(--color-bg)",
+            // Dark blueprint-style grid backdrop — always visible underneath/around the floor plan
+            // image, and the only thing visible once zoomed/panned past the image's own edges,
+            // so the canvas reads as an infinite surface rather than a fixed photo frame.
+            backgroundColor: "var(--color-bg)",
+            backgroundImage:
+              "linear-gradient(var(--color-border) 1px, transparent 1px), linear-gradient(90deg, var(--color-border) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
           }}
         >
           <div
             ref={setContainerEl}
-            style={{ position: "relative", width: "100%", height: "100%" }}
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "100%",
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: "center center",
+              cursor: drawing ? undefined : "grab",
+              touchAction: "none",
+            }}
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
+            onPointerDown={handleCanvasPanPointerDown}
+            onPointerMove={handleCanvasPanPointerMove}
+            onPointerUp={handleCanvasPanPointerUp}
           >
             {/* object-fit: cover — the canvas fills the container edge-to-edge (rather than
                 letterboxing to the image's own aspect ratio), which keeps the SVG/marker overlay's
@@ -380,7 +458,8 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
                     onPointerDown={(e) => handleMarkerPointerDown(e, p)}
                     onPointerMove={(e) => handleMarkerPointerMove(e, p)}
                     onPointerUp={(e) => handleMarkerPointerUp(e, p)}
-                    title={p.device.name}
+                    onClick={() => handleMarkerClick(p)}
+                    title={`${p.device.name} — click to turn ${p.device.isOn ? "off" : "on"}`}
                     style={{
                       position: "absolute",
                       left: `${left}%`,
@@ -405,6 +484,39 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
                 );
               })}
             </div>
+          </div>
+
+          {siteMap.devices.length === 0 && (
+            <div
+              className="muted"
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                gap: 4,
+                fontSize: 13,
+                pointerEvents: "none",
+              }}
+            >
+              <div>No devices placed on this map yet.</div>
+              {canEdit && <div style={{ fontSize: 12 }}>Switch to Edit Layout and drag a device onto the map to place it here.</div>}
+            </div>
+          )}
+
+          <div className="row gap-1" style={{ position: "absolute", right: 12, bottom: 12, alignItems: "center", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 8, padding: 3, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
+            <button className="btn-icon" title="Zoom out" onClick={() => setZoom((z) => clamp(z / 1.25, MIN_ZOOM, MAX_ZOOM))}>
+              <Icon name="minus" size={14} />
+            </button>
+            <button className="btn-icon" title="Reset zoom" style={{ fontSize: 11, width: "auto", padding: "0 8px" }} onClick={resetView}>
+              {Math.round(zoom * 100)}%
+            </button>
+            <button className="btn-icon" title="Zoom in" onClick={() => setZoom((z) => clamp(z * 1.25, MIN_ZOOM, MAX_ZOOM))}>
+              <Icon name="plus" size={14} />
+            </button>
           </div>
         </div>
 

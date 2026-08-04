@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { verifyJwt } from "../../middleware/auth";
@@ -6,9 +7,11 @@ import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import { logAudit } from "../../lib/auditLogger";
 import { ApiError } from "../../middleware/errorHandler";
+import { importCsvRows } from "../../lib/csvImport";
 
 const router = Router();
 router.use(verifyJwt);
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const schema = z.object({
   name: z.string().min(1),
@@ -44,6 +47,19 @@ router.delete("/:id", requirePermission("admin", "delete"), async (req, res) => 
   await prisma.ticketCategory.delete({ where: { id: Number(req.params.id) } });
   await logAudit({ userId: req.user!.id, action: "ticketCategory.delete", entityType: "TicketCategory", entityId: Number(req.params.id) });
   res.json({ ok: true });
+});
+
+// CSV columns: Name (required). Parent/template/SLA links aren't settable via CSV — edit those
+// individually afterward, same as a freshly-created category via the form.
+router.post("/import", requirePermission("admin", "import"), upload.single("file"), async (req, res) => {
+  if (!req.file) throw new ApiError(400, "No file uploaded");
+  const result = await importCsvRows(req.file.buffer, async (row) => {
+    const name = (row.Name ?? row.name ?? "").trim();
+    if (!name) throw new Error("Missing Name");
+    const category = await prisma.ticketCategory.create({ data: { name } });
+    await logAudit({ userId: req.user!.id, action: "ticketCategory.create", entityType: "TicketCategory", entityId: category.id });
+  });
+  res.json(result);
 });
 
 router.post("/:id/duplicate", requirePermission("admin", "create"), async (req, res) => {

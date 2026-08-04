@@ -231,6 +231,20 @@ export function MonitoringTab() {
     setDraft({ ...draft, ranges: [...draft.ranges, { ...range, label: subnet.label ?? subnet.cidr }] });
   }
 
+  function subnetRangeIndex(subnet: DiscoveredSubnet): number {
+    if (!draft) return -1;
+    const range = cidrToRange(subnet.cidr);
+    if (!range) return -1;
+    return draft.ranges.findIndex((r) => r.startIp === range.startIp && r.endIp === range.endIp);
+  }
+
+  function removeSubnetRange(subnet: DiscoveredSubnet) {
+    if (!draft) return;
+    const index = subnetRangeIndex(subnet);
+    if (index === -1) return;
+    setDraft({ ...draft, ranges: draft.ranges.filter((_, i) => i !== index) });
+  }
+
   function openSnmp(device: MonitoredDevice) {
     setSnmpDeviceId(device.id);
     setSnmpCommunity("");
@@ -412,22 +426,32 @@ export function MonitoringTab() {
             Network Relay Agent). Purely informational — nothing here is added to the ranges above automatically.
           </p>
           <div className="stack gap-1">
-            {discoveredSubnets.map((s) => (
-              <div key={s.id} className="row gap-2" style={{ alignItems: "center", justifyContent: "space-between", fontSize: 13, padding: "4px 0" }}>
-                <span>
-                  <span style={{ fontFamily: "monospace" }}>{s.cidr}</span>
-                  {s.label && <span className="muted"> — {s.label}</span>}
-                </span>
-                <span className="row gap-2" style={{ alignItems: "center" }}>
-                  <span className="muted" style={{ fontSize: 11 }}>seen {dayjs(s.lastSeenAt).fromNow()}</span>
-                  <PermissionGate module="network" action="edit">
-                    <button className="btn btn-secondary btn-sm" disabled={!draft} onClick={() => addSubnetAsRange(s)}>
-                      <Icon name="plus" size={11} /> Add as Range
-                    </button>
-                  </PermissionGate>
-                </span>
-              </div>
-            ))}
+            {discoveredSubnets.map((s) => {
+              const rangeIndex = subnetRangeIndex(s);
+              const inRange = rangeIndex !== -1;
+              return (
+                <div key={s.id} className="row gap-2" style={{ alignItems: "center", justifyContent: "space-between", fontSize: 13, padding: "4px 0" }}>
+                  <span>
+                    <span style={{ fontFamily: "monospace" }}>{s.cidr}</span>
+                    {s.label && <span className="muted"> — {s.label}</span>}
+                  </span>
+                  <span className="row gap-2" style={{ alignItems: "center" }}>
+                    <span className="muted" style={{ fontSize: 11 }}>seen {dayjs(s.lastSeenAt).fromNow()}</span>
+                    <PermissionGate module="network" action="edit">
+                      {inRange ? (
+                        <button className="btn btn-secondary btn-sm" disabled={!draft} onClick={() => removeSubnetRange(s)}>
+                          <Icon name="close" size={11} /> Remove from Range
+                        </button>
+                      ) : (
+                        <button className="btn btn-secondary btn-sm" disabled={!draft} onClick={() => addSubnetAsRange(s)}>
+                          <Icon name="plus" size={11} /> Add as Range
+                        </button>
+                      )}
+                    </PermissionGate>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -436,6 +460,7 @@ export function MonitoringTab() {
         <h3 className="mt-0">Monitored Devices</h3>
         <DataTable
           tableId="network.monitoredDevices"
+          exportModule="network"
           columns={columns}
           data={devices ?? []}
           isLoading={isLoading}

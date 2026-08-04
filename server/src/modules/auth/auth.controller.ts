@@ -38,6 +38,40 @@ function homeSchemaFor(req: Request): string {
   return req.user?.roleName === "System Admin" ? DEFAULT_SCHEMA : currentSchemaName();
 }
 
+// Lets client-side "can this user see/edit records shared with their team" checks work without a
+// round trip per record — see client/src/components/AccessControl.tsx. A separate lightweight
+// query rather than threading `include: { teamMemberships }` through every place `user` gets
+// fetched for a login/refresh/me response, several of which go through auth.service.ts helpers
+// (verifyCredentials, etc.) that return a narrower shape already relied on elsewhere.
+async function getMyTeamIds(userId: number): Promise<number[]> {
+  const memberships = await prisma.teamMember.findMany({ where: { userId }, select: { teamId: true } });
+  return memberships.map((m) => m.teamId);
+}
+
+// Same reasoning as getMyTeamIds above — a separate lightweight query so the client can apply the
+// user's chosen appearance (color palette + sidebar/topbar layout, see AppearanceContext.tsx) the
+// moment a session loads, without a second round trip.
+async function getActiveTheme(userId: number) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      activeTheme: {
+        select: {
+          id: true,
+          name: true,
+          navPosition: true,
+          primaryColor: true,
+          sidebarBgColor: true,
+          sidebarTextColor: true,
+          pageBgColor: true,
+          isDark: true,
+        },
+      },
+    },
+  });
+  return user?.activeTheme ?? null;
+}
+
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: "lax" as const,
@@ -73,7 +107,7 @@ export async function login(req: Request, res: Response) {
 
     const permissions = await getEffectivePermissionMap(user.roleId, user.role.name);
     const organization = await getViewingOrganization(schemaName);
-    res.json({ accessToken, user: sanitizeUser(user), permissions, organization });
+    res.json({ accessToken, user: sanitizeUser(user), myTeamIds: await getMyTeamIds(user.id), activeTheme: await getActiveTheme(user.id), permissions, organization });
   });
 }
 
@@ -113,6 +147,8 @@ export async function refresh(req: Request, res: Response) {
     res.json({
       accessToken,
       user: sanitizeUser(user),
+      myTeamIds: await getMyTeamIds(user.id),
+      activeTheme: await getActiveTheme(user.id),
       permissions,
       organization,
       orgSwitchConfirmedOrgId: session.orgSwitchConfirmedOrgId,
@@ -145,6 +181,8 @@ export async function me(req: Request, res: Response) {
     const session = currentHash ? await prisma.refreshSession.findUnique({ where: { tokenHash: currentHash } }) : null;
     res.json({
       user: sanitizeUser(user),
+      myTeamIds: await getMyTeamIds(user.id),
+      activeTheme: await getActiveTheme(user.id),
       permissions,
       organization,
       orgSwitchConfirmedOrgId: session?.orgSwitchConfirmedOrgId ?? null,
@@ -339,7 +377,7 @@ export async function magicLogin(req: Request, res: Response) {
 
     const permissions = await getEffectivePermissionMap(user.roleId, user.role.name);
     const organization = await getViewingOrganization(schemaName);
-    res.json({ accessToken, user: sanitizeUser(user), permissions, organization });
+    res.json({ accessToken, user: sanitizeUser(user), myTeamIds: await getMyTeamIds(user.id), activeTheme: await getActiveTheme(user.id), permissions, organization });
   });
 }
 

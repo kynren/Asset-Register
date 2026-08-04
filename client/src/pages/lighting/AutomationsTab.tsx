@@ -230,6 +230,7 @@ export function AutomationsTab() {
           </p>
           <DataTable
             tableId="lighting.automationRuns"
+            exportModule="lighting"
             defaultViewMode="list"
             columns={runColumns}
             data={runsPage?.runs ?? []}

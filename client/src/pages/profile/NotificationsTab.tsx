@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 
-type NotificationEventKind = "TICKET_ASSIGNED" | "TICKET_WATCHING" | "ASSET_ASSIGNED" | "LOW_STOCK" | "MAINTENANCE_DUE" | "DEVICE_OFFLINE";
+type NotificationEventKind = "TICKET_ASSIGNED" | "TICKET_WATCHING" | "ASSET_ASSIGNED" | "LOW_STOCK" | "MAINTENANCE_DUE" | "DEVICE_OFFLINE" | "PROJECT_UPDATED";
 
 interface PreferenceRow {
   kind: NotificationEventKind;
@@ -17,6 +17,7 @@ const EVENT_LABELS: Record<NotificationEventKind, { label: string; description: 
   LOW_STOCK: { label: "Low Stock Alerts", description: "A stock item drops below its reorder threshold." },
   MAINTENANCE_DUE: { label: "Maintenance Due", description: "A scheduled maintenance task is coming due or overdue." },
   DEVICE_OFFLINE: { label: "Device Offline Alerts", description: "A monitored network device goes offline." },
+  PROJECT_UPDATED: { label: "IT Project Updated", description: "Someone you've granted edit access to updates or moves an IT Project you created." },
 };
 
 export function NotificationsTab() {

@@ -2,8 +2,9 @@ import fs from "fs";
 import path from "path";
 import multer from "multer";
 import { Router } from "express";
-import { prisma } from "../../config/prisma";
+import { prisma, currentSchemaName } from "../../config/prisma";
 import { verifyAgentKey } from "../../middleware/agentAuth";
+import { getViewingOrganization } from "../auth/auth.service";
 import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { decryptSecret } from "../../lib/crypto";
@@ -34,6 +35,15 @@ import {
 // different capability.
 const router = Router();
 router.use(verifyAgentKey);
+
+// The agent calls this once at startup, before entering any polling loop, so a wrong/revoked key
+// or a key pointed at the wrong organization fails fast with a readable message instead of the
+// agent silently retrying inside next-job/next-device-job/next-video-job forever. Also lets the
+// operator running the agent visually confirm which org they're about to relay traffic for.
+router.get("/handshake", async (_req, res) => {
+  const org = await getViewingOrganization(currentSchemaName());
+  res.json({ organizationName: org?.name ?? null, schemaName: currentSchemaName() });
+});
 
 router.get("/next-job", async (_req, res) => {
   const pending = await prisma.networkScan.findFirst({ where: { status: "PENDING" }, orderBy: { startedAt: "asc" } });

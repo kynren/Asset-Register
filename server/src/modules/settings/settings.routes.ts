@@ -52,14 +52,21 @@ router.put("/", requirePermission("app-settings", "edit"), validateBody(updateSc
 // read/write, separate from the generic app-settings-gated GET/PUT above — a role holding
 // only the "branding" module must not be able to write unrelated app-settings keys (password
 // policy, device thresholds, etc.) through the generic endpoint.
-const BRAND_FIELD_KEYS = ["companyName", "brandPrimaryColor", "brandSecondaryColor"] as const;
-// appIconUrl/faviconUrl are read-only here (written only via POST /branding below) — included
-// so a "branding"-only role can see current logo/favicon previews without needing app-settings.
-const BRAND_READ_KEYS = [...BRAND_FIELD_KEYS, "appIconUrl", "faviconUrl"] as const;
+const WATERMARK_POSITIONS = [
+  "top-left", "top-center", "top-right",
+  "middle-left", "center", "middle-right",
+  "bottom-left", "bottom-center", "bottom-right",
+] as const;
+const BRAND_FIELD_KEYS = ["companyName", "brandPrimaryColor", "brandSecondaryColor", "docsWatermarkPosition"] as const;
+// appIconUrl/faviconUrl/docsWatermarkUrl are read-only here (written only via POST /branding
+// below) — included so a "branding"-only role can see current logo/favicon/watermark previews
+// without needing app-settings.
+const BRAND_READ_KEYS = [...BRAND_FIELD_KEYS, "appIconUrl", "faviconUrl", "docsWatermarkUrl"] as const;
 const brandFieldsSchema = z.object({
   companyName: z.string().min(1).optional(),
   brandPrimaryColor: z.string().optional(),
   brandSecondaryColor: z.string().optional(),
+  docsWatermarkPosition: z.enum(WATERMARK_POSITIONS).optional(),
 });
 
 router.get("/branding-fields", requirePermission("branding", "view"), async (_req, res) => {
@@ -80,18 +87,34 @@ router.put("/branding-fields", requirePermission("branding", "edit"), validateBo
   res.json({ ok: true });
 });
 
-const brandingTypeSchema = z.object({ type: z.enum(["appIcon", "favicon"]) });
+const brandingTypeSchema = z.object({ type: z.enum(["appIcon", "favicon", "docsWatermark"]) });
+const BRANDING_TYPE_TO_KEY: Record<string, string> = { appIcon: "appIconUrl", favicon: "faviconUrl", docsWatermark: "docsWatermarkUrl" };
 
 router.post("/branding", requirePermission("branding", "edit"), brandingUpload.single("file"), async (req, res) => {
   const parsed = brandingTypeSchema.safeParse(req.body);
   if (!parsed.success || !req.file) throw new ApiError(400, "Missing file or type");
 
-  const key = parsed.data.type === "appIcon" ? "appIconUrl" : "faviconUrl";
+  // The watermark gets embedded as a raster ImageRun in Word exports (docx's ImageRun only
+  // accepts jpg/png/gif/bmp, not svg/ico) and its pixel dimensions are read by a hand-rolled
+  // PNG/JPEG-only parser (server/src/lib/imageDimensions.ts) for both PDF and Word sizing — so,
+  // unlike appIcon/favicon, it can't accept the svg/ico types the generic upload filter allows.
+  if (parsed.data.type === "docsWatermark" && !/^image\/(png|jpe?g)$/.test(req.file.mimetype)) {
+    fs.unlink(req.file.path, () => {});
+    throw new ApiError(400, "Watermark image must be PNG or JPEG");
+  }
+
+  const key = BRANDING_TYPE_TO_KEY[parsed.data.type];
   const url = `/uploads/branding/${req.file.filename}`;
   await prisma.systemSetting.upsert({ where: { key }, update: { value: url }, create: { key, value: url } });
 
   await logAudit({ userId: req.user!.id, action: "settings.branding_update", metadata: { key, url } });
   res.status(201).json({ key, url });
+});
+
+router.delete("/branding/docs-watermark", requirePermission("branding", "edit"), async (req, res) => {
+  await prisma.systemSetting.deleteMany({ where: { key: "docsWatermarkUrl" } });
+  await logAudit({ userId: req.user!.id, action: "settings.branding_update", metadata: { key: "docsWatermarkUrl", removed: true } });
+  res.json({ ok: true });
 });
 
 // Agent API keys

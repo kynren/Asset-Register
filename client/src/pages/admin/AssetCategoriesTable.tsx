@@ -142,7 +142,7 @@ export function AssetCategoriesTable() {
           </button>
         </PermissionGate>
       </div>
-      <DataTable tableId="admin.assetCategories" columns={columns} data={categories ?? []} isLoading={isLoading} clientPageSize={8} defaultViewMode="list" emptyMessage="No asset categories yet." />
+      <DataTable tableId="admin.assetCategories" exportModule="admin" columns={columns} data={categories ?? []} isLoading={isLoading} clientPageSize={8} defaultViewMode="list" emptyMessage="No asset categories yet." />
 
       {showForm && (
         <CategoryFormModal

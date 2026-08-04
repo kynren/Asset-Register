@@ -5,6 +5,12 @@ import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Icon } from "./Icon";
+import { AudioEmbed, FileEmbed, VideoEmbed } from "./tiptapMediaExtensions";
+
+// Client-side base64 embeds (see tiptapMediaExtensions.ts) bloat the sections JSON column
+// proportionally to file size — 15MB keeps a single step's payload reasonable. Larger video/audio
+// belongs in the document-level Attachments section instead, which streams to disk server-side.
+const MAX_EMBED_BYTES = 15 * 1024 * 1024;
 
 // A WYSIWYG editor for document/SOP body content. Stores its value as HTML (the same shape the
 // read-only SectionsView renders via dangerouslySetInnerHTML) rather than markdown/JSON, so
@@ -22,6 +28,9 @@ export function RichTextEditor({
   minHeight?: number;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -29,6 +38,9 @@ export function RichTextEditor({
       Link.configure({ openOnClick: false, autolink: true }),
       Image,
       Placeholder.configure({ placeholder: placeholder ?? "Start typing…" }),
+      VideoEmbed,
+      AudioEmbed,
+      FileEmbed,
     ],
     content: value || "",
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -52,6 +64,36 @@ export function RichTextEditor({
       }
     };
     reader.readAsDataURL(file);
+  }
+
+  function readAsDataUrl(file: File, onLoaded: (dataUrl: string) => void) {
+    if (file.size > MAX_EMBED_BYTES) {
+      window.alert(`"${file.name}" is larger than 15MB — attach it via the document's Attachments section instead of embedding it in a step.`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") onLoaded(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function insertVideo(file: File) {
+    readAsDataUrl(file, (src) => {
+      editor?.chain().focus().insertContent({ type: "videoEmbed", attrs: { src, fileName: file.name } }).run();
+    });
+  }
+
+  function insertAudio(file: File) {
+    readAsDataUrl(file, (src) => {
+      editor?.chain().focus().insertContent({ type: "audioEmbed", attrs: { src, fileName: file.name } }).run();
+    });
+  }
+
+  function insertAttachment(file: File) {
+    readAsDataUrl(file, (src) => {
+      editor?.chain().focus().insertContent({ type: "fileEmbed", attrs: { src, fileName: file.name } }).run();
+    });
   }
 
   function promptLink() {
@@ -83,6 +125,9 @@ export function RichTextEditor({
         <span className="rte-divider" />
         <button type="button" className={editor.isActive("link") ? "active" : ""} title="Link" onClick={promptLink}><Icon name="link" size={13} /></button>
         <button type="button" title="Insert image" onClick={() => fileInputRef.current?.click()}><Icon name="camera" size={13} /></button>
+        <button type="button" title="Insert video" onClick={() => videoInputRef.current?.click()}><Icon name="video" size={13} /></button>
+        <button type="button" title="Insert audio" onClick={() => audioInputRef.current?.click()}><Icon name="music" size={13} /></button>
+        <button type="button" title="Attach file" onClick={() => attachmentInputRef.current?.click()}><Icon name="paperclip" size={13} /></button>
         <span className="rte-divider" />
         <button type="button" title="Undo" onClick={() => editor.chain().focus().undo().run()}>&#8630;</button>
         <button type="button" title="Redo" onClick={() => editor.chain().focus().redo().run()}>&#8631;</button>
@@ -97,6 +142,38 @@ export function RichTextEditor({
           const file = e.target.files?.[0];
           if (file) insertImage(file);
           if (fileInputRef.current) fileInputRef.current.value = "";
+        }}
+      />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) insertVideo(file);
+          if (videoInputRef.current) videoInputRef.current.value = "";
+        }}
+      />
+      <input
+        ref={audioInputRef}
+        type="file"
+        accept="audio/*"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) insertAudio(file);
+          if (audioInputRef.current) audioInputRef.current.value = "";
+        }}
+      />
+      <input
+        ref={attachmentInputRef}
+        type="file"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) insertAttachment(file);
+          if (attachmentInputRef.current) attachmentInputRef.current.value = "";
         }}
       />
     </div>

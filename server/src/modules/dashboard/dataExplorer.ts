@@ -206,6 +206,14 @@ function coerce(field: FieldDef, value: unknown): unknown {
   if (field.type === "number") return Number(value);
   if (field.type === "date") return new Date(value as string);
   if (field.type === "boolean") return value === true || value === "true";
+  // "enum" fields with dynamicOptions (categoryId, locationId, assignedToId, requesterId, roleId)
+  // are really Int foreign keys presented as a dropdown — the client always sends their id as a
+  // string (see QueryFilterBuilder's useFieldOptions: `String(c.id)`), so without this Prisma
+  // rejects the query with a type-mismatch error the moment one of these filters is used, which
+  // is what broke report/dashboard-query preview and run for any filter on those fields. True
+  // string enums (status, priority, itilType, docType — fixed `options`, no dynamicOptions) are
+  // untouched here and still pass through as-is.
+  if (field.type === "enum" && field.dynamicOptions) return Number(value);
   return value;
 }
 

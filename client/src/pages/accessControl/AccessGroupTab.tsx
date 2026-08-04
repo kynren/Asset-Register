@@ -134,6 +134,7 @@ export function AccessGroupTab() {
         {!isLoading && (
           <DataTable
             tableId="accessControl.groups"
+            exportModule="access-control"
             columns={columns}
             data={groups ?? []}
             clientPageSize={10}

@@ -33,6 +33,7 @@ export function AuditLogTab() {
     <div className="card">
       <DataTable
         tableId="admin.auditLog"
+        exportModule="admin"
         defaultViewMode="list"
         columns={columns}
         data={data?.items ?? []}

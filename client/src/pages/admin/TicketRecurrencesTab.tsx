@@ -159,7 +159,7 @@ export function TicketRecurrencesTab() {
           </div>
         </form>
       </PermissionGate>
-      <DataTable tableId="admin.ticket-recurrences" columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={10} emptyMessage="No recurring tickets configured." />
+      <DataTable tableId="admin.ticket-recurrences" exportModule="admin" columns={columns} data={data ?? []} isLoading={isLoading} clientPageSize={10} emptyMessage="No recurring tickets configured." />
       {deleting && (
         <ConfirmDialog
           title={`Delete "${deleting.name}"`}

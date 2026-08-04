@@ -157,6 +157,7 @@ export function SwitchingTab() {
         </div>
         <DataTable
           tableId="network.adoptedSwitches"
+          exportModule="network"
           columns={adoptedColumns}
           data={data?.adopted ?? []}
           isLoading={isLoading}
@@ -176,6 +177,7 @@ export function SwitchingTab() {
         </p>
         <DataTable
           tableId="network.discoveredSwitches"
+          exportModule="network"
           defaultViewMode="list"
           columns={discoveredColumns}
           data={data?.discovered ?? []}
