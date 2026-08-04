@@ -63,6 +63,8 @@ import backupsRoutes from "./modules/backups/backups.routes";
 import toastSettingsRoutes from "./modules/toastSettings/toastSettings.routes";
 import appSettingsRoutes from "./modules/appSettings/appSettings.routes";
 import scheduledChangesRoutes from "./modules/scheduledChanges/scheduledChanges.routes";
+import databaseManagerRoutes from "./modules/databaseManager/databaseManager.routes";
+import mediaCenterRoutes from "./modules/mediaCenter/mediaCenter.routes";
 
 export function createApp() {
   const app = express();
@@ -83,6 +85,7 @@ export function createApp() {
   app.use("/uploads/email-templates", express.static(path.join(__dirname, "..", "uploads", "email-templates")));
   app.use("/uploads/org-logos", express.static(path.join(__dirname, "..", "uploads", "org-logos")));
   app.use("/uploads/lighting-sitemaps", express.static(path.join(__dirname, "..", "uploads", "lighting-sitemaps")));
+  app.use("/uploads/media-center", express.static(path.join(__dirname, "..", "uploads", "media-center")));
 
   app.use("/api/auth", authRoutes);
   app.use("/api/users", usersRoutes);
@@ -135,6 +138,8 @@ export function createApp() {
   app.use("/api/backups", backupsRoutes);
   app.use("/api/app-settings", appSettingsRoutes);
   app.use("/api/scheduled-changes", scheduledChangesRoutes);
+  app.use("/api/database", databaseManagerRoutes);
+  app.use("/api/media-center", mediaCenterRoutes);
   app.use("/api/toast-settings", toastSettingsRoutes);
   app.use("/api/docs", docsRoutes);
   app.use("/api/search", searchRoutes);

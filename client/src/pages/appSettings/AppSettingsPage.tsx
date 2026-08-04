@@ -7,6 +7,8 @@ import { ChangeManagementTab } from "./ChangeManagementTab";
 import { AgentLogTab } from "./AgentLogTab";
 import { ChangelogTab } from "./ChangelogTab";
 import { BrandingTab } from "./BrandingTab";
+import { DatabaseManagerTab } from "./DatabaseManagerTab";
+import { MediaCenterTab } from "./MediaCenterTab";
 import { McpConnectionCard } from "./McpConnectionCard";
 import { DocsImportLimitCard } from "../docs/DocsImportLimitCard";
 import { RolesTab } from "../admin/RolesTab";
@@ -22,6 +24,8 @@ const TABS = [
   { key: "backups", label: "Backups" },
   { key: "settings", label: "System Settings" },
   { key: "branding", label: "Branding" },
+  { key: "database", label: "Database" },
+  { key: "media", label: "Media Center" },
   { key: "integrations", label: "Integrations" },
   { key: "status", label: "System Status" },
   { key: "changeManagement", label: "Change Management" },
@@ -141,6 +145,8 @@ export function AppSettingsPage() {
         </div>
       )}
       {activeTab === "branding" && <BrandingTab />}
+      {activeTab === "database" && <DatabaseManagerTab />}
+      {activeTab === "media" && <MediaCenterTab />}
       {activeTab === "integrations" && <McpConnectionCard />}
       {activeTab === "status" && <SystemStatusTab />}
       {activeTab === "changeManagement" && <ChangeManagementTab onEdit={handleEditScheduledChange} />}
