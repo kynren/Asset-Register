@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -6,6 +6,7 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Icon } from "./Icon";
 import { AudioEmbed, FileEmbed, VideoEmbed } from "./tiptapMediaExtensions";
+import { MediaLibraryPickerModal, PickedMediaAsset } from "./MediaLibraryPickerModal";
 
 // Client-side base64 embeds (see tiptapMediaExtensions.ts) bloat the sections JSON column
 // proportionally to file size — 15MB keeps a single step's payload reasonable. Larger video/audio
@@ -31,6 +32,7 @@ export function RichTextEditor({
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -96,6 +98,19 @@ export function RichTextEditor({
     });
   }
 
+  function insertFromLibrary(asset: PickedMediaAsset) {
+    if (asset.type === "IMAGE") {
+      editor?.chain().focus().setImage({ src: asset.url, alt: asset.altText ?? asset.title ?? asset.originalName }).run();
+    } else if (asset.type === "VIDEO") {
+      editor?.chain().focus().insertContent({ type: "videoEmbed", attrs: { src: asset.url, fileName: asset.originalName } }).run();
+    } else if (asset.type === "AUDIO") {
+      editor?.chain().focus().insertContent({ type: "audioEmbed", attrs: { src: asset.url, fileName: asset.originalName } }).run();
+    } else {
+      editor?.chain().focus().insertContent({ type: "fileEmbed", attrs: { src: asset.url, fileName: asset.originalName } }).run();
+    }
+    setShowMediaPicker(false);
+  }
+
   function promptLink() {
     const previousUrl = editor?.getAttributes("link").href as string | undefined;
     const url = window.prompt("Link URL", previousUrl ?? "https://");
@@ -128,6 +143,7 @@ export function RichTextEditor({
         <button type="button" title="Insert video" onClick={() => videoInputRef.current?.click()}><Icon name="video" size={13} /></button>
         <button type="button" title="Insert audio" onClick={() => audioInputRef.current?.click()}><Icon name="music" size={13} /></button>
         <button type="button" title="Attach file" onClick={() => attachmentInputRef.current?.click()}><Icon name="paperclip" size={13} /></button>
+        <button type="button" title="Insert from Media Library" onClick={() => setShowMediaPicker(true)}><Icon name="grid" size={13} /></button>
         <span className="rte-divider" />
         <button type="button" title="Undo" onClick={() => editor.chain().focus().undo().run()}>&#8630;</button>
         <button type="button" title="Redo" onClick={() => editor.chain().focus().redo().run()}>&#8631;</button>
@@ -176,6 +192,7 @@ export function RichTextEditor({
           if (attachmentInputRef.current) attachmentInputRef.current.value = "";
         }}
       />
+      {showMediaPicker && <MediaLibraryPickerModal onPick={insertFromLibrary} onClose={() => setShowMediaPicker(false)} />}
     </div>
   );
 }

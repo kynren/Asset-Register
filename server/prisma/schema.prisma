@@ -138,6 +138,7 @@ model User {
   appearanceThemeSharesReceived AppearanceThemeShare[] @relation("AppearanceThemeShareUser")
 
   changelogEntriesCreated ChangelogEntry[]
+  mediaAssetsUploaded     MediaAsset[]
 }
 
 model RefreshSession {
@@ -2808,4 +2809,40 @@ model ChangelogEntry {
   createdAt   DateTime @default(now())
 
   @@index([publishedAt])
+}
+
+enum MediaAssetType {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  OTHER
+}
+
+// Standalone WordPress-style media library — files uploaded here have no required parent record
+// (unlike AssetPhoto/DocumentAttachment/TicketAttachment/etc, which are always sub-resources of
+// something). Consumed by RichTextEditor's "Insert from Media Library" picker, which just points a
+// TipTap image/file-embed node's src at `url` — no schema change needed in any of its consumers.
+// See App Settings' Media Center tab (System Admin only) for the management UI.
+model MediaAsset {
+  id           Int            @id @default(autoincrement())
+  filename     String
+  originalName String
+  url          String
+  mimeType     String
+  sizeBytes    Int
+  type         MediaAssetType
+  title        String?
+  altText      String?
+  caption      String?
+  description  String?
+  width        Int?
+  height       Int?
+  uploadedById Int?
+  uploadedBy   User?          @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([type])
+  @@index([createdAt])
 }

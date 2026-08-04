@@ -48,6 +48,13 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
   const [pastDrafts, setPastDrafts] = useState<DraftSnapshot[]>([]);
   const [futureDrafts, setFutureDrafts] = useState<DraftSnapshot[]>([]);
   const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
+  // Freehand PATH painting: while the pointer is down over the canvas, points are appended
+  // continuously (distance-throttled) instead of one per click — a "press and drag" stroke like a
+  // paintbrush rather than placing polygon vertices. Circle/Zone keep their existing precise tools
+  // (drag-to-size, click-to-place-vertex) since coarse freehand strokes suit a walkway/path shape
+  // better than a boundary you want exact corners on.
+  const isPaintingRef = useRef(false);
+  const lastPaintPointRef = useRef<{ x: number; y: number } | null>(null);
   const [dragPos, setDragPos] = useState<{ placementId: number; x: number; y: number; moved: boolean } | null>(null);
   const [flashing, setFlashing] = useState<Set<number>>(new Set());
   const [toggleCounts, setToggleCounts] = useState<Record<number, number>>({});
@@ -341,10 +348,36 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
   }
 
   function handleCanvasClick(e: React.MouseEvent) {
-    if (!drawing || drawing.shapeType === "CIRCLE" || !containerRef.current || draggingPointIndex !== null) return;
+    if (!drawing || drawing.shapeType !== "POLYGON" || !containerRef.current || draggingPointIndex !== null) return;
     const { x, y } = clientToPercent(e.clientX, e.clientY);
     pushDraftHistory();
     setDraftPoints((pts) => [...pts, { x, y }]);
+  }
+
+  // One history entry per stroke (pointer down → up), not per sampled point — so one Undo removes
+  // the whole stroke just painted, matching how undo reads in an actual paint tool.
+  function handlePathPaintPointerDown(e: React.PointerEvent) {
+    if (!drawing || drawing.shapeType !== "PATH" || !containerRef.current) return;
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    pushDraftHistory();
+    isPaintingRef.current = true;
+    const { x, y } = clientToPercent(e.clientX, e.clientY);
+    lastPaintPointRef.current = { x, y };
+    setDraftPoints((pts) => [...pts, { x, y }]);
+  }
+  function handlePathPaintPointerMove(e: React.PointerEvent) {
+    if (!isPaintingRef.current || !drawing || drawing.shapeType !== "PATH" || !containerRef.current) return;
+    const { x, y } = clientToPercent(e.clientX, e.clientY);
+    const last = lastPaintPointRef.current;
+    // Distance-throttled so a slow drag doesn't flood draftPoints with near-duplicate points —
+    // 1.2% of canvas width is fine-grained enough to look smooth while keeping point counts sane.
+    if (last && Math.hypot(x - last.x, y - last.y) < 1.2) return;
+    lastPaintPointRef.current = { x, y };
+    setDraftPoints((pts) => [...pts, { x, y }]);
+  }
+  function handlePathPaintPointerUp() {
+    isPaintingRef.current = false;
+    lastPaintPointRef.current = null;
   }
 
   // Repositioning an existing draft point (polygon/path edit) — pointer capture on the point
@@ -455,6 +488,8 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
           <span style={{ fontSize: 12 }}>
             {drawing.shapeType === "CIRCLE"
               ? "Press and drag from the marker to size the coverage circle."
+              : drawing.shapeType === "PATH"
+              ? "Press and drag across the map to paint the coverage path — release to pause, press again to keep extending it."
               : "Click the map to add points. Drag a point to reposition it, double-click to remove it."}
           </span>
           <button className="btn-icon" title="Undo (Ctrl+Z)" disabled={pastDrafts.length === 0} onClick={undoDraft}>
@@ -524,8 +559,12 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
               width={size.width}
               height={size.height}
               viewBox={`0 0 ${size.width} ${size.height}`}
-              style={{ position: "absolute", inset: 0, cursor: drawing && drawing.shapeType !== "CIRCLE" ? "crosshair" : undefined }}
+              style={{ position: "absolute", inset: 0, cursor: drawing && drawing.shapeType !== "CIRCLE" ? "crosshair" : undefined, touchAction: drawing?.shapeType === "PATH" ? "none" : undefined }}
               onClick={handleCanvasClick}
+              onPointerDown={handlePathPaintPointerDown}
+              onPointerMove={handlePathPaintPointerMove}
+              onPointerUp={handlePathPaintPointerUp}
+              onPointerLeave={handlePathPaintPointerUp}
             >
               {siteMap.devices.map((p) => {
                 const isDrawingThis = drawing?.placementId === p.id;
@@ -566,7 +605,10 @@ export function SiteMapEditor({ siteMapId, onBack }: { siteMapId: number; onBack
                   strokeDasharray="4 3"
                 />
               )}
-              {drawing && drawing.shapeType !== "CIRCLE" &&
+              {/* Draggable per-point handles only for POLYGON (zone) — a freehand-painted PATH can
+                  easily have hundreds of sampled points, so rendering a handle at every one would
+                  be visual noise; fixing a painted stroke is Undo + repaint, not point-nudging. */}
+              {drawing && drawing.shapeType === "POLYGON" &&
                 draftPoints.map((pt, i) => (
                   <circle
                     key={i}
