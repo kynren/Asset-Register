@@ -8,7 +8,7 @@ import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
-import { createSiteMapSchema, placeDeviceSchema, updatePlacementSchema, updateSiteMapSchema } from "./siteMap.schema";
+import { createSiteMapSchema, placeDeviceSchema, updateOverlaySchema, updatePlacementSchema, updateSiteMapSchema } from "./siteMap.schema";
 
 const SITEMAP_UPLOAD_ROOT = path.join(__dirname, "..", "..", "..", "uploads", "lighting-sitemaps");
 fs.mkdirSync(SITEMAP_UPLOAD_ROOT, { recursive: true });
@@ -86,6 +86,17 @@ router.patch("/:id", requirePermission("lighting", "edit"), siteMapUpload.single
     data: { ...parsed.data, ...(req.file ? { imageUrl: `/uploads/lighting-sitemaps/${req.file.filename}` } : {}) },
   });
   await logAudit({ userId: req.user!.id, action: "lightingSiteMap.update", entityType: "LightingSiteMap", entityId: siteMap.id });
+  res.json(siteMap);
+});
+
+// Separate from the multipart rename/replace-image PATCH above — the density slider fires many
+// updates per drag gesture, so this stays a plain JSON route rather than round-tripping through
+// multer on every tick.
+router.patch("/:id/overlay", requirePermission("lighting", "edit"), validateBody(updateOverlaySchema), async (req, res) => {
+  const siteMap = await prisma.lightingSiteMap.update({
+    where: { id: Number(req.params.id) },
+    data: { overlayDensity: req.body.overlayDensity },
+  });
   res.json(siteMap);
 });
 

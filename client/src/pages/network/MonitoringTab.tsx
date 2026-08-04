@@ -93,6 +93,7 @@ interface MonitoredDevice {
   hostname: string | null;
   vendor: string | null;
   deviceType: string | null;
+  os: string | null;
   loggedInUser: string | null;
   status: "ONLINE" | "OFFLINE";
   firstSeenAt: string;
@@ -271,6 +272,7 @@ export function MonitoringTab() {
       </div>
     ) },
     { header: "Vendor / Type", accessorFn: (d) => [d.vendor, d.deviceType].filter(Boolean).join(" · ") || "—" },
+    { header: "OS", accessorFn: (d) => d.os ?? "—" },
     { header: "Status Since", accessorFn: (d) => d.lastChangedAt, cell: ({ row }) => dayjs(row.original.lastChangedAt).fromNow() },
     { header: "Last Seen", accessorFn: (d) => d.lastSeenAt, cell: ({ row }) => dayjs(row.original.lastSeenAt).fromNow() },
     {

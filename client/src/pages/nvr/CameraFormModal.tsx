@@ -19,6 +19,7 @@ export interface CameraFormValues {
   locationId: number | null;
   ipAddress: string;
   port: number | null;
+  httpPort: number | null;
   username: string;
   password: string;
   streamUrl: string;
@@ -31,6 +32,7 @@ const emptyValues: CameraFormValues = {
   locationId: null,
   ipAddress: "",
   port: 554,
+  httpPort: 80,
   username: "",
   password: "",
   streamUrl: "",
@@ -94,7 +96,14 @@ export function CameraFormModal({
         <div className="field"><label>Channel</label><input className="input" type="number" value={values.channel ?? ""} onChange={(e) => update("channel", e.target.value ? Number(e.target.value) : null)} placeholder="Channel # on the NVR (optional)" /></div>
         <QuickAddSelect label="Location" value={values.locationId} onChange={(id) => update("locationId", id)} options={locations} createUrl="/locations" queryKey="locations" />
         <div className="field"><label>IP Address</label><input className="input" value={values.ipAddress} onChange={(e) => update("ipAddress", e.target.value)} /></div>
-        <div className="field"><label>Port</label><input className="input" type="number" value={values.port ?? ""} onChange={(e) => update("port", e.target.value ? Number(e.target.value) : null)} /></div>
+        <div className="field"><label>Port (RTSP)</label><input className="input" type="number" value={values.port ?? ""} onChange={(e) => update("port", e.target.value ? Number(e.target.value) : null)} /></div>
+        {values.ptzEnabled && (
+          <div className="field">
+            <label>ONVIF Port (PTZ)</label>
+            <input className="input" type="number" value={values.httpPort ?? ""} onChange={(e) => update("httpPort", e.target.value ? Number(e.target.value) : null)} placeholder="80" />
+            <span className="muted" style={{ fontSize: 11 }}>PTZ control uses ONVIF's HTTP/SOAP port — usually different from the RTSP port above.</span>
+          </div>
+        )}
         <div className="field"><label>Username</label><input className="input" value={values.username} onChange={(e) => update("username", e.target.value)} autoComplete="off" /></div>
         <div className="field"><label>Password</label><PasswordInput value={values.password} onChange={(e) => update("password", e.target.value)} autoComplete="new-password" placeholder={editing ? "Leave blank to keep current password" : ""} /></div>
         <div className="field" style={{ gridColumn: "span 2" }}>

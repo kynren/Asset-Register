@@ -6,12 +6,14 @@ import {
   HeadingLevel,
   TextRun,
   Header,
+  Footer,
   ImageRun,
   HorizontalPositionAlign,
   HorizontalPositionRelativeFrom,
   VerticalPositionAlign,
   VerticalPositionRelativeFrom,
   TextWrappingType,
+  AlignmentType,
 } from "docx";
 import { DocTypeValue } from "../modules/docs/docs.schema";
 
@@ -133,7 +135,43 @@ function drawPdfWatermark(pdf: PDFKit.PDFDocument, watermark: WatermarkAsset) {
   pdf.y = savedY;
 }
 
-export async function buildDocPdfBuffer(doc: ExportableDocument, watermark?: WatermarkAsset | null): Promise<Buffer> {
+// A small, unobtrusive "© {year} {org}" line pinned to the bottom of every page — every
+// downloadable document export in the app (docs/SOPs, asset reports, harness certifications)
+// draws this the same way. 8pt is the smallest size that stays legible in both a PDF viewer and
+// print; there's no literal "8px" unit in either pdfkit or docx (both work in points), so this is
+// the closest real equivalent to what was asked for.
+export function drawPdfCopyrightFooter(pdf: PDFKit.PDFDocument, companyName: string | null | undefined) {
+  if (!companyName) return;
+  const savedX = pdf.x;
+  const savedY = pdf.y;
+  try {
+    const text = `© ${new Date().getFullYear()} ${companyName}. All rights reserved.`;
+    pdf.save();
+    pdf.fontSize(8).fillColor("#98a2b3");
+    pdf.text(text, 0, pdf.page.height - 28, { width: pdf.page.width, align: "center" });
+    pdf.restore();
+  } catch (err) {
+    console.error("Failed to draw copyright footer in PDF export, continuing without it:", err);
+  }
+  pdf.x = savedX;
+  pdf.y = savedY;
+}
+
+// docx counterpart of drawPdfCopyrightFooter — a repeating page Footer, same 8pt/gray treatment.
+export function buildCopyrightFooter(companyName: string | null | undefined): Footer | undefined {
+  if (!companyName) return undefined;
+  const text = `© ${new Date().getFullYear()} ${companyName}. All rights reserved.`;
+  return new Footer({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text, size: 16, color: "98A2B3" })],
+      }),
+    ],
+  });
+}
+
+export async function buildDocPdfBuffer(doc: ExportableDocument, watermark?: WatermarkAsset | null, companyName?: string | null): Promise<Buffer> {
   const blocks = sectionsToBlocks(doc.sections);
   return new Promise((resolve, reject) => {
     const pdf = new PDFDocument({ margin: 50, size: "A4" });
@@ -145,6 +183,10 @@ export async function buildDocPdfBuffer(doc: ExportableDocument, watermark?: Wat
     if (watermark) {
       drawPdfWatermark(pdf, watermark);
       pdf.on("pageAdded", () => drawPdfWatermark(pdf, watermark));
+    }
+    if (companyName) {
+      drawPdfCopyrightFooter(pdf, companyName);
+      pdf.on("pageAdded", () => drawPdfCopyrightFooter(pdf, companyName));
     }
 
     pdf.fontSize(20).fillColor("#101828").text(doc.title);
@@ -212,7 +254,7 @@ function buildWatermarkHeader(watermark: WatermarkAsset): Header {
   });
 }
 
-export async function buildDocDocxBuffer(doc: ExportableDocument, watermark?: WatermarkAsset | null): Promise<Buffer> {
+export async function buildDocDocxBuffer(doc: ExportableDocument, watermark?: WatermarkAsset | null, companyName?: string | null): Promise<Buffer> {
   const blocks = sectionsToBlocks(doc.sections);
   const children: Paragraph[] = [
     new Paragraph({ text: doc.title, heading: HeadingLevel.TITLE }),
@@ -243,8 +285,14 @@ export async function buildDocDocxBuffer(doc: ExportableDocument, watermark?: Wa
     }
   }
 
+  const footer = buildCopyrightFooter(companyName);
+
   const docx = new DocxDocument({
-    sections: [{ headers: watermarkHeader ? { default: watermarkHeader } : undefined, children }],
+    sections: [{
+      headers: watermarkHeader ? { default: watermarkHeader } : undefined,
+      footers: footer ? { default: footer } : undefined,
+      children,
+    }],
   });
   return Packer.toBuffer(docx);
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { axiosClient } from "../../api/axiosClient";
 import { getAccessToken } from "../../api/tokenStore";
@@ -6,19 +6,24 @@ import { Icon } from "../../components/Icon";
 import { AddNodeModal, NodeFormValues } from "./AddNodeModal";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useClientInfo } from "../../hooks/useClientInfo";
+import { useUserPreference } from "../../hooks/useUserPreference";
+import { useDebouncedCallback } from "../../hooks/useDebouncedCallback";
 import { PermissionGate } from "../../auth/PermissionGate";
+import {
+  getPingSessionSnapshot,
+  hydratePingHostIfEmpty,
+  setPingCount,
+  setPingHost,
+  startPingSession,
+  stopPingSession,
+  subscribePingSession,
+} from "../../lib/pingSession";
 
 interface AssetDeviceOption {
   id: number;
   name: string;
   assetTag: string;
   staticIpAddress: string | null;
-}
-
-interface ConsoleLine {
-  id: number;
-  kind: "reply" | "timeout" | "error" | "info";
-  text: string;
 }
 
 const PACKET_OPTIONS: { value: number | "continuous"; label: string }[] = [
@@ -33,21 +38,31 @@ export function PingConsoleTab() {
   const queryClient = useQueryClient();
   const [showAddDevice, setShowAddDevice] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
-  const [host, setHost] = useState("10.12.10.1");
-  const [count, setCount] = useState<number | "continuous">(4);
-  const [running, setRunning] = useState(false);
-  const [lines, setLines] = useState<ConsoleLine[]>([]);
-  const abortRef = useRef<AbortController | null>(null);
-  const consoleEndRef = useRef<HTMLDivElement>(null);
-  const lineIdRef = useRef(0);
+  const consoleRef = useRef<HTMLDivElement>(null);
+
+  // Session state (host/count/running/lines) lives in a module-level singleton — see
+  // client/src/lib/pingSession.ts — so navigating away mid-ping doesn't abort it and coming back
+  // just re-subscribes to whatever's still running.
+  const session = useSyncExternalStore(subscribePingSession, getPingSessionSnapshot);
+  const { host, count, running, lines } = session;
+
+  // Restored once per tab session: saved preference takes priority, observed-IP is the fallback
+  // if nothing was ever saved. Both go through hydratePingHostIfEmpty, which only applies when the
+  // singleton's host is still unset, so neither can clobber a value the user's already typed.
+  const { value: savedHost, setValue: saveHostPref, isLoading: hostPrefLoading } = useUserPreference<string | null>("network.icmpPinger.host", null);
+  useEffect(() => {
+    if (!hostPrefLoading && savedHost) hydratePingHostIfEmpty(savedHost);
+  }, [savedHost, hostPrefLoading]);
 
   const { data: clientInfo } = useClientInfo();
-  const defaultHostSet = useRef(false);
   useEffect(() => {
-    if (defaultHostSet.current || !clientInfo?.observedIp) return;
-    setHost(clientInfo.observedIp);
-    defaultHostSet.current = true;
-  }, [clientInfo]);
+    if (!hostPrefLoading && clientInfo?.observedIp) hydratePingHostIfEmpty(clientInfo.observedIp);
+  }, [clientInfo, hostPrefLoading]);
+
+  const debouncedSaveHost = useDebouncedCallback((value: string) => saveHostPref(value), 600);
+  useEffect(() => {
+    if (host) debouncedSaveHost(host);
+  }, [host, debouncedSaveHost]);
 
   const { data: assetDevices } = useQuery({
     queryKey: ["network-asset-devices"],
@@ -61,83 +76,21 @@ export function PingConsoleTab() {
 
   const deviceOptions = (assetDevices ?? []).map((a) => ({ id: a.id, label: `${a.name} — ${a.assetTag}`, ipAddress: a.staticIpAddress }));
 
+  // Scrolls only the console's own div to its bottom — the previous scrollIntoView({block:
+  // "center"} implied by omitting `block`) walked every scrollable ancestor including the page
+  // itself, which is what was yanking the whole screen upward on every streamed reply.
   useEffect(() => {
-    consoleEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = consoleRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [lines]);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
-
-  function appendLine(kind: ConsoleLine["kind"], text: string) {
-    lineIdRef.current += 1;
-    setLines((prev) => [...prev.slice(-200), { id: lineIdRef.current, kind, text }]);
-  }
-
-  async function startPing() {
+  function startPing() {
     if (!host.trim()) return;
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setLines([]);
-    setRunning(true);
-    appendLine("info", `Pinging ${host} ${count === "continuous" ? "continuously" : `with ${count} packet(s)`}...`);
-
-    try {
-      const token = getAccessToken();
-      const url = `/api/network/ping-stream?host=${encodeURIComponent(host.trim())}&count=${count}`;
-      const res = await fetch(url, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        signal: controller.signal,
-      });
-
-      if (!res.ok || !res.body) {
-        const body = await res.json().catch(() => null);
-        appendLine("error", body?.error ?? `Request failed (${res.status})`);
-        setRunning(false);
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() ?? "";
-
-        for (const part of parts) {
-          const dataLine = part.split("\n").find((l) => l.startsWith("data: "));
-          if (!dataLine) continue;
-          try {
-            const evt = JSON.parse(dataLine.slice(6));
-            if (evt.type === "reply") {
-              appendLine("reply", `Reply from ${evt.host ?? host}: ${evt.bytes ? `bytes=${evt.bytes} ` : ""}time=${evt.timeMs}ms${evt.ttl ? ` TTL=${evt.ttl}` : ""}`);
-            } else if (evt.type === "timeout") {
-              appendLine("timeout", "Request timed out.");
-            } else if (evt.type === "error") {
-              appendLine("error", evt.raw);
-            } else if (evt.type === "done") {
-              appendLine("info", "Ping sequence complete.");
-            }
-          } catch {
-            // ignore malformed chunk boundary
-          }
-        }
-      }
-    } catch (err: any) {
-      if (err?.name !== "AbortError") appendLine("error", "Connection to ping stream lost.");
-    } finally {
-      setRunning(false);
-    }
+    startPingSession(host, count, getAccessToken());
   }
 
   function stopPing() {
-    abortRef.current?.abort();
-    setRunning(false);
-    appendLine("info", "Stopped by user.");
+    stopPingSession();
   }
 
   const lineColor: Record<ConsoleLine["kind"], string> = {
@@ -167,7 +120,7 @@ export function PingConsoleTab() {
             onChange={(e) => {
               setSelectedDeviceId(e.target.value);
               const node = deviceOptions.find((n) => String(n.id) === e.target.value);
-              if (node?.ipAddress) setHost(node.ipAddress);
+              if (node?.ipAddress) setPingHost(node.ipAddress);
             }}
           >
             <option value="">-- Choose a Device --</option>
@@ -177,7 +130,7 @@ export function PingConsoleTab() {
 
         <div className="ad-field" style={{ marginBottom: 12 }}>
           <label>Target IP / Host</label>
-          <input className="ad-input" value={host} onChange={(e) => setHost(e.target.value)} placeholder="10.12.10.1" />
+          <input className="ad-input" value={host} onChange={(e) => setPingHost(e.target.value)} placeholder="10.12.10.1" disabled={running} />
         </div>
 
         <div className="ad-field" style={{ marginBottom: 16 }}>
@@ -188,7 +141,8 @@ export function PingConsoleTab() {
                 key={opt.label}
                 className={`ad-btn ${count === opt.value ? "ad-btn-primary" : ""}`}
                 style={{ flex: 1 }}
-                onClick={() => setCount(opt.value)}
+                onClick={() => setPingCount(opt.value)}
+                disabled={running}
               >
                 {opt.label}
               </button>
@@ -215,7 +169,7 @@ export function PingConsoleTab() {
             style={{ width: 8, height: 8, borderRadius: "50%", background: running ? "#34d399" : "#4b5568" }}
           />
         </div>
-        <div style={{ flex: 1, background: "#000", borderRadius: 8, padding: 14, fontFamily: "monospace", fontSize: 12, minHeight: 360, maxHeight: 480, overflowY: "auto" }}>
+        <div ref={consoleRef} style={{ flex: 1, background: "#000", borderRadius: 8, padding: 14, fontFamily: "monospace", fontSize: 12, minHeight: 360, maxHeight: 480, overflowY: "auto" }}>
           {lines.length === 0 ? (
             <div style={{ color: "#4b5568", textAlign: "center", marginTop: 140 }}>
               Console idle. Enter host IP and execute ICMP Ping to trigger live replies.
@@ -225,7 +179,6 @@ export function PingConsoleTab() {
               <div key={line.id} style={{ color: lineColor[line.kind] }}>{line.text}</div>
             ))
           )}
-          <div ref={consoleEndRef} />
         </div>
       </div>
 

@@ -136,6 +136,8 @@ model User {
   activeTheme                 AppearanceTheme?        @relation("UserActiveTheme", fields: [activeThemeId], references: [id], onDelete: SetNull)
   appearanceThemesCreated     AppearanceTheme[]       @relation("AppearanceThemeCreatedBy")
   appearanceThemeSharesReceived AppearanceThemeShare[] @relation("AppearanceThemeShareUser")
+
+  changelogEntriesCreated ChangelogEntry[]
 }
 
 model RefreshSession {
@@ -476,6 +478,12 @@ model Asset {
   manufacturer      String?
   model             String?
   serialNumber      String?
+  // Filled in automatically when the IP Range Scanner / continuous Monitoring discovers a device
+  // whose hostname matches this asset's name/assetTag — see enrichAssetFromScan() in
+  // scan.service.ts. Manually enterable too; auto-fill never overwrites an existing value except
+  // loggedInUser, which reflects live status rather than a fixed attribute.
+  os                String?
+  loggedInUser      String?
   purchaseDate      DateTime?
   purchaseCost      Decimal?       @db.Decimal(12, 2)
   warrantyExpiresAt DateTime?
@@ -811,6 +819,10 @@ model NetworkScanResult {
   macAddress     String?
   vendor         String?
   deviceType     String?
+  // Best-effort guess from the ICMP reply's TTL (see guessOsFromTtl() in ping.ts) — a well-known
+  // heuristic (~64 unmodified hops in ⇒ Linux/Unix, ~128 ⇒ Windows, ~255 ⇒ network gear/older
+  // Unix), not a real fingerprint. Good enough for "what kind of thing is this" at a glance.
+  os             String?
   // Cross-referenced from Device (the Python agent's own hardware self-report) by MAC/IP match —
   // never guessed for hosts the agent isn't installed on. Real remote "who's logged in" discovery
   // would need admin credentials on every target machine (WMI/RPC), which this app doesn't have.
@@ -858,6 +870,8 @@ model MonitoredNetworkDevice {
   hostname          String?
   vendor            String?
   deviceType        String?
+  // Best-effort TTL-based guess, same as NetworkScanResult.os above.
+  os                String?
   // Cross-referenced from Device by MAC/IP match, same as NetworkScanResult.loggedInUser above.
   loggedInUser      String?
   status            DeviceLiveStatus @default(ONLINE)
@@ -910,6 +924,11 @@ model RelayDiscoveredSubnet {
 enum RelayDeviceJobKind {
   PING
   HTTP
+  // Raw TCP-reachability probe against host:port, with an optional RTSP OPTIONS handshake when
+  // protocolScheme is "RTSP" — the relay-executed counterpart to lib/deviceConnection.ts's direct
+  // net.Socket test, used by the NVR/Camera "Test Connection" button when the on-prem relay agent
+  // is the only thing with a real route to the device's LAN.
+  TCP_PROBE
 }
 
 enum RelayDeviceJobStatus {
@@ -1526,6 +1545,11 @@ model Nvr {
   name              String
   ipAddress         String?
   port              Int?
+  // Separate from `port` (the RTSP port, typically 554) because ISAPI/ONVIF speak HTTP/SOAP on
+  // their own port (typically 80/443) — reusing one field for both was the root cause of ISAPI
+  // calls landing on the RTSP daemon and getting back a raw "RTSP/1.0 400 Bad Request" instead of
+  // a JSON device-info response. Null defaults to 80 in the ISAPI/ONVIF client code.
+  httpPort          Int?
   protocol          String?       @default("RTSP")
   username          String?
   encryptedPassword String?
@@ -1550,6 +1574,9 @@ model Camera {
   location          Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
   ipAddress         String?
   port              Int?
+  // See Nvr.httpPort's comment — same RTSP-vs-ISAPI/ONVIF port split, needed here too since a
+  // camera can be addressed directly (not just through its parent NVR).
+  httpPort          Int?
   username          String?
   encryptedPassword String?
   streamUrl         String?
@@ -2083,6 +2110,10 @@ model LightingSiteMap {
   name      String
   imageUrl  String
   sortOrder Int                     @default(0)
+  // 0-100 — a dark scrim drawn over the whole map, punched through with an animated "cleared"
+  // hole over each ON light's own coverage shape (or a small default circle around its marker
+  // when no shape has been drawn). 0 disables the overlay entirely. See SiteMapEditor.tsx.
+  overlayDensity Int                @default(0)
   createdAt DateTime                @default(now())
   devices   LightingSiteMapDevice[]
 }
@@ -2751,4 +2782,23 @@ model AppearanceThemeShare {
   createdAt        DateTime        @default(now())
 
   @@unique([themeId, sharedWithUserId])
+}
+
+// "What's new" release notes shown to a user the first time they load the app after a new entry
+// is published — see changelog.routes.ts and client's ChangelogModal.tsx. id is the monotonic
+// ordering key (avoids parsing semantic version strings); a user's read position is just the
+// highest id they've been shown, stored via the generic UserPreference mechanism under the key
+// "changelog.lastSeenId" rather than a dedicated column.
+model ChangelogEntry {
+  id          Int      @id @default(autoincrement())
+  title       String
+  summary     String?
+  // Array of bullet-point strings.
+  items       Json     @default("[]")
+  publishedAt DateTime @default(now())
+  createdById Int?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([publishedAt])
 }

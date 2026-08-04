@@ -31,6 +31,15 @@ export interface RelayPingJobResult {
   errorMessage?: string;
 }
 
+export interface RelayTcpProbeResult {
+  ok: boolean;
+  reachable?: boolean;
+  latencyMs?: number | null;
+  protocolConfirmed?: boolean;
+  message?: string;
+  errorMessage?: string;
+}
+
 async function awaitJobCompletion(jobId: number, timeoutMs: number) {
   // Small buffer over the agent-side timeout — the agent itself gives up around `timeoutMs`, so
   // waiting slightly longer here lets its own FAILED submission win the race instead of us
@@ -93,6 +102,37 @@ export async function enqueueAndAwaitPing(target: string, timeoutMs: number, pri
     return { ok: true, alive: Boolean(parsedBody?.alive), responseTimeMs: parsedBody?.responseTimeMs ?? null };
   } catch {
     return { ok: false, errorMessage: "Malformed ping result from relay agent." };
+  }
+}
+
+// The relay-executed counterpart to lib/deviceConnection.ts's direct net.Socket test — used by
+// the NVR/Camera "Test Connection" button when the on-prem relay agent is the only thing with a
+// real route to the device's LAN (see agent/kynren_network_relay.py's TCP_PROBE handling in
+// run_device_job()). Reuses the generic target/protocolScheme columns rather than adding
+// TCP_PROBE-specific ones — target carries "host:port", protocolScheme optionally carries a
+// protocol hint (e.g. "RTSP") the agent uses to decide whether to also send an RTSP OPTIONS probe.
+export async function enqueueAndAwaitTcpProbe(host: string, port: number, protocol: string | undefined, timeoutMs: number): Promise<RelayTcpProbeResult> {
+  const job = await prisma.relayDeviceJob.create({
+    data: { kind: "TCP_PROBE", status: "PENDING", target: `${host}:${port}`, protocolScheme: protocol, timeoutMs },
+  });
+
+  const result = await awaitJobCompletion(job.id, timeoutMs);
+  await prisma.relayDeviceJob.delete({ where: { id: job.id } }).catch(() => undefined);
+
+  if (!result) return { ok: false, errorMessage: "Relay job timed out — the on-prem agent never responded." };
+  if (result.status === "FAILED") return { ok: false, errorMessage: result.errorMessage ?? "Relay TCP probe failed." };
+
+  try {
+    const parsedBody = result.responseBodyBase64 ? JSON.parse(Buffer.from(result.responseBodyBase64, "base64").toString("utf8")) : null;
+    return {
+      ok: true,
+      reachable: Boolean(parsedBody?.reachable),
+      latencyMs: parsedBody?.latencyMs ?? null,
+      protocolConfirmed: Boolean(parsedBody?.protocolConfirmed),
+      message: parsedBody?.message,
+    };
+  } catch {
+    return { ok: false, errorMessage: "Malformed TCP probe result from relay agent." };
   }
 }
 

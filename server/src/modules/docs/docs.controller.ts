@@ -429,16 +429,18 @@ export async function exportDocument(req: Request, res: Response) {
   };
   const safeName = doc.title.replace(/[^a-z0-9-_]+/gi, "_");
   const watermark = await loadDocsWatermark();
+  const companyNameSetting = await prisma.systemSetting.findUnique({ where: { key: "companyName" } });
+  const companyName = companyNameSetting?.value ?? null;
 
   await logAudit({ userId: req.user!.id, action: "docs.export", entityType: "Document", entityId: id, metadata: { format } });
 
   if (format === "docx") {
-    const buffer = await buildDocDocxBuffer(exportable, watermark);
+    const buffer = await buildDocDocxBuffer(exportable, watermark, companyName);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     res.setHeader("Content-Disposition", `attachment; filename="${safeName}.docx"`);
     res.send(buffer);
   } else {
-    const buffer = await buildDocPdfBuffer(exportable, watermark);
+    const buffer = await buildDocPdfBuffer(exportable, watermark, companyName);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${safeName}.pdf"`);
     res.send(buffer);

@@ -19,12 +19,14 @@ interface IsapiTestResult {
 export function TestConnectionButton({
   ipAddress,
   port,
+  httpPort,
   protocol,
   username,
   password,
 }: {
   ipAddress: string;
   port: number | null;
+  httpPort?: number | null;
   protocol?: string;
   username?: string;
   password?: string;
@@ -36,7 +38,7 @@ export function TestConnectionButton({
       isIsapi
         ? axiosClient.post<IsapiTestResult>("/nvr/isapi/test-connection", {
             ipAddress,
-            port,
+            port: httpPort ?? undefined,
             username: username || undefined,
             password: password || undefined,
           })

@@ -38,6 +38,7 @@ const nvrSelect = {
   name: true,
   ipAddress: true,
   port: true,
+  httpPort: true,
   protocol: true,
   username: true,
   locationId: true,
@@ -57,6 +58,7 @@ const nvrSelect = {
       location: { select: { id: true, name: true } },
       ipAddress: true,
       port: true,
+      httpPort: true,
       username: true,
       streamUrl: true,
       ptzEnabled: true,
@@ -169,7 +171,7 @@ router.post("/:id/discover-channels", requirePermission("nvr", "view"), async (r
   const password = nvr.encryptedPassword ? decryptSecret(nvr.encryptedPassword) : "";
 
   if (nvr.protocol === "ISAPI") {
-    const result = await getInputProxyChannels(nvr.ipAddress, nvr.port ?? undefined, username, password);
+    const result = await getInputProxyChannels(nvr.ipAddress, nvr.httpPort ?? undefined, username, password);
     const channels = result.channels.map((ch) => ({
       ...ch,
       streamUri: buildIsapiRtspUrl(nvr.ipAddress!, undefined, username, password, ch.channelNumber),
@@ -178,7 +180,7 @@ router.post("/:id/discover-channels", requirePermission("nvr", "view"), async (r
     return;
   }
 
-  const result = await discoverOnvifChannels(nvr.ipAddress, nvr.port ?? undefined, username, password);
+  const result = await discoverOnvifChannels(nvr.ipAddress, nvr.httpPort ?? undefined, username, password);
   res.json({ ...result, protocol: "ONVIF" });
 });
 
@@ -293,11 +295,11 @@ router.get("/cameras/:cameraId/live-latency", requirePermission("nvr", "view"), 
   res.json(await relayAwarePing(camera.ipAddress));
 });
 
-function cameraOnvifOptions(camera: { ipAddress: string | null; port: number | null; username: string | null; encryptedPassword: string | null }) {
+function cameraOnvifOptions(camera: { ipAddress: string | null; httpPort: number | null; username: string | null; encryptedPassword: string | null }) {
   if (!camera.ipAddress) throw new ApiError(400, "This camera has no IP address set — required for ONVIF PTZ control.");
   return {
     hostname: camera.ipAddress,
-    port: camera.port ?? undefined,
+    port: camera.httpPort ?? undefined,
     username: camera.username ?? undefined,
     password: camera.encryptedPassword ? decryptSecret(camera.encryptedPassword) : undefined,
   };

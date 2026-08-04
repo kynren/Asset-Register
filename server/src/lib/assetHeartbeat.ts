@@ -63,7 +63,7 @@ async function tick(): Promise<void> {
   // see assets.controller.ts's list()/stats()), so it's excluded here too.
   const assets = await prisma.asset.findMany({
     where: { NOT: { category: { name: "Harness" } } },
-    select: { id: true, assetTag: true, staticIpAddress: true },
+    select: { id: true, name: true, assetTag: true, staticIpAddress: true },
   });
 
   if (assets.length === 0) {
@@ -72,7 +72,8 @@ async function tick(): Promise<void> {
   }
 
   const results = await mapLimit(assets, PING_CONCURRENCY, async (asset) => {
-    const result = await relayAwarePing(asset.staticIpAddress || asset.assetTag, 800, BACKGROUND_JOB_PRIORITY);
+    const target = asset.staticIpAddress || asset.assetTag || asset.name;
+    const result = await relayAwarePing(target, 800, BACKGROUND_JOB_PRIORITY);
     return { id: asset.id, assetTag: asset.assetTag, alive: result.alive, responseTimeMs: result.responseTimeMs };
   });
 

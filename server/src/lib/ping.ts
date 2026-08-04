@@ -13,6 +13,19 @@ export const COMMON_PORTS = [21, 22, 23, 25, 80, 443, 554, 3389, 8080, 8443];
 export interface PingResult {
   alive: boolean;
   responseTimeMs: number | null;
+  ttl: number | null;
+}
+
+// A well-known (not authoritative) heuristic: most stacks start ICMP replies at a round default
+// TTL — 64 (Linux/Unix/macOS/most IoT), 128 (Windows), or 255 (Cisco/network gear, older Unix) —
+// and it only counts down by one per router hop, so a reply's TTL almost never lands exactly on
+// the starting value. Bucketing "TTL so far under a threshold" against the next-highest common
+// default is the standard way this signal is used; it's a guess, not a fingerprint.
+export function guessOsFromTtl(ttl: number | null): string | null {
+  if (ttl === null || ttl <= 0) return null;
+  if (ttl > 128) return "Network Device / Unix (TTL~255)";
+  if (ttl > 64) return "Windows (TTL~128)";
+  return "Linux/Unix (TTL~64)";
 }
 
 // A conservative hostname pattern (RFC 952/1123-ish): alnum start/end, dots/hyphens/underscores
@@ -25,23 +38,27 @@ function isValidPingTarget(target: string): boolean {
 }
 
 export async function pingHost(target: string, timeoutMs = 800): Promise<PingResult> {
-  if (!isValidPingTarget(target)) return { alive: false, responseTimeMs: null };
+  if (!isValidPingTarget(target)) return { alive: false, responseTimeMs: null, ttl: null };
 
   try {
     const args = IS_WINDOWS ? ["-n", "1", "-w", String(timeoutMs), target] : ["-c", "1", "-W", String(Math.ceil(timeoutMs / 1000)), target];
     const { stdout } = await execFileAsync("ping", args, { timeout: timeoutMs + 1000 });
 
+    // Windows prints "TTL=64", Linux/macOS print "ttl=64" — case-insensitive covers both.
+    const ttlMatch = stdout.match(/ttl[=:]\s*(\d+)/i);
+    const ttl = ttlMatch ? Number(ttlMatch[1]) : null;
+
     const timeMatch = stdout.match(/time[=<]([\d.]+)\s*ms/i);
     if (timeMatch) {
-      return { alive: true, responseTimeMs: Math.round(Number(timeMatch[1])) };
+      return { alive: true, responseTimeMs: Math.round(Number(timeMatch[1])), ttl };
     }
     // Some Windows locales report 0ms round-trips without a "time=" token when replies succeed.
     if (IS_WINDOWS && /Reply from/i.test(stdout)) {
-      return { alive: true, responseTimeMs: 0 };
+      return { alive: true, responseTimeMs: 0, ttl };
     }
-    return { alive: false, responseTimeMs: null };
+    return { alive: false, responseTimeMs: null, ttl: null };
   } catch {
-    return { alive: false, responseTimeMs: null };
+    return { alive: false, responseTimeMs: null, ttl: null };
   }
 }
 

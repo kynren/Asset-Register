@@ -1,7 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { mapLimit } from "../../lib/concurrency";
 import { expandRange } from "../../lib/ipRange";
-import { getArpMac, getNetbiosName, pingHost, reverseDns, scanCommonPorts } from "../../lib/ping";
+import { getArpMac, getNetbiosName, guessOsFromTtl, pingHost, reverseDns, scanCommonPorts } from "../../lib/ping";
 import { guessDeviceType, lookupVendor, lookupVendorOnline } from "../../lib/macVendor";
 import { logAudit } from "../../lib/auditLogger";
 
@@ -121,20 +121,49 @@ async function resolveHostname(ip: string, deviceHostnameByIp: Map<string, strin
 
 // If a scanned host's resolved hostname matches an existing asset's name or asset tag (real IT
 // estates commonly name machines after one or the other — see pingAsset()'s comment), and that
-// asset has no static IP recorded yet and isn't already linked to a Device (which would carry its
-// own MAC/IP info), fill in the discovered IP. Best-effort and silent on no match — most scanned
-// hosts won't correspond to any inventory asset.
-export async function fillAssetIpFromHostname(hostname: string, ip: string, scanId: number) {
-  const updated = await prisma.asset.updateMany({
+// asset isn't already linked to a Device (which would carry its own, more authoritative IP/
+// MAC/OS/manufacturer self-report — see "Asset Detail: auto-populate IT tabs from matched network
+// device"), fill in whatever the scan discovered. staticIpAddress, manufacturer, and os are only
+// ever filled when currently empty (never overwrite a manually-entered value); loggedInUser is
+// always refreshed since it reflects live status, not a fixed attribute, the same way
+// Device.loggedInUser is refreshed on every agent check-in. Best-effort and silent on no match —
+// most scanned hosts won't correspond to any inventory asset.
+export async function enrichAssetFromScan(
+  hostname: string,
+  ip: string,
+  vendor: string | null,
+  os: string | null,
+  loggedInUser: string | null,
+  scanId: number
+) {
+  const candidates = await prisma.asset.findMany({
     where: {
-      staticIpAddress: null,
       deviceId: null,
       OR: [{ name: { equals: hostname, mode: "insensitive" } }, { assetTag: { equals: hostname, mode: "insensitive" } }],
     },
-    data: { staticIpAddress: ip },
+    select: { id: true, staticIpAddress: true, manufacturer: true, os: true, loggedInUser: true },
   });
-  if (updated.count > 0) {
-    await logAudit({ action: "asset.auto_fill_ip_from_scan", entityType: "NetworkScan", entityId: scanId, metadata: { hostname, ip, assetsUpdated: updated.count } });
+  if (candidates.length === 0) return;
+
+  const updatedIds: number[] = [];
+  for (const asset of candidates) {
+    const data: Record<string, string> = {};
+    if (!asset.staticIpAddress) data.staticIpAddress = ip;
+    if (!asset.manufacturer && vendor) data.manufacturer = vendor;
+    if (!asset.os && os) data.os = os;
+    if (loggedInUser && asset.loggedInUser !== loggedInUser) data.loggedInUser = loggedInUser;
+    if (Object.keys(data).length === 0) continue;
+    await prisma.asset.update({ where: { id: asset.id }, data });
+    updatedIds.push(asset.id);
+  }
+
+  if (updatedIds.length > 0) {
+    await logAudit({
+      action: "asset.auto_enrich_from_scan",
+      entityType: "NetworkScan",
+      entityId: scanId,
+      metadata: { hostname, ip, vendor, os, loggedInUser, assetIds: updatedIds },
+    });
   }
 }
 
@@ -156,6 +185,7 @@ async function runScan(scanId: number, addresses: string[]) {
     let vendor: string | null = null;
     let deviceType: string | null = null;
     let loggedInUser: string | null = null;
+    const os = guessOsFromTtl(ping.ttl);
 
     if (ping.alive) {
       [hostname, mac, openPorts] = await Promise.all([resolveHostname(ip, deviceHostnameByIp), getArpMac(ip), scanCommonPorts(ip)]);
@@ -163,7 +193,7 @@ async function runScan(scanId: number, addresses: string[]) {
       deviceType = guessDeviceType(vendor, openPorts);
       loggedInUser = matchDevice(ip, mac, deviceLookup)?.loggedInUser ?? null;
       aliveCount += 1;
-      if (hostname) await fillAssetIpFromHostname(hostname, ip, scanId).catch(() => undefined);
+      if (hostname) await enrichAssetFromScan(hostname, ip, vendor, os, loggedInUser, scanId).catch(() => undefined);
     }
 
     scannedCount += 1;
@@ -177,6 +207,7 @@ async function runScan(scanId: number, addresses: string[]) {
         macAddress: mac,
         vendor,
         deviceType,
+        os,
         loggedInUser,
         responseTimeMs: ping.responseTimeMs,
         openPorts,
@@ -202,13 +233,16 @@ export interface RelayHostResult {
   macAddress: string | null;
   openPorts: number[];
   responseTimeMs: number | null;
+  // Optional — only present if the relay agent's own ping parsed a TTL from its reply. Absent
+  // (rather than required) so older relay agent builds that don't send it yet still validate.
+  ttl?: number | null;
 }
 
 // Counterpart to runScan() above for relay-executed scans: the relay agent does the actual
 // network probing (it's the one with a real route into the LAN) and hands back raw per-host
 // results; this applies the exact same server-side processing runScan() does directly — vendor
-// classification, device-type guessing, and the hostname-match asset IP auto-fill — so scans
-// behave identically regardless of which mode produced them.
+// classification, device-type guessing, TTL-based OS guess, and the hostname-match asset
+// enrichment — so scans behave identically regardless of which mode produced them.
 export async function applyRelayResults(scanId: number, results: RelayHostResult[]): Promise<{ aliveHosts: number; scannedHosts: number }> {
   let aliveHosts = 0;
   const deviceLookup = await buildDeviceLookup();
@@ -217,13 +251,14 @@ export async function applyRelayResults(scanId: number, results: RelayHostResult
     let vendor: string | null = null;
     let deviceType: string | null = null;
     let loggedInUser: string | null = null;
+    const os = guessOsFromTtl(r.ttl ?? null);
 
     if (r.alive) {
       vendor = lookupVendor(r.macAddress) ?? (await lookupVendorOnline(r.macAddress));
       deviceType = guessDeviceType(vendor, r.openPorts);
       loggedInUser = matchDevice(r.ipAddress, r.macAddress, deviceLookup)?.loggedInUser ?? null;
       aliveHosts += 1;
-      if (r.hostname) await fillAssetIpFromHostname(r.hostname, r.ipAddress, scanId).catch(() => undefined);
+      if (r.hostname) await enrichAssetFromScan(r.hostname, r.ipAddress, vendor, os, loggedInUser, scanId).catch(() => undefined);
     }
 
     await prisma.networkScanResult.create({
@@ -235,6 +270,7 @@ export async function applyRelayResults(scanId: number, results: RelayHostResult
         macAddress: r.macAddress,
         vendor,
         deviceType,
+        os,
         loggedInUser,
         responseTimeMs: r.responseTimeMs,
         openPorts: r.openPorts,
