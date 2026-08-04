@@ -54,6 +54,9 @@ router.get("/graph", requirePermission("network", "view"), async (_req, res) => 
     liveStatus: liveStatuses[i].status,
   }));
 
+  // Every node here was just freshly ICMP-probed above — never let the browser serve a stale
+  // cached copy of a live reading.
+  res.setHeader("Cache-Control", "no-store");
   res.json({ nodes: shapedNodes, edges });
 });
 
@@ -317,10 +320,15 @@ router.post("/monitor/run-now", requirePermission("network", "edit"), async (req
   res.status(202).json({ started: true });
 });
 
+// Pure DB read of the persisted last-known state (see MonitoredNetworkDevice's status/lastSeenAt)
+// — no live test triggered by this route itself, fresh scans only happen via /monitor/run-now or
+// the background scheduler. Still marked no-store so the browser never serves an even-more-stale
+// copy of what's already just a snapshot.
 router.get("/monitor/devices", requirePermission("network", "view"), async (_req, res) => {
   const devices = await prisma.monitoredNetworkDevice.findMany({
     orderBy: [{ status: "asc" }, { hostname: "asc" }],
   });
+  res.setHeader("Cache-Control", "no-store");
   res.json(devices.map(shapeMonitoredDevice));
 });
 

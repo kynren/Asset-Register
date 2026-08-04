@@ -49,6 +49,11 @@ export const testConnectionSchema = z.object({
   ipAddress: z.string().min(1),
   port: z.number().int().nullable().optional(),
   protocol: z.string().optional(),
+  // Present when testing an already-saved NVR/Camera (not the blank "Add" form) — lets the route
+  // persist the result onto that row so it's shown instantly next time instead of re-testing.
+  // Mutually exclusive; at most one is ever sent, matching which form the button was rendered in.
+  nvrId: z.number().int().optional(),
+  cameraId: z.number().int().optional(),
 });
 
 export const discoverCamerasSchema = z.object({
@@ -63,6 +68,9 @@ export const discoverCamerasSchema = z.object({
 
 export const startStreamSchema = z.object({
   streamUrl: z.string().regex(/^rtsps?:\/\//i, "Stream URL must start with rtsp:// or rtsps://"),
+  // Present when starting live view for an already-saved camera (not the Add-form preview) — lets
+  // the session do a fast reachability pre-check and persist its outcome onto that Camera row.
+  cameraId: z.number().int().optional(),
 });
 
 export const importCamerasSchema = z.object({
@@ -91,4 +99,7 @@ export const isapiConnectionSchema = z.object({
   port: z.number().int().nullable().optional(),
   username: z.string().optional(),
   password: z.string().optional(),
+  // Present when testing an already-saved NVR (ISAPI test-connection is NVR-only) — see
+  // testConnectionSchema's nvrId comment for why.
+  nvrId: z.number().int().optional(),
 });

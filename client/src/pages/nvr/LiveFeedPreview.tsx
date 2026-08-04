@@ -2,9 +2,9 @@ import { useRef } from "react";
 import { Icon } from "../../components/Icon";
 import { useRtspStream } from "./useRtspStream";
 
-function RtspPreview({ streamUrl }: { streamUrl: string }) {
+function RtspPreview({ streamUrl, cameraId }: { streamUrl: string; cameraId?: number }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { status, error, start, stop } = useRtspStream(streamUrl, videoRef);
+  const { status, error, start, stop } = useRtspStream(streamUrl, videoRef, cameraId);
 
   const isLive = status === "ready";
   const isBusy = status === "starting" || status === "ready" || status === "reconnecting";
@@ -41,14 +41,14 @@ function RtspPreview({ streamUrl }: { streamUrl: string }) {
   );
 }
 
-export function LiveFeedPreview({ streamUrl }: { streamUrl: string }) {
+export function LiveFeedPreview({ streamUrl, cameraId }: { streamUrl: string; cameraId?: number }) {
   const isRtsp = /^rtsps?:\/\//i.test(streamUrl.trim());
 
   return (
     <div className="field">
       <label>Live Feed</label>
       {isRtsp ? (
-        <RtspPreview streamUrl={streamUrl} />
+        <RtspPreview streamUrl={streamUrl} cameraId={cameraId} />
       ) : (
         <div className="alert alert-warning" style={{ margin: 0 }}>Enter an rtsp:// stream URL above to enable live preview.</div>
       )}

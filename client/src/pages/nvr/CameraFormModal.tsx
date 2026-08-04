@@ -4,7 +4,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { FormModal } from "../../components/FormModal";
 import { QuickAddSelect } from "../../components/QuickAddSelect";
 import { Icon } from "../../components/Icon";
-import { TestConnectionButton } from "./TestConnectionButton";
+import { LastKnownConnectionState, TestConnectionButton } from "./TestConnectionButton";
 import { LiveFeedPreview } from "./LiveFeedPreview";
 import { PasswordInput } from "../../components/PasswordInput";
 
@@ -54,13 +54,17 @@ const CONNECTION_FIELDS = new Set<keyof CameraFormValues>(["ipAddress", "port", 
 
 export function CameraFormModal({
   editing,
+  cameraId,
   initial,
+  lastKnown,
   onClose,
   onSubmit,
   submitting,
 }: {
   editing?: boolean;
+  cameraId?: number;
   initial?: Partial<CameraFormValues>;
+  lastKnown?: LastKnownConnectionState;
   onClose: () => void;
   onSubmit: (v: CameraFormValues) => void;
   submitting?: boolean;
@@ -131,8 +135,10 @@ export function CameraFormModal({
         protocol="RTSP"
         username={values.username}
         password={values.password}
+        cameraId={cameraId}
+        lastKnown={lastKnown}
       />
-      <LiveFeedPreview streamUrl={values.streamUrl} />
+      <LiveFeedPreview streamUrl={values.streamUrl} cameraId={cameraId} />
     </FormModal>
   );
 }

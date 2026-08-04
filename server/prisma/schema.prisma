@@ -1559,6 +1559,11 @@ model Nvr {
   notes             String?
   status            CameraStatus  @default(UNKNOWN)
   lastCheckedAt     DateTime?
+  // Latency of the most recent successful connection test/check (Test Connection button, Check
+  // Status, or a live-view session's pre-flight probe) — lets the UI show a persisted "last known"
+  // reading instantly instead of re-testing on every modal open. Null whenever the last result was
+  // a failure or nothing has been tested yet.
+  lastConnectionLatencyMs Int?
   cameras           Camera[]
   events            CameraEvent[]
   createdAt         DateTime      @default(now())
@@ -1583,6 +1588,8 @@ model Camera {
   ptzEnabled        Boolean           @default(false)
   status            CameraStatus      @default(UNKNOWN)
   lastCheckedAt     DateTime?
+  // See Nvr.lastConnectionLatencyMs's comment — same "persisted last known reading" purpose.
+  lastConnectionLatencyMs Int?
   events            CameraEvent[]
   recordings        CameraRecording[]
   // Implicit many-to-many — a camera covering an entrance can reasonably be linked to more than

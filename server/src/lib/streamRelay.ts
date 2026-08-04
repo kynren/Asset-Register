@@ -3,8 +3,10 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { Readable } from "stream";
+import { prisma } from "../config/prisma";
 import { isNetworkRelayEnabled } from "../modules/network/scan.service";
 import { enqueueVideoJob, getVideoJobStatus, requestStop } from "./relayVideoJobs";
+import { testDeviceConnection } from "./deviceConnection";
 
 export const SESSION_ROOT = path.join(__dirname, "..", "..", "uploads", "stream-sessions");
 fs.mkdirSync(SESSION_ROOT, { recursive: true });
@@ -26,6 +28,21 @@ interface StreamSession {
   // that reads from `dir` (getSessionStatus/getSessionFilePath) is unaffected either way; only
   // startup and teardown differ.
   relayBacked: boolean;
+  // Present when this session belongs to an already-saved Camera row (not an unsaved Add-form
+  // preview) — lets getSessionStatus persist the real outcome (ONLINE/OFFLINE + latency) back onto
+  // that row once, on the transition into "ready"/"failed", so the next Test Connection or live
+  // view open shows accurate state without re-testing.
+  cameraId?: number;
+  statusPersisted: boolean;
+}
+
+async function persistCameraConnectionState(cameraId: number, reachable: boolean, latencyMs: number | null): Promise<void> {
+  await prisma.camera
+    .update({
+      where: { id: cameraId },
+      data: { status: reachable ? "ONLINE" : "OFFLINE", lastCheckedAt: new Date(), lastConnectionLatencyMs: latencyMs },
+    })
+    .catch(() => undefined);
 }
 
 const sessions = new Map<string, StreamSession>();
@@ -54,8 +71,14 @@ setInterval(sweepIdleSessions, 30_000).unref();
  * actually reach the camera's LAN) and uploads segments here; otherwise ffmpeg is spawned locally
  * exactly as before, and if ffmpeg isn't installed the session is marked "failed" with a clear
  * message rather than pretending to produce video.
+ *
+ * When `cameraId` is given (an already-saved Camera, not an unsaved Add-form preview), a fast
+ * TCP-level reachability probe (relay-aware, same one the Test Connection button uses) runs first
+ * and its outcome is persisted onto that Camera row — see Camera.lastConnectionLatencyMs's schema
+ * comment. A device already known unreachable fails in under a second or two instead of silently
+ * spawning ffmpeg and waiting through the 15s connect watchdog below for the same answer.
  */
-export async function startStreamSession(streamUrl: string): Promise<string> {
+export async function startStreamSession(streamUrl: string, cameraId?: number): Promise<string> {
   const id = crypto.randomUUID();
   const dir = path.join(SESSION_ROOT, id);
   fs.mkdirSync(dir, { recursive: true });
@@ -73,8 +96,32 @@ export async function startStreamSession(streamUrl: string): Promise<string> {
     lastAccessedAt: Date.now(),
     createdAt: Date.now(),
     relayBacked,
+    cameraId,
+    statusPersisted: false,
   };
   sessions.set(id, session);
+
+  if (cameraId) {
+    let host: string | undefined;
+    let port = 554;
+    try {
+      const parsed = new URL(streamUrl);
+      host = parsed.hostname;
+      if (parsed.port) port = Number(parsed.port);
+    } catch {
+      // Malformed URL — let the normal ffmpeg/relay path below surface a clear error instead.
+    }
+    if (host) {
+      const probe = await testDeviceConnection(host, port, "RTSP", 5000);
+      await persistCameraConnectionState(cameraId, probe.reachable, probe.latencyMs);
+      session.statusPersisted = true;
+      if (!probe.reachable) {
+        session.status = "failed";
+        session.error = probe.message;
+        return id;
+      }
+    }
+  }
 
   if (relayBacked) {
     await enqueueVideoJob(id, "LIVE", streamUrl);
@@ -170,6 +217,15 @@ export async function getSessionStatus(id: string): Promise<{ status: SessionSta
       session.status = "failed";
       session.error = "Relay video job not found — it may have been cleaned up.";
     }
+  }
+
+  // Close the loop on Camera.lastConnectionLatencyMs once the actual ffmpeg/relay attempt (not
+  // just the fast pre-check above) resolves, so a device that passed the pre-check but then
+  // failed to actually stream still ends up with accurate persisted state. Fires exactly once per
+  // session, on the transition into a terminal status.
+  if (session.cameraId && !session.statusPersisted && (session.status === "ready" || session.status === "failed")) {
+    session.statusPersisted = true;
+    await persistCameraConnectionState(session.cameraId, session.status === "ready", null);
   }
 
   return { status: session.status, error: session.error };

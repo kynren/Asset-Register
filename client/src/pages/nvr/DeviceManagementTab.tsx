@@ -8,6 +8,7 @@ import { FormModal } from "../../components/FormModal";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { NvrFormModal, NvrFormValues } from "./NvrFormModal";
 import { CameraFormModal, CameraFormValues } from "./CameraFormModal";
+import { LastKnownConnectionState } from "./TestConnectionButton";
 import { PtzControlModal } from "./PtzControlModal";
 import { CameraOpsModal } from "./CameraOpsModal";
 import { LiveFeedPreview } from "./LiveFeedPreview";
@@ -28,6 +29,7 @@ interface Camera {
   ptzEnabled: boolean;
   status: string;
   lastCheckedAt: string | null;
+  lastConnectionLatencyMs: number | null;
 }
 interface Nvr {
   id: number;
@@ -41,7 +43,13 @@ interface Nvr {
   model: string | null;
   status: string;
   lastCheckedAt: string | null;
+  lastConnectionLatencyMs: number | null;
   cameras: Camera[];
+}
+
+function toLastKnown(entity: { status: string; lastCheckedAt: string | null; lastConnectionLatencyMs: number | null }): LastKnownConnectionState {
+  const status = entity.status === "ONLINE" || entity.status === "OFFLINE" ? entity.status : "UNKNOWN";
+  return { status, lastCheckedAt: entity.lastCheckedAt, latencyMs: entity.lastConnectionLatencyMs };
 }
 
 export function DeviceManagementTab() {
@@ -236,6 +244,7 @@ export function DeviceManagementTab() {
             locationId: editingNvr.location?.id ?? null,
             model: editingNvr.model ?? "",
           }}
+          lastKnown={toLastKnown(editingNvr)}
           onClose={() => setEditingNvr(null)}
           onSubmit={(v) => updateNvrMutation.mutate(v)}
           submitting={updateNvrMutation.isPending}
@@ -252,6 +261,7 @@ export function DeviceManagementTab() {
       {editingCamera && (
         <CameraFormModal
           editing
+          cameraId={editingCamera.id}
           initial={{
             name: editingCamera.name,
             channel: editingCamera.channel,
@@ -264,6 +274,7 @@ export function DeviceManagementTab() {
             streamUrl: editingCamera.streamUrl ?? "",
             ptzEnabled: editingCamera.ptzEnabled,
           }}
+          lastKnown={toLastKnown(editingCamera)}
           onClose={() => setEditingCamera(null)}
           onSubmit={(v) => updateCameraMutation.mutate(v)}
           submitting={updateCameraMutation.isPending}

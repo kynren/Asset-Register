@@ -16,6 +16,22 @@ interface IsapiTestResult {
   message: string;
 }
 
+export interface LastKnownConnectionState {
+  status: "ONLINE" | "OFFLINE" | "UNKNOWN";
+  lastCheckedAt: string | null;
+  latencyMs: number | null;
+}
+
+function timeAgo(iso: string): string {
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
 export function TestConnectionButton({
   ipAddress,
   port,
@@ -23,6 +39,9 @@ export function TestConnectionButton({
   protocol,
   username,
   password,
+  nvrId,
+  cameraId,
+  lastKnown,
 }: {
   ipAddress: string;
   port: number | null;
@@ -30,6 +49,14 @@ export function TestConnectionButton({
   protocol?: string;
   username?: string;
   password?: string;
+  // Present only when testing an already-saved NVR/Camera (edit mode) — the backend persists the
+  // result onto that row so it's shown instantly next time. Never both set at once.
+  nvrId?: number;
+  cameraId?: number;
+  // The row's persisted state from the last time it was tested (Test Connection, Check Status, or
+  // a live-view session's pre-flight probe) — shown immediately on mount, before any fresh test
+  // has run this session, so reopening the modal doesn't look like a blank slate.
+  lastKnown?: LastKnownConnectionState;
 }) {
   const isIsapi = protocol === "ISAPI";
 
@@ -41,8 +68,9 @@ export function TestConnectionButton({
             port: httpPort ?? undefined,
             username: username || undefined,
             password: password || undefined,
+            nvrId,
           })
-        : axiosClient.post<GenericTestResult>("/nvr/test-connection", { ipAddress, port, protocol }),
+        : axiosClient.post<GenericTestResult>("/nvr/test-connection", { ipAddress, port, protocol, nvrId, cameraId }),
   });
 
   const data = mutation.data?.data;
@@ -57,6 +85,12 @@ export function TestConnectionButton({
       <button className="btn btn-secondary" type="button" disabled={!ipAddress || mutation.isPending} onClick={() => mutation.mutate()}>
         <Icon name="wifi" size={13} /> {mutation.isPending ? "Testing..." : "Test Connection"}
       </button>
+      {!data && !mutation.isError && lastKnown?.lastCheckedAt && lastKnown.status !== "UNKNOWN" && (
+        <div className={`alert ${lastKnown.status === "ONLINE" ? "alert-success" : "alert-danger"}`} style={{ marginTop: 8, marginBottom: 0 }}>
+          Last known: {lastKnown.status === "ONLINE" ? "Online" : "Offline"} ({timeAgo(lastKnown.lastCheckedAt)}
+          {lastKnown.status === "ONLINE" && lastKnown.latencyMs !== null ? `, ${lastKnown.latencyMs}ms` : ""})
+        </div>
+      )}
       {data && (
         <div className={`alert ${success ? "alert-success" : "alert-danger"}`} style={{ marginTop: 8, marginBottom: 0 }}>
           {data.message}
