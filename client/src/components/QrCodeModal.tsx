@@ -7,12 +7,16 @@ export function QrCodeModal({
   value,
   label,
   subLabel,
+  footer,
   onClose,
 }: {
   title: string;
   value: string;
   label: string;
   subLabel?: string;
+  // Guaranteed to render at the very bottom of the printed label, below label/subLabel — use this
+  // (rather than relying on subLabel ordering) when a value like a SKU must always be the last line.
+  footer?: string;
   onClose: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -33,6 +37,7 @@ export function QrCodeModal({
         <canvas ref={canvasRef} />
         <strong>{label}</strong>
         {subLabel && <span className="muted">{subLabel}</span>}
+        {footer && <span className="muted" style={{ fontWeight: 600 }}>{footer}</span>}
       </div>
       <div className="modal-footer">
         <button className="btn btn-secondary" onClick={onClose}>Close</button>

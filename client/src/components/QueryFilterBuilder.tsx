@@ -40,17 +40,13 @@ function ValueInput({ field, operator, value, onChange }: { field: FieldDef; ope
   if (operator === "in") {
     const selected = Array.isArray(value) ? value : [];
     return (
-      <select
-        className="select"
+      <ChipSelect
         multiple
         value={selected}
-        onChange={(e) => onChange(Array.from(e.target.selectedOptions).map((o) => o.value))}
-        style={{ minHeight: 60 }}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
+        onChange={onChange}
+        placeholder="Select values..."
+        options={options.map((o) => ({ value: o.value, label: o.label }))}
+      />
     );
   }
   const strValue = typeof value === "string" ? value : "";

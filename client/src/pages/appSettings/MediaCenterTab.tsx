@@ -7,6 +7,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { FormModal } from "../../components/FormModal";
 import { Skeleton } from "../../components/Skeleton";
 import { FilePreview } from "../../components/FilePreview";
+import { ChipSelect } from "../../components/ChipSelect";
 import { usePermission } from "../../auth/PermissionGate";
 
 interface MediaAsset {
@@ -92,13 +93,19 @@ function MediaLibrarySection() {
     <div className="stack gap-3">
       <div className="row gap-2" style={{ alignItems: "center" }}>
         <input className="input" style={{ maxWidth: 260 }} placeholder="Search media..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
-        <div className="row gap-1">
-          {["", "IMAGE", "VIDEO", "AUDIO", "DOCUMENT", "OTHER"].map((t) => (
-            <button key={t || "all"} className={`btn btn-sm ${type === t ? "btn-primary" : "btn-secondary"}`} onClick={() => { setType(t); setPage(1); }}>
-              {t || "All"}
-            </button>
-          ))}
-        </div>
+        <ChipSelect
+          style={{ width: "auto", minWidth: 130 }}
+          value={type}
+          onChange={(v) => { setType(v); setPage(1); }}
+          options={[
+            { value: "", label: "All types" },
+            { value: "IMAGE", label: "Image" },
+            { value: "VIDEO", label: "Video" },
+            { value: "AUDIO", label: "Audio" },
+            { value: "DOCUMENT", label: "Document" },
+            { value: "OTHER", label: "Other" },
+          ]}
+        />
         <div className="flex-1" />
         {canCreate && (
           <>
@@ -341,14 +348,12 @@ function AttachedUploadsSection() {
       <p className="muted" style={{ margin: 0, fontSize: 12 }}>
         Files already uploaded through other features (asset photos, document/ticket/project attachments, avatars) — browse, audit, and clean up here.
       </p>
-      <div className="row gap-1 flex-wrap">
-        <button className={`btn btn-sm ${sourceKey === "" ? "btn-primary" : "btn-secondary"}`} onClick={() => setSourceKey("")}>All</button>
-        {(sources ?? []).map((s) => (
-          <button key={s.key} className={`btn btn-sm ${sourceKey === s.key ? "btn-primary" : "btn-secondary"}`} onClick={() => setSourceKey(s.key)}>
-            {s.label}
-          </button>
-        ))}
-      </div>
+      <ChipSelect
+        style={{ width: "auto", minWidth: 180 }}
+        value={sourceKey}
+        onChange={setSourceKey}
+        options={[{ value: "", label: "All sources" }, ...(sources ?? []).map((s) => ({ value: s.key, label: s.label }))]}
+      />
 
       {isLoading && <Skeleton height={200} />}
       {!isLoading && (items?.length ?? 0) === 0 && <div className="empty-state card">No attached files found.</div>}

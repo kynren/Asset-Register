@@ -13,7 +13,10 @@ import { ReportBuilderModal } from "./ReportBuilderModal";
 import { ShareReportModal } from "./ShareReportModal";
 import { ReportSummary } from "./types";
 
-export function ReportsListPage() {
+// sourceFilter narrows the list to reports built against a single data source — used when this
+// table is embedded in a module's own Reports tab (e.g. Stock Registry) rather than the top-level
+// Reports page, so it only shows reports relevant to that module.
+export function ReportsListPage({ sourceFilter }: { sourceFilter?: string } = {}) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [sharingReport, setSharingReport] = useState<ReportSummary | null>(null);
   const [deletingReport, setDeletingReport] = useState<ReportSummary | null>(null);
@@ -22,10 +25,11 @@ export function ReportsListPage() {
   const { hasPermission, user } = useAuth();
   const isBypassAdmin = user?.roleName === "System Admin" || user?.roleName === "Super Admin";
 
-  const { data, isLoading } = useQuery<ReportSummary[]>({
+  const { data: allReports, isLoading } = useQuery<ReportSummary[]>({
     queryKey: ["reports"],
     queryFn: async () => (await axiosClient.get("/reports")).data,
   });
+  const data = sourceFilter ? allReports?.filter((r) => r.source === sourceFilter) : allReports;
 
   const duplicateMutation = useMutation({
     mutationFn: (id: number) => axiosClient.post(`/reports/${id}/duplicate`),

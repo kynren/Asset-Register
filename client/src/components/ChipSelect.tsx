@@ -8,23 +8,7 @@ export interface ChipSelectOption {
   disabled?: boolean;
 }
 
-// Drop-in replacement for a native single-select <select className="select">: closed it looks like
-// the same button-styled field, but clicking it opens a small popover with a search box (shown once
-// there are enough options to be worth filtering) and every option rendered as a clickable chip.
-// value/onChange are plain strings (no synthetic event), since there's no real <select> underneath.
-export function ChipSelect({
-  value,
-  onChange,
-  options,
-  placeholder = "Select...",
-  disabled,
-  className,
-  style,
-  searchPlaceholder = "Search...",
-  searchThreshold = 8,
-}: {
-  value: string;
-  onChange: (value: string) => void;
+interface ChipSelectBaseProps {
   options: ChipSelectOption[];
   placeholder?: string;
   disabled?: boolean;
@@ -32,7 +16,43 @@ export function ChipSelect({
   style?: React.CSSProperties;
   searchPlaceholder?: string;
   searchThreshold?: number;
-}) {
+}
+
+interface ChipSelectSingleProps extends ChipSelectBaseProps {
+  multiple?: false;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+interface ChipSelectMultiProps extends ChipSelectBaseProps {
+  multiple: true;
+  value: string[];
+  onChange: (value: string[]) => void;
+}
+
+// Drop-in replacement for a native single-select <select className="select">: closed it looks like
+// the same button-styled field, but clicking it opens a small popover with a search box (shown once
+// there are enough options to be worth filtering) and every option rendered as a clickable chip.
+// value/onChange are plain strings (no synthetic event), since there's no real <select> underneath.
+// multiple:true switches value/onChange to string[] (see overloads below) — used for "match any of"
+// filters (e.g. Report Builder's "in" operator) that previously fell back to a raw native
+// <select multiple>; picking an option toggles it and keeps the popover open instead of closing.
+export function ChipSelect(props: ChipSelectSingleProps): JSX.Element;
+export function ChipSelect(props: ChipSelectMultiProps): JSX.Element;
+export function ChipSelect(props: ChipSelectSingleProps | ChipSelectMultiProps) {
+  const {
+    value,
+    onChange,
+    options,
+    placeholder = "Select...",
+    disabled,
+    className,
+    style,
+    searchPlaceholder = "Search...",
+    searchThreshold = 8,
+    multiple,
+  } = props;
+
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
@@ -93,12 +113,36 @@ export function ChipSelect({
     };
   }, [open]);
 
-  const selected = options.find((o) => o.value === value);
+  const selectedValues = multiple ? value : undefined;
+  const selected = !multiple ? options.find((o) => o.value === value) : undefined;
+  const isSelected = (v: string) => (multiple ? selectedValues!.includes(v) : v === value);
+
+  const triggerLabel = multiple
+    ? selectedValues!.length === 0
+      ? placeholder
+      : selectedValues!.length === 1
+        ? options.find((o) => o.value === selectedValues![0])?.label ?? selectedValues![0]
+        : `${selectedValues!.length} selected`
+    : selected
+      ? selected.label
+      : placeholder;
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return options;
     return options.filter((o) => o.label.toLowerCase().includes(q));
   }, [options, search]);
+
+  function handlePick(v: string) {
+    if (multiple) {
+      const next = selectedValues!.includes(v) ? selectedValues!.filter((x) => x !== v) : [...selectedValues!, v];
+      (onChange as (value: string[]) => void)(next);
+      // multi-select stays open so the user can toggle several options in one interaction
+      return;
+    }
+    (onChange as (value: string) => void)(v);
+    close();
+  }
 
   return (
     <div ref={rootRef} className={className} style={{ position: "relative", ...style }}>
@@ -110,8 +154,8 @@ export function ChipSelect({
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
       >
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: selected ? "inherit" : "var(--color-text-muted)" }}>
-          {selected ? selected.label : placeholder}
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: (multiple ? selectedValues!.length > 0 : !!selected) ? "inherit" : "var(--color-text-muted)" }}>
+          {triggerLabel}
         </span>
         <Icon name="chevronDown" size={13} />
       </button>
@@ -156,17 +200,19 @@ export function ChipSelect({
                   key={o.value}
                   type="button"
                   disabled={o.disabled}
-                  className={`badge ${o.value === value ? "badge-primary" : "badge-neutral"}`}
+                  className={`badge ${isSelected(o.value) ? "badge-primary" : "badge-neutral"}`}
                   style={{ cursor: o.disabled ? "not-allowed" : "pointer", border: "none", fontSize: 12.5, padding: "5px 10px" }}
-                  onClick={() => {
-                    onChange(o.value);
-                    close();
-                  }}
+                  onClick={() => handlePick(o.value)}
                 >
                   {o.label}
                 </button>
               ))}
             </div>
+            {multiple && (
+              <div className="row gap-2" style={{ justifyContent: "flex-end", marginTop: 8 }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={close}>Done</button>
+              </div>
+            )}
           </div>,
           document.body
         )}

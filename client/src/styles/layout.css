@@ -284,6 +284,53 @@
     @apply text-xs text-text-muted;
   }
 
+  .cmdk-overlay {
+    @apply fixed inset-0 flex justify-center z-[300] px-5;
+    padding-top: 12vh;
+    background: rgba(16, 24, 40, 0.45);
+  }
+  .cmdk-panel {
+    @apply w-full max-w-[640px] bg-surface border border-border rounded-2xl shadow-md flex flex-col overflow-hidden;
+    max-height: 70vh;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  }
+  .cmdk-input-row {
+    @apply flex items-center gap-3 px-5 py-4 border-b border-border text-text-muted flex-shrink-0;
+  }
+  .cmdk-input {
+    @apply flex-1 bg-transparent border-none outline-none text-text text-[15px];
+  }
+  .cmdk-input::placeholder {
+    @apply text-text-muted;
+  }
+  .cmdk-kbd {
+    @apply text-[11px] font-semibold text-text-muted bg-bg border border-border rounded px-1.5 py-0.5;
+  }
+  .cmdk-list {
+    @apply overflow-y-auto p-2;
+  }
+  .cmdk-section-heading {
+    @apply px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted;
+  }
+  .cmdk-row {
+    @apply w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left border-none bg-transparent text-text cursor-pointer;
+  }
+  .cmdk-row-active {
+    @apply bg-border;
+  }
+  .cmdk-row-text {
+    @apply flex flex-col items-start leading-tight;
+  }
+  .cmdk-row-label {
+    @apply text-[13.5px] font-medium;
+  }
+  .cmdk-row-sublabel {
+    @apply text-[11.5px] text-text-muted;
+  }
+  .cmdk-empty {
+    @apply text-center text-text-muted text-[13px] py-8;
+  }
+
   .floating-assistant-fab {
     @apply fixed bottom-6 right-6 w-[54px] h-[54px] rounded-full bg-primary text-white border-none shadow-md cursor-pointer flex items-center justify-center z-[200] transition-transform duration-150 ease-in-out;
   }
