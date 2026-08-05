@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Icon } from "../../components/Icon";
+import { useAuth } from "../../auth/AuthContext";
 import { ProjectsTab } from "./tabs/ProjectsTab";
 import { RssFeedTab } from "./tabs/RssFeedTab";
 import { KnowledgeBaseTab } from "./tabs/KnowledgeBaseTab";
@@ -26,6 +27,7 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
 
 export function OperationsPage() {
   const [tab, setTab] = useState<TabKey>("projects");
+  const { organization } = useAuth();
 
   return (
     <div className="ad-shell ot-shell">
@@ -33,7 +35,7 @@ export function OperationsPage() {
         <div className="ot-header-top">
           <div className="ot-header-icon"><Icon name="wrench" size={18} /></div>
           <div>
-            <h1 className="ot-header-title">Showground Operational Tools</h1>
+            <h1 className="ot-header-title">{organization?.name ? `${organization.name} Operational Tools` : "Operational Tools"}</h1>
             <p className="ot-header-subtitle">Launch secondary support workflows including IT scheduling, knowledge base, reservations, and query bookmarking.</p>
           </div>
         </div>

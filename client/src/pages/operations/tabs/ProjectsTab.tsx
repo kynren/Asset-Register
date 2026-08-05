@@ -14,6 +14,7 @@ import { useAuth } from "../../../auth/AuthContext";
 import { AccessGrant, AccessGrantPicker, AccessLevel, ManageAccessModal, canDeleteRecord, canEditRecord, canManageRecordAccess } from "../../../components/AccessControl";
 
 type ProjectStatus = "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
+type ProjectVisibility = "PUBLIC" | "PRIVATE" | "RESTRICTED";
 
 interface ProjectAttachment {
   id: number;
@@ -31,6 +32,7 @@ interface ProjectCard {
   title: string;
   description: string | null;
   status: ProjectStatus;
+  visibility: ProjectVisibility;
   assigneeId: number | null;
   assignee: { id: number; firstName: string; lastName: string } | null;
   startDate: string | null;
@@ -212,6 +214,7 @@ export function ProjectsTab() {
           initial={editingCard}
           users={users ?? []}
           teams={teams ?? []}
+          canManageVisibility={!editingCard || (!!user && canManageRecordAccess(editingCard.createdById, user.id, user.roleName))}
           onClose={() => { setShowForm(false); setEditingCardId(null); }}
         />
       )}
@@ -225,6 +228,7 @@ export function ProjectsTab() {
           users={users ?? []}
           teams={teams ?? []}
           queryKey={["op-projects"]}
+          levels={["VIEW", "EDIT", "DELETE"]}
           onClose={() => setManagingAccessId(null)}
         />
       )}
@@ -313,7 +317,14 @@ function ProjectCardView({
       className="ot-card"
       style={{ ...style, borderLeft: `3px solid ${color}`, cursor: canEdit ? "grab" : "default", opacity: draggable.isDragging ? 0.35 : 1 }}
     >
-      <div className="ot-card-title">{card.title}</div>
+      <div className="ot-card-title row gap-1" style={{ alignItems: "center" }}>
+        {card.visibility !== "PUBLIC" && (
+          <span title={card.visibility === "PRIVATE" ? "Private — only you can see this" : "Restricted — only people you've granted access can see this"}>
+            <Icon name={card.visibility === "PRIVATE" ? "eyeOff" : "shield"} size={11} />
+          </span>
+        )}
+        {card.title}
+      </div>
       {card.description && <div className="ot-card-desc">{card.description}</div>}
       <div className="ot-card-footer">
         <span className="ot-card-assignee">
@@ -353,20 +364,33 @@ function ProjectCardView({
   );
 }
 
+const VISIBILITY_OPTIONS: { value: ProjectVisibility; label: string }[] = [
+  { value: "PUBLIC", label: "Public — anyone with Operations access" },
+  { value: "PRIVATE", label: "Private — only me" },
+  { value: "RESTRICTED", label: "Restricted — only people I choose" },
+];
+
 function ProjectFormModal({
   initial,
   users,
   teams,
+  canManageVisibility,
   onClose,
 }: {
   initial: ProjectCard | null;
   users: any[];
   teams: any[];
+  // Visibility (and who gets to see a RESTRICTED card) is the creator's call alone — see the
+  // matching creator-only check server-side in projects.routes.ts's PATCH "/:id". True whenever
+  // creating a brand-new card (the current user will be its creator) or editing one they already
+  // created (or a bypass-role admin).
+  canManageVisibility: boolean;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [visibility, setVisibility] = useState<ProjectVisibility>(initial?.visibility ?? "PUBLIC");
   const [assigneeId, setAssigneeId] = useState(initial?.assigneeId ? String(initial.assigneeId) : "");
   const [startDate, setStartDate] = useState(initial?.startDate ? dayjs(initial.startDate).format("YYYY-MM-DD") : "");
   const [dueDate, setDueDate] = useState(initial?.dueDate ? dayjs(initial.dueDate).format("YYYY-MM-DD") : "");
@@ -379,6 +403,7 @@ function ProjectFormModal({
       const payload = {
         title,
         description: description || undefined,
+        ...(canManageVisibility ? { visibility } : {}),
         assigneeId: assigneeId ? Number(assigneeId) : null,
         startDate: startDate ? dayjs(startDate).toISOString() : null,
         dueDate: dueDate ? dayjs(dueDate).toISOString() : null,
@@ -407,7 +432,24 @@ function ProjectFormModal({
         <div className="field" style={{ flex: 1 }}><label>Due Date</label><input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
       </div>
 
-      {!initial && <AccessGrantPicker users={users} teams={teams} value={newAccess} onChange={setNewAccess} />}
+      {canManageVisibility ? (
+        <div className="field">
+          <label>Who can see this project</label>
+          <ChipSelect value={visibility} onChange={(v) => setVisibility(v as ProjectVisibility)} options={VISIBILITY_OPTIONS} />
+        </div>
+      ) : (
+        <div className="field">
+          <label>Who can see this project</label>
+          <p className="muted" style={{ fontSize: 12, marginTop: 2 }}>Only the creator can change this.</p>
+        </div>
+      )}
+
+      {!initial && <AccessGrantPicker users={users} teams={teams} value={newAccess} onChange={setNewAccess} levels={["VIEW", "EDIT", "DELETE"]} />}
+      {initial && visibility === "RESTRICTED" && canManageVisibility && (
+        <p className="muted" style={{ fontSize: 11.5, marginTop: -6 }}>
+          Use "Access" on the card to choose who can view, edit, or delete this project.
+        </p>
+      )}
     </FormModal>
   );
 }

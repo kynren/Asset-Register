@@ -11,7 +11,7 @@ import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { notifyUsers } from "../../lib/notify";
-import { RECORD_ACCESS_BYPASS_ROLE_NAMES, grantRecordAccess, hasRecordAccess, listRecordAccess, listRecordAccessBatch, revokeRecordAccess } from "../../lib/recordAccess";
+import { RECORD_ACCESS_BYPASS_ROLE_NAMES, grantRecordAccess, hasAnyRecordAccess, hasRecordAccess, listRecordAccess, listRecordAccessBatch, revokeRecordAccess } from "../../lib/recordAccess";
 
 const router = Router();
 router.use(verifyJwt);
@@ -23,6 +23,7 @@ const cardSelect = {
   title: true,
   description: true,
   status: true,
+  visibility: true,
   assigneeId: true,
   assignee: { select: { id: true, firstName: true, lastName: true } },
   startDate: true,
@@ -62,19 +63,42 @@ async function notifyCreatorOfUpdate(creatorId: number, actingUserId: number, pr
   });
 }
 
-router.get("/", requirePermission("operations", "view"), async (_req, res) => {
+// PUBLIC cards are visible to anyone with "operations" view permission, same as before this
+// feature existed. PRIVATE/RESTRICTED cards are filtered out here for everyone except the
+// creator, a bypass-role admin, or (RESTRICTED only) someone holding an access grant — see
+// ProjectVisibility in schema.prisma. This is a per-row check rather than a single query with a
+// WHERE clause because "does a grant exist for this user or any team they're on" isn't expressible
+// against a small, already-cached list without one query per restricted card; project boards are
+// small enough (dozens, not thousands of cards) that this stays cheap.
+router.get("/", requirePermission("operations", "view"), async (req, res) => {
   const cards = await prisma.projectCard.findMany({ select: cardSelect, orderBy: [{ order: "asc" }, { createdAt: "asc" }] });
-  const accessByCard = await listRecordAccessBatch(ENTITY_TYPE, cards.map((c) => c.id));
-  res.json(cards.map((c) => ({ ...c, access: accessByCard.get(c.id) ?? [] })));
+
+  const visibleCards = [];
+  for (const card of cards) {
+    if (card.visibility === "PUBLIC") {
+      visibleCards.push(card);
+    } else if (card.visibility === "PRIVATE") {
+      if (card.createdById === req.user!.id || RECORD_ACCESS_BYPASS_ROLE_NAMES.includes(req.user!.roleName)) visibleCards.push(card);
+    } else if (await hasAnyRecordAccess(ENTITY_TYPE, card.id, card, req.user!.id, req.user!.roleName)) {
+      visibleCards.push(card);
+    }
+  }
+
+  const accessByCard = await listRecordAccessBatch(ENTITY_TYPE, visibleCards.map((c) => c.id));
+  res.json(visibleCards.map((c) => ({ ...c, access: accessByCard.get(c.id) ?? [] })));
 });
 
 const accessGrantSchema = z
-  .object({ userId: z.number().int().optional(), teamId: z.number().int().optional(), level: z.enum(["EDIT", "DELETE"]) })
+  .object({ userId: z.number().int().optional(), teamId: z.number().int().optional(), level: z.enum(["EDIT", "DELETE", "VIEW"]) })
   .refine((v) => (v.userId != null) !== (v.teamId != null), { message: "Provide exactly one of userId or teamId" });
 
 const createSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
+  // Who can even see the card once created — see ProjectVisibility in schema.prisma. Defaults to
+  // PUBLIC (the historical, only behavior before this field existed) so existing create callers
+  // that never send it keep working exactly as before.
+  visibility: z.enum(["PUBLIC", "PRIVATE", "RESTRICTED"]).optional(),
   assigneeId: z.number().int().nullable().optional(),
   startDate: z.string().datetime().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
@@ -101,6 +125,9 @@ const updateSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
   status: z.enum(["TODO", "IN_PROGRESS", "REVIEW", "DONE"]).optional(),
+  // Only the creator (or a bypass-role admin) may change this — see the explicit check below.
+  // A regular EDIT grantee can update title/status/etc. but not who's allowed to see the card.
+  visibility: z.enum(["PUBLIC", "PRIVATE", "RESTRICTED"]).optional(),
   assigneeId: z.number().int().nullable().optional(),
   startDate: z.string().datetime().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
@@ -118,6 +145,12 @@ router.patch("/:id", requirePermission("operations", "edit"), validateBody(updat
 
   const canEdit = await hasRecordAccess(ENTITY_TYPE, id, existing, req.user!.id, req.user!.roleName, "EDIT");
   if (!canEdit) throw new ApiError(403, "Only the project's creator or someone they've granted edit access to can update this project");
+
+  // Visibility is the creator's call alone, even for someone who otherwise has EDIT access —
+  // matches the same creator-only rule already applied to granting/revoking access below.
+  if (req.body.visibility !== undefined && existing.createdById !== req.user!.id && !RECORD_ACCESS_BYPASS_ROLE_NAMES.includes(req.user!.roleName)) {
+    throw new ApiError(403, "Only the project's creator can change who can see this project");
+  }
 
   const card = await prisma.projectCard.update({ where: { id }, data: req.body, select: cardSelect });
   await logAudit({ userId: req.user!.id, action: "operations.project.update", entityType: "ProjectCard", entityId: id, metadata: req.body });
@@ -184,7 +217,7 @@ router.post("/:id/access", requirePermission("operations", "edit"), validateBody
 router.delete("/:id/access/:kind/:targetId/:level", requirePermission("operations", "edit"), async (req, res) => {
   const id = Number(req.params.id);
   const targetId = Number(req.params.targetId);
-  const level = req.params.level === "DELETE" ? "DELETE" : "EDIT";
+  const level = req.params.level === "DELETE" ? "DELETE" : req.params.level === "VIEW" ? "VIEW" : "EDIT";
   const target = req.params.kind === "team" ? { teamId: targetId } : { userId: targetId };
   const card = await prisma.projectCard.findUnique({ where: { id } });
   if (!card) throw new ApiError(404, "Project card not found");

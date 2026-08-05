@@ -42,7 +42,14 @@ export function KpiCard({ label, value, icon, tone = "primary", live = false }: 
       </div>
       <span className="kpi-value">{displayValue}</span>
       {icon && (
-        <span className="kpi-icon-badge" style={{ background: toneColors[tone] }}>
+        <span
+          className="kpi-icon-badge"
+          style={
+            tone === "neutral"
+              ? { background: toneColors[tone] }
+              : { background: "rgba(255, 255, 255, 0.18)", color: "#fff" }
+          }
+        >
           <Icon name={icon} size={16} />
         </span>
       )}

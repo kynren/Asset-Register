@@ -70,6 +70,7 @@ model User {
   ticketWatching                TicketWatcher[]
   auditLogs                     AuditLog[]
   notifications                 Notification[]
+  pushTokens                    PushToken[]
   stockTransactions             StockTransaction[]
   networkScans                  NetworkScan[]
   vaultEntries                  VaultEntry[]
@@ -2358,6 +2359,21 @@ model Notification {
   createdAt DateTime @default(now())
 }
 
+// One row per (user, device) — a user can have the mobile app installed on more than one device,
+// each gets its own Expo push token. Re-registering the same token (app reinstall, token refresh)
+// upserts by the unique token rather than creating a duplicate row. Consumed by
+// server/src/lib/pushNotify.ts, fired from notify.ts alongside the in-app Notification row so
+// push mirrors the in-app feed rather than being a separate notification channel.
+model PushToken {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String   @unique
+  platform   String
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+}
+
 enum NotificationEventKind {
   TICKET_ASSIGNED
   TICKET_WATCHING
@@ -2502,11 +2518,23 @@ enum ProjectCardStatus {
   DONE
 }
 
+// PUBLIC: visible to anyone with the "operations" view permission (the historical default, and
+// still the default for new cards). PRIVATE: visible only to the creator (and System/Super Admin).
+// RESTRICTED: visible to the creator plus anyone holding *any* RecordAccessGrant on the card (a
+// VIEW grant, or an EDIT/DELETE grant — being allowed to edit a card implies being allowed to see
+// it). See GET /operations/projects in projects.routes.ts for where this is enforced.
+enum ProjectVisibility {
+  PUBLIC
+  PRIVATE
+  RESTRICTED
+}
+
 model ProjectCard {
   id          Int               @id @default(autoincrement())
   title       String
   description String?
   status      ProjectCardStatus @default(TODO)
+  visibility  ProjectVisibility @default(PUBLIC)
   assigneeId  Int?
   assignee    User?             @relation("ProjectCardAssignee", fields: [assigneeId], references: [id])
   startDate   DateTime?
@@ -2544,6 +2572,9 @@ model ProjectCardAttachment {
 enum RecordAccessLevel {
   EDIT
   DELETE
+  // Grants read access to a RESTRICTED record without also granting EDIT/DELETE — see
+  // ProjectVisibility above for the first (and so far only) consumer of this level.
+  VIEW
 }
 
 // App-wide creator/editor/delete-access grant system: any creator-owned record type (identified

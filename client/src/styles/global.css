@@ -404,20 +404,28 @@
   .kpi-card-neutral {
     @apply bg-surface border-border;
   }
+  .kpi-card-primary,
+  .kpi-card-success,
+  .kpi-card-warning,
+  .kpi-card-danger {
+    color: #fff;
+    --kpi-label-color: rgba(255, 255, 255, 0.82);
+  }
   .kpi-card-primary {
-    background: var(--color-primary-soft);
+    background: var(--color-primary);
   }
   .kpi-card-success {
-    background: var(--color-success-soft);
+    background: var(--color-success);
   }
   .kpi-card-warning {
-    background: var(--color-warning-soft);
+    background: var(--color-warning);
   }
   .kpi-card-danger {
-    background: var(--color-danger-soft);
+    background: var(--color-danger);
   }
   .kpi-label {
-    @apply text-xs text-text-muted font-semibold uppercase tracking-wide;
+    @apply text-xs font-semibold uppercase tracking-wide;
+    color: var(--kpi-label-color, var(--color-text-muted));
   }
   .kpi-value {
     @apply text-[26px] font-bold tabular-nums;
