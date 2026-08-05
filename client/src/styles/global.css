@@ -143,8 +143,8 @@
 
   .app-shell {
     @apply flex overflow-hidden;
-    margin: 2px;
-    height: calc(100vh - 4px);
+    margin: 34px;
+    height: calc(100vh - 68px);
     border-radius: var(--shell-radius);
     box-shadow: var(--shell-shadow);
   }
