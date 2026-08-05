@@ -27,7 +27,10 @@ type PreviewResult =
   | { kind: "table"; columns: string[]; rows: Record<string, unknown>[] }
   | { kind: "chart"; data: { label: string; count: number }[] };
 
-export function ReportBuilderModal({ reportId, onClose }: { reportId?: number; onClose: () => void }) {
+// defaultSource preselects a data source (e.g. opening the builder from a module's own Reports
+// tab rather than the top-level Reports page) — only applies to new reports, never overrides an
+// existing report being edited.
+export function ReportBuilderModal({ reportId, defaultSource, onClose }: { reportId?: number; defaultSource?: string; onClose: () => void }) {
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
   const availableSources = DATA_EXPLORER_SOURCES.filter((s) => hasPermission(s.module as ModuleName, "view"));
@@ -40,7 +43,7 @@ export function ReportBuilderModal({ reportId, onClose }: { reportId?: number; o
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [sourceId, setSourceId] = useState(availableSources[0]?.id ?? "");
+  const [sourceId, setSourceId] = useState((defaultSource && availableSources.some((s) => s.id === defaultSource) ? defaultSource : availableSources[0]?.id) ?? "");
   const [combinator, setCombinator] = useState<"AND" | "OR">("AND");
   const [conditions, setConditions] = useState<FilterCondition[]>([]);
   const [columns, setColumns] = useState<string[]>([]);

@@ -21,16 +21,16 @@ model Role {
 }
 
 model RolePermission {
-  id        Int     @id @default(autoincrement())
-  roleId    Int
-  role      Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  module    String
-  canView   Boolean @default(false)
-  canCreate Boolean @default(false)
-  canEdit   Boolean @default(false)
-  canDelete Boolean @default(false)
-  canExport Boolean @default(false)
-  canImport Boolean @default(false)
+  id                Int     @id @default(autoincrement())
+  roleId            Int
+  role              Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  module            String
+  canView           Boolean @default(false)
+  canCreate         Boolean @default(false)
+  canEdit           Boolean @default(false)
+  canDelete         Boolean @default(false)
+  canExport         Boolean @default(false)
+  canImport         Boolean @default(false)
   // Only consulted for module="helpdesk" today: when true, a holder of this role only sees tickets
   // they're assigned to or requested, instead of every ticket canView would otherwise grant.
   scopeAssignedOnly Boolean @default(false)
@@ -62,40 +62,40 @@ model User {
   lockedUntil         DateTime?
   passwordChangedAt   DateTime?
 
-  assetsAssigned    Asset[]            @relation("AssetAssignee")
-  ticketsRequested  Ticket[]           @relation("TicketRequester")
-  ticketAssignments TicketAssignee[]
-  ticketComments    TicketComment[]
-  ticketAttachments TicketAttachment[]
-  ticketWatching    TicketWatcher[]
-  auditLogs         AuditLog[]
-  notifications     Notification[]
-  stockTransactions StockTransaction[]
-  networkScans      NetworkScan[]
-  vaultEntries      VaultEntry[]
-  images            UserImage[]
-  dashboardsOwned         Dashboard[]      @relation("DashboardOwner")
-  dashboardSharesReceived DashboardShare[] @relation("DashboardShareUser")
-  savedViewsOwned         SavedView[]      @relation("SavedViewOwner")
-  savedViewSharesReceived SavedViewShare[] @relation("SavedViewShareUser")
-  reportsOwned            Report[]         @relation("ReportOwner")
-  reportSharesReceived    ReportShare[]    @relation("ReportShareUser")
+  assetsAssigned                Asset[]                    @relation("AssetAssignee")
+  ticketsRequested              Ticket[]                   @relation("TicketRequester")
+  ticketAssignments             TicketAssignee[]
+  ticketComments                TicketComment[]
+  ticketAttachments             TicketAttachment[]
+  ticketWatching                TicketWatcher[]
+  auditLogs                     AuditLog[]
+  notifications                 Notification[]
+  stockTransactions             StockTransaction[]
+  networkScans                  NetworkScan[]
+  vaultEntries                  VaultEntry[]
+  images                        UserImage[]
+  dashboardsOwned               Dashboard[]                @relation("DashboardOwner")
+  dashboardSharesReceived       DashboardShare[]           @relation("DashboardShareUser")
+  savedViewsOwned               SavedView[]                @relation("SavedViewOwner")
+  savedViewSharesReceived       SavedViewShare[]           @relation("SavedViewShareUser")
+  reportsOwned                  Report[]                   @relation("ReportOwner")
+  reportSharesReceived          ReportShare[]              @relation("ReportShareUser")
   approvalSubstituteDelegations TicketApprovalSubstitute[] @relation("ApprovalSubstituteDelegator")
   approvalSubstituteAssignments TicketApprovalSubstitute[] @relation("ApprovalSubstituteDelegate")
-  contactEmails           UserContactEmail[]
-  preferences             UserPreference[]
-  mcpApiKeys        McpApiKey[]
+  contactEmails                 UserContactEmail[]
+  preferences                   UserPreference[]
+  mcpApiKeys                    McpApiKey[]
 
-  projectCardsAssigned ProjectCard[]      @relation("ProjectCardAssignee")
-  projectCardsCreated  ProjectCard[]      @relation("ProjectCardCreator")
+  projectCardsAssigned           ProjectCard[]           @relation("ProjectCardAssignee")
+  projectCardsCreated            ProjectCard[]           @relation("ProjectCardCreator")
   projectCardAttachmentsUploaded ProjectCardAttachment[] @relation("ProjectCardAttachmentUploader")
-  recordAccessGrantsReceived RecordAccessGrant[] @relation("RecordAccessGrantUser")
-  recordAccessGrantsGiven    RecordAccessGrant[] @relation("RecordAccessGrantGrantedBy")
-  net2ServersCreated         Net2Server[]
-  knowledgeArticles    KnowledgeArticle[]
-  assetBookings        AssetBooking[]
-  savedQueries         SavedQuery[]
-  resourceSchedules    ResourceSchedule[]
+  recordAccessGrantsReceived     RecordAccessGrant[]     @relation("RecordAccessGrantUser")
+  recordAccessGrantsGiven        RecordAccessGrant[]     @relation("RecordAccessGrantGrantedBy")
+  net2ServersCreated             Net2Server[]
+  knowledgeArticles              KnowledgeArticle[]
+  assetBookings                  AssetBooking[]
+  savedQueries                   SavedQuery[]
+  resourceSchedules              ResourceSchedule[]
 
   refreshSessions               RefreshSession[]
   passwordResetTokens           PasswordResetToken[]
@@ -120,42 +120,45 @@ model User {
   systemStatusSettingsUpdates   SystemStatusSettings[]
   notificationPreferences       NotificationPreference[]
 
-  ticketTasksAssigned      TicketTask[]      @relation("TicketTaskAssignee")
-  ticketTasksAuthored      TicketTask[]      @relation("TicketTaskAuthor")
-  ticketSolutionsAuthored  TicketSolution[]  @relation("TicketSolutionAuthor")
-  ticketSolutionsAnswered  TicketSolution[]  @relation("TicketSolutionAnswerer")
-  ticketApprovalsRequested TicketApproval[]  @relation("TicketApprovalRequester")
-  ticketApprovalsTargeted  TicketApproval[]  @relation("TicketApprovalTargetUser")
-  ticketApprovalsAnswered  TicketApproval[]  @relation("TicketApprovalAnswerer")
+  ticketTasksAssigned      TicketTask[]       @relation("TicketTaskAssignee")
+  ticketTasksAuthored      TicketTask[]       @relation("TicketTaskAuthor")
+  ticketSolutionsAuthored  TicketSolution[]   @relation("TicketSolutionAuthor")
+  ticketSolutionsAnswered  TicketSolution[]   @relation("TicketSolutionAnswerer")
+  ticketApprovalsRequested TicketApproval[]   @relation("TicketApprovalRequester")
+  ticketApprovalsTargeted  TicketApproval[]   @relation("TicketApprovalTargetUser")
+  ticketApprovalsAnswered  TicketApproval[]   @relation("TicketApprovalAnswerer")
   ticketRecurrencesOwned   TicketRecurrence[] @relation("TicketRecurrenceRequester")
 
   // Personal appearance (color palette + sidebar/topbar layout) — a user picks one saved
   // AppearanceTheme (their own, or one shared with them) as "active"; null means the app's
   // default look. See AppearanceTheme below.
-  activeThemeId               Int?
-  activeTheme                 AppearanceTheme?        @relation("UserActiveTheme", fields: [activeThemeId], references: [id], onDelete: SetNull)
-  appearanceThemesCreated     AppearanceTheme[]       @relation("AppearanceThemeCreatedBy")
+  activeThemeId                 Int?
+  activeTheme                   AppearanceTheme?       @relation("UserActiveTheme", fields: [activeThemeId], references: [id], onDelete: SetNull)
+  appearanceThemesCreated       AppearanceTheme[]      @relation("AppearanceThemeCreatedBy")
   appearanceThemeSharesReceived AppearanceThemeShare[] @relation("AppearanceThemeShareUser")
 
   changelogEntriesCreated ChangelogEntry[]
   mediaAssetsUploaded     MediaAsset[]
+
+  stockItemAttachmentsUploaded StockItemAttachment[]
+  stockIssuancesReceived       StockIssuance[]
 }
 
 model RefreshSession {
-  id        Int       @id @default(autoincrement())
-  userId    Int
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique
-  userAgent String?
-  ipAddress String?
-  createdAt DateTime  @default(now())
-  expiresAt DateTime
-  revokedAt DateTime?
+  id                      Int       @id @default(autoincrement())
+  userId                  Int
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash               String    @unique
+  userAgent               String?
+  ipAddress               String?
+  createdAt               DateTime  @default(now())
+  expiresAt               DateTime
+  revokedAt               DateTime?
   // Set when a System Admin re-verifies their password/PIN to switch into a given organization —
   // lets the client skip re-prompting for the same org until this expires (or this session ends).
   // A non-null orgSwitchConfirmedOrgId with a null Until means "confirmed until logout" (no timer).
-  orgSwitchConfirmedOrgId  Int?
-  orgSwitchConfirmedUntil  DateTime?
+  orgSwitchConfirmedOrgId Int?
+  orgSwitchConfirmedUntil DateTime?
 }
 
 model PasswordResetToken {
@@ -950,28 +953,28 @@ enum RelayDeviceJobStatus {
 // For PING jobs, responseBodyBase64 carries base64(JSON.stringify({alive, responseTimeMs})) —
 // reusing the one generic result field rather than adding ping-specific columns.
 model RelayDeviceJob {
-  id                      Int                   @id @default(autoincrement())
+  id                      Int                  @id @default(autoincrement())
   kind                    RelayDeviceJobKind
-  status                  RelayDeviceJobStatus  @default(PENDING)
-  target                  String                // PING: host/IP. HTTP: host:port
+  status                  RelayDeviceJobStatus @default(PENDING)
+  target                  String // PING: host/IP. HTTP: host:port
   method                  String?
   path                    String?
-  protocolScheme          String?               @default("http")
+  protocolScheme          String?              @default("http")
   requestHeaders          Json?
   requestBody             String?
   digestUsername          String?
   digestPasswordEncrypted String?
-  timeoutMs               Int                   @default(8000)
+  timeoutMs               Int                  @default(8000)
   // Lower claims first (see GET /next-device-job's orderBy). 0 = on-demand (a user waiting on a
   // response — NVR/camera check, lighting refresh, ICMP pinger, single asset ping). 10 = background
   // (the asset-heartbeat sweep's own bulk concurrent pings) so it can never starve an on-demand
   // job of a worker — see assetHeartbeat.ts's BACKGROUND_JOB_PRIORITY.
-  priority                Int                   @default(0)
+  priority                Int                  @default(0)
   responseStatus          Int?
   responseHeaders         Json?
   responseBodyBase64      String?
   errorMessage            String?
-  createdAt               DateTime              @default(now())
+  createdAt               DateTime             @default(now())
   completedAt             DateTime?
 
   @@index([status, priority, createdAt])
@@ -1025,21 +1028,54 @@ enum StockTxType {
 }
 
 model StockItem {
-  id                 Int                 @id @default(autoincrement())
-  sku                String              @unique
+  id                 Int                   @id @default(autoincrement())
+  sku                String                @unique
   name               String
+  // Free-text legacy category, kept in sync with stockItemType.name for backward compatibility —
+  // dataExplorer.ts groups reports by this column, so it isn't dropped when stockItemTypeId is set.
   category           String?
-  unit               String              @default("pcs")
-  quantityOnHand     Int                 @default(0)
-  reorderLevel       Int                 @default(0)
-  unitCost           Decimal?            @db.Decimal(12, 2)
+  stockItemTypeId    Int?
+  stockItemType      StockItemType?        @relation(fields: [stockItemTypeId], references: [id])
+  unit               String                @default("pcs")
+  quantityOnHand     Int                   @default(0)
+  reorderLevel       Int                   @default(0)
+  unitCost           Decimal?              @db.Decimal(12, 2)
   locationId         Int?
-  location           Location?           @relation(fields: [locationId], references: [id])
+  location           Location?             @relation(fields: [locationId], references: [id])
   stockLevels        StockLevel[]
   transactions       StockTransaction[]
   purchaseOrderItems PurchaseOrderItem[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  attachments        StockItemAttachment[]
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+}
+
+// Real stock-type model — supersedes StockItem.category's free text for new UI (type picker with
+// inline "+create") while category stays populated for existing reports/dashboards. `code` is a
+// stable, uppercase/alnum SKU fragment (e.g. "LAPTOP") independent of the display name.
+model StockItemType {
+  id          Int         @id @default(autoincrement())
+  name        String
+  code        String      @unique
+  description String?
+  stockItems  StockItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// Image/video attachments for a stock item. Separate from AssetPhoto (which only supports images)
+// since video is an explicit requirement here; mimeType is stored explicitly so FilePreview's
+// getPreviewKind() can reliably pick <img>/<video> without depending on the URL having an extension.
+model StockItemAttachment {
+  id           Int       @id @default(autoincrement())
+  stockItemId  Int
+  stockItem    StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  url          String
+  mimeType     String?
+  originalName String?
+  uploadedById Int?
+  uploadedBy   User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
 }
 
 // Per-location quantity breakdown for a StockItem. StockItem.quantityOnHand
@@ -1060,17 +1096,34 @@ model StockLevel {
 }
 
 model StockTransaction {
-  id             Int         @id @default(autoincrement())
+  id             Int            @id @default(autoincrement())
   stockItemId    Int
-  stockItem      StockItem   @relation(fields: [stockItemId], references: [id])
+  stockItem      StockItem      @relation(fields: [stockItemId], references: [id])
   type           StockTxType
   quantity       Int
   reason         String?
   fromLocationId Int?
   toLocationId   Int?
   performedById  Int
-  performedBy    User        @relation(fields: [performedById], references: [id])
-  createdAt      DateTime    @default(now())
+  performedBy    User           @relation(fields: [performedById], references: [id])
+  createdAt      DateTime       @default(now())
+  issuance       StockIssuance?
+}
+
+// Marks a StockTransaction (always type: OUT) as a formal, signed goods-issue — scanned QR,
+// quantity-validated, and countersigned by the recipient — as opposed to an ordinary ad-hoc stock
+// adjustment via the Manage Stock modal. Kept as a separate table rather than columns on
+// StockTransaction (which also serves IN/TRANSFER/ad-hoc OUT with no recipient concept) so those
+// columns aren't null ~95% of the time; mirrors this schema's own Asset + AssetCheckout split.
+model StockIssuance {
+  id                Int              @id @default(autoincrement())
+  transactionId     Int              @unique
+  transaction       StockTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  receivedById      Int
+  receivedBy        User             @relation(fields: [receivedById], references: [id])
+  signatureImageUrl String
+  scannedSku        String?
+  createdAt         DateTime         @default(now())
 }
 
 model Supplier {
@@ -1208,16 +1261,16 @@ model TicketCategory {
 }
 
 model Team {
-  id                Int                  @id @default(autoincrement())
-  name              String               @unique
-  members           TeamMember[]
-  ticketAssignments TicketAssignedTeam[]
-  ticketApprovals   TicketApproval[]
-  dashboardShares   DashboardShare[]
-  savedViewShares   SavedViewShare[]
-  reportShares      ReportShare[]
+  id                 Int                  @id @default(autoincrement())
+  name               String               @unique
+  members            TeamMember[]
+  ticketAssignments  TicketAssignedTeam[]
+  ticketApprovals    TicketApproval[]
+  dashboardShares    DashboardShare[]
+  savedViewShares    SavedViewShare[]
+  reportShares       ReportShare[]
   recordAccessGrants RecordAccessGrant[]
-  createdAt         DateTime             @default(now())
+  createdAt          DateTime             @default(now())
 }
 
 model TeamMember {
@@ -1249,30 +1302,30 @@ model EmailIngestSettings {
 }
 
 model Ticket {
-  id                  Int                @id @default(autoincrement())
-  ticketNumber        String             @unique
+  id                  Int                      @id @default(autoincrement())
+  ticketNumber        String                   @unique
   title               String
   description         String
-  type                TicketType         @default(ACTION)
-  itilType            TicketItilType     @default(INCIDENT)
-  status              TicketStatus       @default(OPEN)
-  priority            TicketPriority     @default(MEDIUM)
+  type                TicketType               @default(ACTION)
+  itilType            TicketItilType           @default(INCIDENT)
+  status              TicketStatus             @default(OPEN)
+  priority            TicketPriority           @default(MEDIUM)
   categoryId          Int?
-  category            TicketCategory?    @relation(fields: [categoryId], references: [id])
+  category            TicketCategory?          @relation(fields: [categoryId], references: [id])
   templateId          Int?
-  template            TicketTemplate?    @relation(fields: [templateId], references: [id])
+  template            TicketTemplate?          @relation(fields: [templateId], references: [id])
   assetId             Int?
-  asset               Asset?             @relation(fields: [assetId], references: [id])
+  asset               Asset?                   @relation(fields: [assetId], references: [id])
   locationId          Int?
-  location            Location?          @relation(fields: [locationId], references: [id])
+  location            Location?                @relation(fields: [locationId], references: [id])
   requesterId         Int
-  requester           User               @relation("TicketRequester", fields: [requesterId], references: [id])
+  requester           User                     @relation("TicketRequester", fields: [requesterId], references: [id])
   assignees           TicketAssignee[]
   assignedTeams       TicketAssignedTeam[]
   dueAt               DateTime?
   // SLA — a simplified, calendar-time (not business-hours-aware) version of GLPI's TTO/TTR split.
   slaId               Int?
-  sla                 TicketSla?         @relation(fields: [slaId], references: [id])
+  sla                 TicketSla?               @relation(fields: [slaId], references: [id])
   ttoDueAt            DateTime?
   ttrDueAt            DateTime?
   ttoMetAt            DateTime?
@@ -1287,11 +1340,11 @@ model Ticket {
   solutions           TicketSolution[]
   approvals           TicketApproval[]
   knowledgeArticles   TicketKnowledgeArticle[]
-  linksFrom           TicketLink[]       @relation("TicketLinkFrom")
-  linksTo             TicketLink[]       @relation("TicketLinkTo")
+  linksFrom           TicketLink[]             @relation("TicketLinkFrom")
+  linksTo             TicketLink[]             @relation("TicketLinkTo")
   recurrenceSpawns    TicketRecurrence[]
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
   resolvedAt          DateTime?
 }
 
@@ -1542,61 +1595,61 @@ enum CameraStatus {
 }
 
 model Nvr {
-  id                Int           @id @default(autoincrement())
-  name              String
-  ipAddress         String?
-  port              Int?
+  id                      Int           @id @default(autoincrement())
+  name                    String
+  ipAddress               String?
+  port                    Int?
   // Separate from `port` (the RTSP port, typically 554) because ISAPI/ONVIF speak HTTP/SOAP on
   // their own port (typically 80/443) — reusing one field for both was the root cause of ISAPI
   // calls landing on the RTSP daemon and getting back a raw "RTSP/1.0 400 Bad Request" instead of
   // a JSON device-info response. Null defaults to 80 in the ISAPI/ONVIF client code.
-  httpPort          Int?
-  protocol          String?       @default("RTSP")
-  username          String?
-  encryptedPassword String?
-  locationId        Int?
-  location          Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  model             String?
-  notes             String?
-  status            CameraStatus  @default(UNKNOWN)
-  lastCheckedAt     DateTime?
+  httpPort                Int?
+  protocol                String?       @default("RTSP")
+  username                String?
+  encryptedPassword       String?
+  locationId              Int?
+  location                Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  model                   String?
+  notes                   String?
+  status                  CameraStatus  @default(UNKNOWN)
+  lastCheckedAt           DateTime?
   // Latency of the most recent successful connection test/check (Test Connection button, Check
   // Status, or a live-view session's pre-flight probe) — lets the UI show a persisted "last known"
   // reading instantly instead of re-testing on every modal open. Null whenever the last result was
   // a failure or nothing has been tested yet.
   lastConnectionLatencyMs Int?
-  cameras           Camera[]
-  events            CameraEvent[]
-  createdAt         DateTime      @default(now())
+  cameras                 Camera[]
+  events                  CameraEvent[]
+  createdAt               DateTime      @default(now())
 }
 
 model Camera {
-  id                Int               @id @default(autoincrement())
-  nvrId             Int
-  nvr               Nvr               @relation(fields: [nvrId], references: [id], onDelete: Cascade)
-  name              String
-  channel           Int?
-  locationId        Int?
-  location          Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  ipAddress         String?
-  port              Int?
+  id                      Int               @id @default(autoincrement())
+  nvrId                   Int
+  nvr                     Nvr               @relation(fields: [nvrId], references: [id], onDelete: Cascade)
+  name                    String
+  channel                 Int?
+  locationId              Int?
+  location                Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  ipAddress               String?
+  port                    Int?
   // See Nvr.httpPort's comment — same RTSP-vs-ISAPI/ONVIF port split, needed here too since a
   // camera can be addressed directly (not just through its parent NVR).
-  httpPort          Int?
-  username          String?
-  encryptedPassword String?
-  streamUrl         String?
-  ptzEnabled        Boolean           @default(false)
-  status            CameraStatus      @default(UNKNOWN)
-  lastCheckedAt     DateTime?
+  httpPort                Int?
+  username                String?
+  encryptedPassword       String?
+  streamUrl               String?
+  ptzEnabled              Boolean           @default(false)
+  status                  CameraStatus      @default(UNKNOWN)
+  lastCheckedAt           DateTime?
   // See Nvr.lastConnectionLatencyMs's comment — same "persisted last known reading" purpose.
   lastConnectionLatencyMs Int?
-  events            CameraEvent[]
-  recordings        CameraRecording[]
+  events                  CameraEvent[]
+  recordings              CameraRecording[]
   // Implicit many-to-many — a camera covering an entrance can reasonably be linked to more than
   // one door (e.g. a lobby camera facing two adjacent doors), and a door can have more than one
   // linked camera (inside + outside view).
-  doors             Door[]
+  doors                   Door[]
 }
 
 model CameraRecording {
@@ -2114,16 +2167,16 @@ model LightingScanResult {
 // percentages of the image's own dimensions (not pixels) so a map renders correctly at any
 // viewport width without persisting the image's pixel size separately.
 model LightingSiteMap {
-  id        Int                     @id @default(autoincrement())
-  name      String
-  imageUrl  String
-  sortOrder Int                     @default(0)
+  id             Int                     @id @default(autoincrement())
+  name           String
+  imageUrl       String
+  sortOrder      Int                     @default(0)
   // 0-100 — a dark scrim drawn over the whole map, punched through with an animated "cleared"
   // hole over each ON light's own coverage shape (or a small default circle around its marker
   // when no shape has been drawn). 0 disables the overlay entirely. See SiteMapEditor.tsx.
-  overlayDensity Int                @default(0)
-  createdAt DateTime                @default(now())
-  devices   LightingSiteMapDevice[]
+  overlayDensity Int                     @default(0)
+  createdAt      DateTime                @default(now())
+  devices        LightingSiteMapDevice[]
 }
 
 enum LightingSiteMapShapeType {
@@ -2206,18 +2259,19 @@ enum NotificationEventKind {
   MAINTENANCE_DUE
   DEVICE_OFFLINE
   PROJECT_UPDATED
+  STOCK_ISSUED
 }
 
 // Per-user, per-event-kind opt-out toggle. A missing row for a (userId, kind) pair means
 // "enabled" for both channels — matches the pre-existing always-on behavior, so no backfill is
 // needed; a row only appears once a user actually changes a default in Profile > Notifications.
 model NotificationPreference {
-  id           Int                    @id @default(autoincrement())
+  id           Int                   @id @default(autoincrement())
   userId       Int
-  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   kind         NotificationEventKind
-  inAppEnabled Boolean                @default(true)
-  emailEnabled Boolean                @default(true)
+  inAppEnabled Boolean               @default(true)
+  emailEnabled Boolean               @default(true)
 
   @@unique([userId, kind])
 }
@@ -2233,6 +2287,7 @@ enum EmailEventType {
   MAGIC_LOGIN_LINK
   TICKET_ASSIGNED
   PROJECT_UPDATED
+  STOCK_ISSUED
 }
 
 // Blocks is an ordered array of { id, type, ...type-specific fields } — rendered to HTML by
@@ -2760,23 +2815,23 @@ model BackupRunDestination {
 // points at whichever Theme (their own, or one shared with them) is currently applied; null means
 // the app's built-in default look.
 model AppearanceTheme {
-  id                Int      @id @default(autoincrement())
-  name              String
-  createdById       Int
-  createdBy         User     @relation("AppearanceThemeCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
-  navPosition       String   @default("sidebar") // "sidebar" | "topbar"
-  primaryColor      String   @default("#1d4ed8")
+  id               Int      @id @default(autoincrement())
+  name             String
+  createdById      Int
+  createdBy        User     @relation("AppearanceThemeCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  navPosition      String   @default("sidebar") // "sidebar" | "topbar"
+  primaryColor     String   @default("#1d4ed8")
   // Null = inherit the app's built-in default for that slot instead of overriding it (so a theme
   // can customize just the accent color and leave the sidebar/page background alone, for instance).
-  sidebarBgColor    String?
-  sidebarTextColor  String?
-  pageBgColor       String?
-  isDark            Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  sidebarBgColor   String?
+  sidebarTextColor String?
+  pageBgColor      String?
+  isDark           Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  shares        AppearanceThemeShare[]
-  activeForUsers User[]                @relation("UserActiveTheme")
+  shares         AppearanceThemeShare[]
+  activeForUsers User[]                 @relation("UserActiveTheme")
 
   @@index([createdById])
 }

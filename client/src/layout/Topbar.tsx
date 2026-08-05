@@ -1,4 +1,4 @@
-import { KeyboardEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -15,33 +15,8 @@ function initials(firstName: string, lastName: string) {
   return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
 }
 
-interface SearchResult {
-  type: "asset" | "ticket" | "doc";
-  id: number;
-  path: string;
-  label: string;
-  sublabel: string;
-}
-
-interface SearchResponse {
-  assets: SearchResult[];
-  tickets: SearchResult[];
-  docs: SearchResult[];
-}
-
-const SEARCH_GROUPS: { key: keyof SearchResponse; heading: string }[] = [
-  { key: "assets", heading: "Assets" },
-  { key: "tickets", heading: "Tickets" },
-  { key: "docs", heading: "Docs & SOPs" },
-];
-
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-  return debounced;
+function openCommandPalette() {
+  window.dispatchEvent(new Event("open-command-palette"));
 }
 
 function useLatency() {
@@ -81,8 +56,6 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
   const { user, organization, logout, switchOrganization } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showClientInfo, setShowClientInfo] = useState(false);
   const navigate = useNavigate();
@@ -118,42 +91,9 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
     }
   }
 
-  const debouncedSearch = useDebouncedValue(search.trim(), 250);
-  const { data: searchResults, isFetching: searchLoading } = useQuery({
-    queryKey: ["global-search", debouncedSearch],
-    queryFn: async () => (await axiosClient.get<SearchResponse>("/search", { params: { q: debouncedSearch } })).data,
-    enabled: debouncedSearch.length >= 2,
-  });
-
-  const flatResults = searchResults ? SEARCH_GROUPS.flatMap((g) => searchResults[g.key]) : [];
-  const hasResults = flatResults.length > 0;
-
   async function handleLogout() {
     await logout();
     navigate("/login");
-  }
-
-  function goToResult(result: SearchResult) {
-    navigate(result.path);
-    setSearch("");
-    setSearchOpen(false);
-  }
-
-  function handleSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Escape") {
-      setSearchOpen(false);
-      e.currentTarget.blur();
-      return;
-    }
-    if (e.key !== "Enter" || !search.trim()) return;
-    if (flatResults.length > 0) {
-      goToResult(flatResults[0]);
-    } else {
-      // No indexed match (or results haven't loaded yet) — fall back to the asset list's own
-      // search filter, which also catches tags/serials that don't rank in the quick-search.
-      navigate(`/assets?search=${encodeURIComponent(search.trim())}`);
-      setSearchOpen(false);
-    }
   }
 
   async function handleExportBriefing() {
@@ -176,43 +116,15 @@ export function Topbar({ onToggleMobileNav }: { onToggleMobileNav?: () => void }
       <button className="topbar-hamburger-btn" onClick={onToggleMobileNav} title="Menu" aria-label="Toggle navigation menu">
         <Icon name="menu" size={18} />
       </button>
-      <div className="topbar-search" style={{ position: "relative" }}>
+      <div className="topbar-search" style={{ cursor: "text" }} onClick={openCommandPalette}>
         <Icon name="search" size={14} />
         <input
           placeholder="Search assets, tickets, knowledge..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setSearchOpen(true); }}
-          onFocus={() => setSearchOpen(true)}
-          onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
-          onKeyDown={handleSearchKeyDown}
+          readOnly
+          onFocus={(e) => { e.currentTarget.blur(); openCommandPalette(); }}
+          onKeyDown={(e) => { if (e.key === "Enter") openCommandPalette(); }}
+          style={{ cursor: "text" }}
         />
-        {searchOpen && debouncedSearch.length >= 2 && (
-          <div className="user-menu" style={{ top: 44, left: 0, right: "auto", width: "100%", minWidth: 320 }}>
-            {searchLoading && !searchResults && <div className="empty-state" style={{ padding: 16, fontSize: 12.5 }}>Searching...</div>}
-            {!searchLoading && !hasResults && <div className="empty-state" style={{ padding: 16, fontSize: 12.5 }}>No matches for "{debouncedSearch}".</div>}
-            {hasResults && (
-              <div style={{ maxHeight: 360, overflowY: "auto" }}>
-                {SEARCH_GROUPS.map((group) => {
-                  const items = searchResults?.[group.key] ?? [];
-                  if (items.length === 0) return null;
-                  return (
-                    <div key={group.key}>
-                      <div className="user-menu-header" style={{ padding: "6px 14px", fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase", color: "var(--color-text-muted)" }}>
-                        {group.heading}
-                      </div>
-                      {items.map((item) => (
-                        <div key={`${item.type}-${item.id}`} className="user-menu-item" style={{ flexDirection: "column", alignItems: "flex-start", gap: 2 }} onMouseDown={() => goToResult(item)}>
-                          <span style={{ fontSize: 13, fontWeight: 500 }}>{item.label}</span>
-                          <span className="muted" style={{ fontSize: 11 }}>{item.sublabel}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       <div className="topbar-actions">

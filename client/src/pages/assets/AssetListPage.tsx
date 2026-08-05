@@ -28,7 +28,7 @@ export type { Asset };
 
 export function AssetListPage() {
   const [view, setView] = useState<"inventory" | "dashboard">("dashboard");
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [status, setStatus] = useState(searchParams.get("status") ?? "");
   const [categoryId, setCategoryId] = useState<number | null>(searchParams.get("categoryId") ? Number(searchParams.get("categoryId")) : null);
@@ -62,6 +62,17 @@ export function AssetListPage() {
     setCategoryId(searchParams.get("categoryId") ? Number(searchParams.get("categoryId")) : null);
     setAssignedToId(searchParams.get("assignedToId") ?? "");
   }, [searchParams]);
+
+  // Lets the command palette's "Add Asset" quick action deep-link straight into the create form.
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setShowForm(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filters = { search: search || undefined, status: status || undefined, assignedToId: assignedToId || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined };
 
@@ -228,18 +239,19 @@ export function AssetListPage() {
       <>
       <CategoryTabBar categories={collectionTabs} active={activeCollection} onSelect={selectCollection} allCount={collectionTabs.length} />
 
-      <div className="row gap-2 flex-wrap" style={{ marginTop: 16, marginBottom: 14, paddingBottom: 30 }}>
-        <button className={`btn btn-sm ${categoryId === null ? "btn-primary" : "btn-secondary"}`} onClick={() => setCategoryId(null)}>
-          All Assets <span className="badge badge-neutral" style={{ marginLeft: 6 }}>{visibleAssetsTotal}</span>
-        </button>
-        {visibleCategories?.map((c: any) => {
-          const count = stats?.byCategory.find((s) => s.categoryId === c.id)?.count ?? 0;
-          return (
-            <button key={c.id} className={`btn btn-sm ${categoryId === c.id ? "btn-primary" : "btn-secondary"}`} onClick={() => setCategoryId(c.id)}>
-              {c.name} <span className="badge badge-neutral" style={{ marginLeft: 6 }}>{count}</span>
-            </button>
-          );
-        })}
+      <div className="row gap-2 flex-wrap" style={{ marginTop: 16, marginBottom: 14, paddingBottom: 30, alignItems: "center" }}>
+        <ChipSelect
+          style={{ width: "auto", minWidth: 200 }}
+          value={categoryId == null ? "" : String(categoryId)}
+          onChange={(v) => setCategoryId(v === "" ? null : Number(v))}
+          options={[
+            { value: "", label: `All Assets (${visibleAssetsTotal})` },
+            ...(visibleCategories ?? []).map((c: any) => ({
+              value: String(c.id),
+              label: `${c.name} (${stats?.byCategory.find((s) => s.categoryId === c.id)?.count ?? 0})`,
+            })),
+          ]}
+        />
         <PermissionGate module="admin" action="edit">
           <button className="btn btn-secondary btn-sm" onClick={() => navigate("/admin")}><Icon name="plus" size={12} /> Add Asset Type</button>
           <button className="btn btn-secondary btn-sm" onClick={() => setShowManageCollections(true)}><Icon name="grid" size={12} /> Manage Collections</button>

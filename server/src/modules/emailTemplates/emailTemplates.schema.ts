@@ -11,7 +11,7 @@ export const blockSchema = z.discriminatedUnion("type", [
   z.object({ id: z.string(), type: z.literal("spacer"), height: z.number().optional() }),
 ]);
 
-export const emailEventTypeSchema = z.enum(["ACCOUNT_CREATED", "ASSET_ASSIGNED", "PASSWORD_RESET", "TASK_OVERDUE", "LOW_STOCK"]);
+export const emailEventTypeSchema = z.enum(["ACCOUNT_CREATED", "ASSET_ASSIGNED", "PASSWORD_RESET", "TASK_OVERDUE", "LOW_STOCK", "STOCK_ISSUED"]);
 
 export const createEmailTemplateSchema = z.object({
   name: z.string().min(1),

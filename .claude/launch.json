@@ -13,7 +13,7 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "-w", "client"],
       "port": 5173,
-      "autoPort": false
+      "autoPort": true
     }
   ]
 }

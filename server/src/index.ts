@@ -10,6 +10,7 @@ import { startSystemStatusScheduler } from "./lib/systemStatusMonitor";
 import { backfillHarnessPermission } from "./lib/backfillHarnessPermission";
 import { backfillOperationalContextPermission } from "./lib/backfillOperationalContextPermission";
 import { backfillSystemAdmin } from "./lib/backfillSystemAdmin";
+import { backfillStockItemTypes } from "./lib/backfillStockItemTypes";
 import { startBackupScheduler } from "./lib/backupScheduler";
 import { startScheduledChangeScheduler } from "./lib/scheduledChangeScheduler";
 import { startEmailIngestScheduler } from "./lib/emailIngestScheduler";
@@ -56,6 +57,10 @@ bootstrapControlPlane()
       backfillSystemAdmin().catch((err) => {
         // eslint-disable-next-line no-console
         console.error("System Admin backfill failed:", err);
+      });
+      backfillStockItemTypes().catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error("Stock item type backfill failed:", err);
       });
     });
   })

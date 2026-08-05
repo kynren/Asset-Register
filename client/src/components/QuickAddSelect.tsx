@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { axiosClient } from "../api/axiosClient";
 import { Icon } from "./Icon";
 import { usePermission } from "../auth/PermissionGate";
+import type { ModuleName } from "../lib/permissions";
 import { ChipSelect } from "./ChipSelect";
 
 interface Option {
@@ -18,6 +19,7 @@ export function QuickAddSelect({
   options,
   createUrl,
   queryKey,
+  permissionModule = "admin",
 }: {
   label: string;
   required?: boolean;
@@ -26,9 +28,10 @@ export function QuickAddSelect({
   options: Option[] | undefined;
   createUrl: string;
   queryKey: string;
+  permissionModule?: ModuleName;
 }) {
   const queryClient = useQueryClient();
-  const canCreate = usePermission("admin", "create");
+  const canCreate = usePermission(permissionModule, "create");
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
 

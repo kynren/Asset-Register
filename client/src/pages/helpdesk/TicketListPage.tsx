@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { axiosClient } from "../../api/axiosClient";
 import { DataTable } from "../../components/DataTable";
 import { FilterBar } from "../../components/FilterBar";
@@ -32,6 +32,18 @@ export function TicketListPage() {
   const [showApprovals, setShowApprovals] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Lets the command palette's "New Ticket" quick action deep-link straight into the create form.
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setShowForm(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data, isLoading } = useQuery({
     queryKey: ["tickets", { status, type, itilType, assignedToMe, overdue, search, page }],

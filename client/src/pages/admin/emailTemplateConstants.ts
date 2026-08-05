@@ -1,6 +1,6 @@
-export type EmailEventType = "ACCOUNT_CREATED" | "ASSET_ASSIGNED" | "PASSWORD_RESET" | "TASK_OVERDUE" | "LOW_STOCK" | "MAGIC_LOGIN_LINK" | "TICKET_ASSIGNED" | "PROJECT_UPDATED";
+export type EmailEventType = "ACCOUNT_CREATED" | "ASSET_ASSIGNED" | "PASSWORD_RESET" | "TASK_OVERDUE" | "LOW_STOCK" | "MAGIC_LOGIN_LINK" | "TICKET_ASSIGNED" | "PROJECT_UPDATED" | "STOCK_ISSUED";
 
-export const EVENT_TYPES: EmailEventType[] = ["ACCOUNT_CREATED", "ASSET_ASSIGNED", "PASSWORD_RESET", "TASK_OVERDUE", "LOW_STOCK", "MAGIC_LOGIN_LINK", "TICKET_ASSIGNED", "PROJECT_UPDATED"];
+export const EVENT_TYPES: EmailEventType[] = ["ACCOUNT_CREATED", "ASSET_ASSIGNED", "PASSWORD_RESET", "TASK_OVERDUE", "LOW_STOCK", "MAGIC_LOGIN_LINK", "TICKET_ASSIGNED", "PROJECT_UPDATED", "STOCK_ISSUED"];
 
 export const EVENT_LABELS: Record<EmailEventType, string> = {
   ACCOUNT_CREATED: "Account Created",
@@ -11,6 +11,7 @@ export const EVENT_LABELS: Record<EmailEventType, string> = {
   MAGIC_LOGIN_LINK: "Magic Login Link",
   TICKET_ASSIGNED: "Ticket Assigned",
   PROJECT_UPDATED: "IT Project Updated",
+  STOCK_ISSUED: "Stock Issued",
 };
 
 export const EVENT_DESCRIPTIONS: Record<EmailEventType, string> = {
@@ -22,6 +23,7 @@ export const EVENT_DESCRIPTIONS: Record<EmailEventType, string> = {
   MAGIC_LOGIN_LINK: "Sent when an admin sends a one-time login link to a user from their User Detail page.",
   TICKET_ASSIGNED: "Sent to a user (or every member of a team) when a helpdesk ticket is assigned to them.",
   PROJECT_UPDATED: "Sent to the creator of an IT Project when someone else (an editor) updates it or moves its status.",
+  STOCK_ISSUED: "Sent to the recipient when a stock item is issued to them via scan-to-issue.",
 };
 
 // Merge fields available to {{token}} interpolation per event — shown as a picker in the
@@ -35,6 +37,7 @@ export const EVENT_VARIABLES: Record<EmailEventType, string[]> = {
   MAGIC_LOGIN_LINK: ["firstName", "magicUrl"],
   TICKET_ASSIGNED: ["firstName", "ticketNumber", "ticketTitle", "priority", "ticketUrl"],
   PROJECT_UPDATED: ["editorName", "projectTitle", "projectUrl"],
+  STOCK_ISSUED: ["firstName", "itemName", "sku", "quantity", "stockUrl"],
 };
 
 // Mirrors the server's SAMPLE_VARIABLES (server/src/modules/emailTemplates/emailTemplates.controller.ts)
@@ -48,6 +51,7 @@ export const SAMPLE_VARIABLES: Record<EmailEventType, Record<string, string>> = 
   MAGIC_LOGIN_LINK: { firstName: "Jordan", magicUrl: "https://app-assets.kynren.com/magic-login/sample-token" },
   TICKET_ASSIGNED: { firstName: "Jordan", ticketNumber: "TCK-00142", ticketTitle: "Printer on 3rd floor not responding", priority: "HIGH", ticketUrl: "https://app-assets.kynren.com/helpdesk/142" },
   PROJECT_UPDATED: { editorName: "Jordan Ellis", projectTitle: "Lake Projector Calibration", projectUrl: "https://app-assets.kynren.com/operations" },
+  STOCK_ISSUED: { firstName: "Jordan", itemName: "Dell Latitude 5440 Charger", sku: "KYN-LAPTOP-435717", quantity: "2", stockUrl: "https://app-assets.kynren.com/stock" },
 };
 
 export type EmailBlock =

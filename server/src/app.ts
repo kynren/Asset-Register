@@ -19,6 +19,7 @@ import agentRoutes from "./modules/devices/agent.routes";
 import networkRoutes from "./modules/network/network.routes";
 import networkRelayRoutes from "./modules/network/relay.routes";
 import stockRoutes from "./modules/stock/stock.routes";
+import stockItemTypesRoutes from "./modules/stockItemTypes/stockItemTypes.routes";
 import ticketsRoutes from "./modules/tickets/tickets.routes";
 import ticketCategoriesRoutes from "./modules/tickets/ticketCategories.routes";
 import teamsRoutes from "./modules/tickets/teams.routes";
@@ -86,6 +87,8 @@ export function createApp() {
   app.use("/uploads/org-logos", express.static(path.join(__dirname, "..", "uploads", "org-logos")));
   app.use("/uploads/lighting-sitemaps", express.static(path.join(__dirname, "..", "uploads", "lighting-sitemaps")));
   app.use("/uploads/media-center", express.static(path.join(__dirname, "..", "uploads", "media-center")));
+  app.use("/uploads/stock-attachments", express.static(path.join(__dirname, "..", "uploads", "stock-attachments")));
+  app.use("/uploads/stock-signatures", express.static(path.join(__dirname, "..", "uploads", "stock-signatures")));
 
   app.use("/api/auth", authRoutes);
   app.use("/api/users", usersRoutes);
@@ -100,6 +103,7 @@ export function createApp() {
   app.use("/api/network", networkRoutes);
   app.use("/api/network-relay", networkRelayRoutes);
   app.use("/api/stock", stockRoutes);
+  app.use("/api/stock-item-types", stockItemTypesRoutes);
   app.use("/api/tickets", ticketsRoutes);
   app.use("/api/ticket-categories", ticketCategoriesRoutes);
   app.use("/api/teams", teamsRoutes);

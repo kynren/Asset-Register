@@ -114,6 +114,16 @@ export function SystemSettingsTab({
           <div className="field"><label>Device Offline Threshold (minutes)</label><input className="input" type="number" value={values.deviceOfflineThresholdMinutes ?? ""} onChange={(e) => setValues((v) => ({ ...v, deviceOfflineThresholdMinutes: e.target.value }))} /></div>
           <div className="field"><label>Camera Recording Retention (days)</label><input className="input" type="number" value={values.cameraRetentionDays ?? ""} onChange={(e) => setValues((v) => ({ ...v, cameraRetentionDays: e.target.value }))} /></div>
           <div className="field"><label>Decrypted Password Auto-Lock (seconds)</label><input className="input" type="number" value={values.vaultDecryptTimeoutSeconds ?? ""} onChange={(e) => setValues((v) => ({ ...v, vaultDecryptTimeoutSeconds: e.target.value }))} /></div>
+          <div className="field">
+            <label>Stock SKU Prefix</label>
+            <input
+              className="input"
+              placeholder="KYN"
+              maxLength={10}
+              value={values.stockSkuPrefix ?? ""}
+              onChange={(e) => setValues((v) => ({ ...v, stockSkuPrefix: e.target.value.toUpperCase() }))}
+            />
+          </div>
           <PermissionGate module="app-settings" action="edit">
             <button className="btn btn-primary" onClick={handleSaveClick} disabled={saving}>
               {saving ? "Please wait..." : editingScheduledChange ? "Update Scheduled Change" : "Save"}

@@ -67,14 +67,15 @@ function TargetPicker({
 }) {
   return (
     <div className="row gap-2" style={{ alignItems: "center" }}>
-      <div className="row gap-1">
-        <button type="button" className={`btn btn-sm ${kind === "user" ? "btn-primary" : "btn-secondary"}`} onClick={() => { onKindChange("user"); onPickedIdChange(""); }}>
-          Person
-        </button>
-        <button type="button" className={`btn btn-sm ${kind === "team" ? "btn-primary" : "btn-secondary"}`} onClick={() => { onKindChange("team"); onPickedIdChange(""); }}>
-          Team
-        </button>
-      </div>
+      <ChipSelect
+        style={{ width: "auto", minWidth: 110 }}
+        value={kind}
+        onChange={(v) => { onKindChange(v as AccessTargetKind); onPickedIdChange(""); }}
+        options={[
+          { value: "user", label: "Person" },
+          { value: "team", label: "Team" },
+        ]}
+      />
       <div style={{ flex: 1 }}>
         {kind === "user" ? (
           <ChipSelect value={pickedId} onChange={onPickedIdChange} placeholder="Select a person..." options={users.map((u) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` }))} />

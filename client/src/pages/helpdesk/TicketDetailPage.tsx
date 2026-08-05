@@ -9,6 +9,7 @@ import { PermissionGate, usePermission } from "../../auth/PermissionGate";
 import { useAuth } from "../../auth/AuthContext";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { QrCodeModal } from "../../components/QrCodeModal";
+import { ChipSelect } from "../../components/ChipSelect";
 import { Skeleton, SkeletonText } from "../../components/Skeleton";
 import { TicketTasksTab } from "./TicketTasksTab";
 import { TicketSolutionTab } from "./TicketSolutionTab";
@@ -247,18 +248,13 @@ export function TicketDetailPage() {
         <div className="card">
           <h3 className="mt-0">Status</h3>
           <PermissionGate module="helpdesk" action="edit" fallback={<StatusBadge status={ticket.status} />}>
-            <div className="row gap-1 flex-wrap">
-              {STATUS_FLOW.map((s) => (
-                <button
-                  key={s}
-                  className={`btn btn-sm ${ticket.status === s ? "btn-primary" : "btn-secondary"}`}
-                  disabled={statusMutation.isPending}
-                  onClick={() => statusMutation.mutate(s)}
-                >
-                  {s.replace("_", " ")}
-                </button>
-              ))}
-            </div>
+            <ChipSelect
+              style={{ width: "auto", minWidth: 160 }}
+              value={ticket.status}
+              disabled={statusMutation.isPending}
+              onChange={(s) => statusMutation.mutate(s)}
+              options={STATUS_FLOW.map((s) => ({ value: s, label: s.replace("_", " ") }))}
+            />
           </PermissionGate>
           <div style={{ marginTop: 12 }}>
             {editingAssignment ? (

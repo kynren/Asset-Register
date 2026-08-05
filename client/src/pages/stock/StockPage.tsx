@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
+import { useSearchParams } from "react-router-dom";
 import { axiosClient } from "../../api/axiosClient";
 import { DataTable } from "../../components/DataTable";
 import { FilterBar } from "../../components/FilterBar";
@@ -14,6 +15,11 @@ import { ProcurementTab } from "./ProcurementTab";
 import { ModuleDashboardTab } from "../dashboard/ModuleDashboardTab";
 import { STOCK_WIDGET_CATALOG, DEFAULT_STOCK_DASHBOARD_LAYOUT } from "./stockDashboardWidgets";
 import { ChipSelect } from "../../components/ChipSelect";
+import { StockAttachmentsField } from "./StockAttachmentsField";
+import { StockQrScannerModal } from "./StockQrScannerModal";
+import { StockItemDetailModal } from "./StockItemDetailModal";
+import { ReportsListPage } from "../reports/ReportsListPage";
+import { ReportBuilderModal } from "../reports/ReportBuilderModal";
 
 interface StockItem {
   id: number;
@@ -26,14 +32,29 @@ interface StockItem {
 }
 
 export function StockPage() {
-  const [tab, setTab] = useState<"register" | "analytics" | "procurement" | "dashboard">("dashboard");
+  const [tab, setTab] = useState<"register" | "analytics" | "procurement" | "dashboard" | "reports">("dashboard");
   const [search, setSearch] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [txItem, setTxItem] = useState<StockItem | null>(null);
   const [qrItem, setQrItem] = useState<StockItem | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
+  const [detailItemId, setDetailItemId] = useState<number | null>(null);
+  const [showReportBuilder, setShowReportBuilder] = useState(false);
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Lets the command palette's "Add Stock Item" quick action deep-link straight into the create form.
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setShowForm(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data, isLoading } = useQuery({
     queryKey: ["stock", { search, lowStockOnly, page }],
@@ -80,6 +101,7 @@ export function StockPage() {
           <PermissionGate module="stock" action="edit">
             <button className="btn btn-secondary btn-sm" onClick={() => setTxItem(row.original)}>Manage Stock</button>
           </PermissionGate>
+          <button className="btn btn-secondary btn-sm btn-icon" title="View details / issue stock" onClick={() => setDetailItemId(row.original.id)}><Icon name="search" size={12} /></button>
           <button className="btn btn-secondary btn-sm btn-icon" title="Print QR label" onClick={() => setQrItem(row.original)}><Icon name="grid" size={12} /></button>
           <PermissionGate module="stock" action="create">
             <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}><Icon name="paperclip" size={12} /></button>
@@ -101,9 +123,18 @@ export function StockPage() {
           <button className={`btn btn-sm ${tab === "register" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("register")}>Register</button>
           <button className={`btn btn-sm ${tab === "analytics" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("analytics")}>Analytics</button>
           <button className={`btn btn-sm ${tab === "procurement" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("procurement")}>Suppliers & POs</button>
+          <button className={`btn btn-sm ${tab === "reports" ? "btn-primary" : "btn-secondary"}`} onClick={() => setTab("reports")}>Reports</button>
           {tab === "register" && (
-            <PermissionGate module="stock" action="create">
-              <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" size={14} /> Add Item</button>
+            <>
+              <button className="btn btn-secondary" onClick={() => setShowScanner(true)}><Icon name="grid" size={14} /> Scan</button>
+              <PermissionGate module="stock" action="create">
+                <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" size={14} /> Add Item</button>
+              </PermissionGate>
+            </>
+          )}
+          {tab === "reports" && (
+            <PermissionGate module="reports" action="create">
+              <button className="btn btn-primary" onClick={() => setShowReportBuilder(true)}><Icon name="plus" size={14} /> New Report</button>
             </PermissionGate>
           )}
         </div>
@@ -144,6 +175,8 @@ export function StockPage() {
         </div>
       ) : tab === "procurement" ? (
         <ProcurementTab />
+      ) : tab === "reports" ? (
+        <ReportsListPage sourceFilter="stock" />
       ) : (
         <ModuleDashboardTab
           module="stock"
@@ -156,7 +189,10 @@ export function StockPage() {
 
       {showForm && <StockItemFormModal onClose={() => setShowForm(false)} onSubmit={(v) => createMutation.mutate(v)} submitting={createMutation.isPending} />}
       {txItem && <StockLevelsModal item={txItem} onClose={() => setTxItem(null)} />}
-      {qrItem && <QrCodeModal title="Stock Item QR Label" value={qrItem.sku} label={qrItem.sku} subLabel={qrItem.name} onClose={() => setQrItem(null)} />}
+      {qrItem && <QrCodeModal title="Stock Item QR Label" value={qrItem.sku} label={qrItem.name} footer={qrItem.sku} onClose={() => setQrItem(null)} />}
+      {showScanner && <StockQrScannerModal onClose={() => setShowScanner(false)} onFound={(id) => setDetailItemId(id)} />}
+      {detailItemId !== null && <StockItemDetailModal stockItemId={detailItemId} onClose={() => setDetailItemId(null)} />}
+      {showReportBuilder && <ReportBuilderModal defaultSource="stock" onClose={() => setShowReportBuilder(false)} />}
     </div>
   );
 }
@@ -304,6 +340,8 @@ function StockLevelsModal({ item, onClose }: { item: StockItem; onClose: () => v
         <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Issued to helpdesk repair" />
       </div>
       <p className="muted">Total across all locations: {detail?.quantityOnHand ?? item.quantityOnHand} {item.unit}</p>
+
+      <StockAttachmentsField stockItemId={item.id} />
     </FormModal>
   );
 }

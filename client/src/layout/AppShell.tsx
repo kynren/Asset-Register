@@ -5,6 +5,7 @@ import { Topbar } from "./Topbar";
 import { TopNavBar } from "./TopNavBar";
 import { FloatingAssistant } from "./FloatingAssistant";
 import { ChangelogModal } from "./ChangelogModal";
+import { CommandPalette } from "../components/CommandPalette";
 import { ThemeSync } from "../theme/ThemeSync";
 import { useAuth } from "../auth/AuthContext";
 import { settingsNav, systemConsoleNav } from "./navConfig";
@@ -46,6 +47,7 @@ export function AppShell() {
       </div>
       <FloatingAssistant />
       <ChangelogModal />
+      <CommandPalette />
     </div>
   );
 }

@@ -31,6 +31,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.0.2",
+    "react-signature-canvas": "^1.1.0-alpha.2",
     "recharts": "^2.13.3"
   },
   "devDependencies": {
@@ -38,6 +39,7 @@
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/react-signature-canvas": "^1.0.7",
     "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.5.4",
     "oxlint": "^1.71.0",

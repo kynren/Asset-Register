@@ -12,6 +12,7 @@ const DOCS_DIR = path.join(UPLOADS_ROOT, "docs");
 const TICKETS_DIR = path.join(UPLOADS_ROOT, "tickets");
 const SITEMAPS_DIR = path.join(UPLOADS_ROOT, "lighting-sitemaps");
 const AVATARS_DIR = path.join(UPLOADS_ROOT, "avatars");
+const STOCK_ATTACHMENTS_DIR = path.join(UPLOADS_ROOT, "stock-attachments");
 
 function statSize(diskPath: string): { sizeBytes: number | null; missing: boolean } {
   try {
@@ -275,6 +276,29 @@ const SOURCES: AttachedSource[] = [
     resolvePath: async (id) => {
       const row = await prisma.userImage.findUnique({ where: { id } });
       return row ? existingOrNull(path.join(AVATARS_DIR, path.basename(row.url))) : null;
+    },
+  },
+  {
+    key: "stockAttachments",
+    label: "Stock Item Attachments",
+    list: async (limit) => {
+      const rows = await prisma.stockItemAttachment.findMany({ orderBy: { createdAt: "desc" }, take: limit, include: { stockItem: { select: { name: true } } } });
+      return rows.map((r) => {
+        const diskPath = path.join(STOCK_ATTACHMENTS_DIR, path.basename(r.url));
+        const { sizeBytes, missing } = statSize(diskPath);
+        const name = r.originalName ?? `Attachment #${r.id}`;
+        return { sourceKey: "stockAttachments", id: r.id, displayName: r.stockItem?.name ? `${name} — ${r.stockItem.name}` : name, url: r.url, sizeBytes, missing, createdAt: r.createdAt };
+      });
+    },
+    remove: async (id) => {
+      const row = await prisma.stockItemAttachment.findUnique({ where: { id } });
+      if (!row) throw new ApiError(404, "Record not found");
+      await prisma.stockItemAttachment.delete({ where: { id } });
+      unlinkIfExists(path.join(STOCK_ATTACHMENTS_DIR, path.basename(row.url)));
+    },
+    resolvePath: async (id) => {
+      const row = await prisma.stockItemAttachment.findUnique({ where: { id } });
+      return row ? existingOrNull(path.join(STOCK_ATTACHMENTS_DIR, path.basename(row.url))) : null;
     },
   },
 ];
