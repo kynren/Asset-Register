@@ -6,6 +6,7 @@ import { ChipSelect } from "../../components/ChipSelect";
 import { SignaturePad } from "../../components/SignaturePad";
 import { Icon } from "../../components/Icon";
 import { StockAttachmentsField } from "./StockAttachmentsField";
+import { CommentThread } from "../../components/CommentThread";
 
 interface StockLevel {
   id: number;
@@ -223,6 +224,8 @@ export function StockItemDetailModal({ stockItemId, onClose }: { stockItemId: nu
             </table>
           )}
         </div>
+
+        <CommentThread entityType="StockItem" entityId={item.id} />
       </div>
     </FormModal>
   );

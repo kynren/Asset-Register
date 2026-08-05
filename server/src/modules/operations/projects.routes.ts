@@ -25,6 +25,7 @@ const cardSelect = {
   status: true,
   assigneeId: true,
   assignee: { select: { id: true, firstName: true, lastName: true } },
+  startDate: true,
   dueDate: true,
   order: true,
   createdById: true,
@@ -75,6 +76,7 @@ const createSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   assigneeId: z.number().int().nullable().optional(),
+  startDate: z.string().datetime().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   // Access to grant other users at creation time — the creator always has full access already,
   // so this is purely additive (satisfies "whenever a user is creating an entry they should be
@@ -100,6 +102,7 @@ const updateSchema = z.object({
   description: z.string().nullable().optional(),
   status: z.enum(["TODO", "IN_PROGRESS", "REVIEW", "DONE"]).optional(),
   assigneeId: z.number().int().nullable().optional(),
+  startDate: z.string().datetime().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   order: z.number().int().optional(),
 });

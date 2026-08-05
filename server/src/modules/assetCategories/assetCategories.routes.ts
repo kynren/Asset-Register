@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
@@ -35,6 +36,8 @@ const categorySelect = {
   collection: { select: { id: true, name: true } },
   tableColumns: true,
   capacities: true,
+  publicIntakeEnabled: true,
+  publicIntakeToken: true,
 };
 
 router.get("/", requirePermission("assets", "view"), async (_req, res) => {
@@ -69,6 +72,32 @@ router.delete("/:id", requirePermission("admin", "delete"), async (req, res) => 
   await prisma.assetCategory.delete({ where: { id: Number(req.params.id) } });
   await logAudit({ userId: req.user!.id, action: "assetCategory.delete", entityType: "AssetCategory", entityId: Number(req.params.id) });
   res.json({ ok: true });
+});
+
+// Enables (or re-enables/rotates) the category's public intake link — see
+// server/src/modules/assets/assetIntakePublic.routes.ts for what the token unlocks. Rotating
+// invalidates any previously shared link, same reasoning as an API-key regenerate button.
+router.post("/:id/public-intake", requirePermission("admin", "edit"), async (req, res) => {
+  const id = Number(req.params.id);
+  const token = crypto.randomBytes(24).toString("base64url");
+  const category = await prisma.assetCategory.update({
+    where: { id },
+    data: { publicIntakeEnabled: true, publicIntakeToken: token },
+    select: categorySelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "assetCategory.publicIntake.enable", entityType: "AssetCategory", entityId: id });
+  res.json(category);
+});
+
+router.delete("/:id/public-intake", requirePermission("admin", "edit"), async (req, res) => {
+  const id = Number(req.params.id);
+  const category = await prisma.assetCategory.update({
+    where: { id },
+    data: { publicIntakeEnabled: false, publicIntakeToken: null },
+    select: categorySelect,
+  });
+  await logAudit({ userId: req.user!.id, action: "assetCategory.publicIntake.disable", entityType: "AssetCategory", entityId: id });
+  res.json(category);
 });
 
 router.post("/:id/duplicate", requirePermission("admin", "create"), async (req, res) => {

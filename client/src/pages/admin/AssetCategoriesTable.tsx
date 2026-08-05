@@ -32,6 +32,8 @@ interface AssetCategory {
   collectionId: number | null;
   collection: CollectionRef | null;
   capacities: string[] | null;
+  publicIntakeEnabled: boolean;
+  publicIntakeToken: string | null;
 }
 
 export function AssetCategoriesTable() {
@@ -200,7 +202,25 @@ function CategoryFormModal({
   const [capacities, setCapacities] = useState<AssetCapacityKey[]>(
     Array.isArray(initial?.capacities) ? (initial!.capacities as AssetCapacityKey[]) : defaultCapacitiesFor(initial?.isComputerAsset ?? false)
   );
+  const [publicIntake, setPublicIntake] = useState({ enabled: initial?.publicIntakeEnabled ?? false, token: initial?.publicIntakeToken ?? null as string | null });
+  const [linkCopied, setLinkCopied] = useState(false);
   const queryClient = useQueryClient();
+
+  const enableIntakeMutation = useMutation({
+    mutationFn: () => axiosClient.post(`/asset-categories/${initial!.id}/public-intake`),
+    onSuccess: (res) => {
+      setPublicIntake({ enabled: res.data.publicIntakeEnabled, token: res.data.publicIntakeToken });
+      queryClient.invalidateQueries({ queryKey: ["asset-categories"] });
+    },
+  });
+  const disableIntakeMutation = useMutation({
+    mutationFn: () => axiosClient.delete(`/asset-categories/${initial!.id}/public-intake`),
+    onSuccess: (res) => {
+      setPublicIntake({ enabled: res.data.publicIntakeEnabled, token: res.data.publicIntakeToken });
+      queryClient.invalidateQueries({ queryKey: ["asset-categories"] });
+    },
+  });
+  const intakeUrl = publicIntake.token ? `${window.location.origin}/intake/${publicIntake.token}` : "";
 
   function toggleCapacity(key: AssetCapacityKey) {
     setCapacities((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -320,6 +340,42 @@ function CategoryFormModal({
               </label>
             ))}
           </div>
+        </div>
+      )}
+      {initial && (
+        <div className="toggle-card" style={{ flexWrap: "wrap" }}>
+          <div className="toggle-card-icon"><Icon name="link" size={16} /></div>
+          <div className="toggle-card-body">
+            <div className="toggle-card-title">Public Intake Form</div>
+            <div className="toggle-card-desc">
+              Generates a shareable, no-login link where anyone can propose a new asset for this category. Submissions never
+              create an asset directly — they land in a review queue (Admin &amp; Setup → Asset Intake) for a staff member to
+              approve or reject first.
+            </div>
+            {publicIntake.enabled && publicIntake.token && (
+              <div className="row gap-2" style={{ marginTop: 8, alignItems: "center" }}>
+                <input className="input" readOnly value={intakeUrl} style={{ fontSize: 11.5, flex: 1, minWidth: 0 }} onFocus={(e) => e.target.select()} />
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => { navigator.clipboard.writeText(intakeUrl); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 1500); }}
+                >
+                  <Icon name={linkCopied ? "check" : "paperclip"} size={12} /> {linkCopied ? "Copied" : "Copy"}
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={enableIntakeMutation.isPending} onClick={() => enableIntakeMutation.mutate()}>
+                  <Icon name="refresh" size={12} /> Rotate
+                </button>
+              </div>
+            )}
+          </div>
+          <label className="form-toggle-switch">
+            <input
+              type="checkbox"
+              checked={publicIntake.enabled}
+              onChange={(e) => (e.target.checked ? enableIntakeMutation.mutate() : disableIntakeMutation.mutate())}
+            />
+            <span className="form-toggle-switch-track" />
+          </label>
         </div>
       )}
       <div className="field">

@@ -469,6 +469,28 @@ async function queryUsers(where: Record<string, unknown>, _groupBy: string | und
   return { kind: "chart", data: g.map((x) => ({ label: map.get(x.roleId) ?? "Unknown", count: x._count._all })) };
 }
 
+export interface MultiQuerySourceSpec {
+  source: string;
+  label?: string;
+  filters?: FilterSpec;
+}
+
+// Powers the home dashboard's cross-module "Comparison" widget — runs a plain KPI count per source
+// (each through the same runQuery()/getRowScope() path as a single-source query, so RBAC row-level
+// scoping still applies per source) and folds the results into one chart-shaped result the client
+// can render as a bar/pie without needing its own multi-fetch logic.
+export async function runMultiQuery(specs: MultiQuerySourceSpec[], user?: QueryUser): Promise<QueryResult> {
+  const data = await Promise.all(
+    specs.map(async (s) => {
+      const source = SOURCES[s.source];
+      if (!source) throw new ApiError(400, `Unknown data source: ${s.source}`);
+      const result = await runQuery({ source: s.source, filters: s.filters, visualization: "kpi" }, user);
+      return { label: s.label?.trim() || source.label, count: result.kind === "kpi" ? result.value : 0 };
+    })
+  );
+  return { kind: "chart", data };
+}
+
 export async function runQuery(spec: QuerySpec, user?: QueryUser): Promise<QueryResult> {
   const source = SOURCES[spec.source];
   if (!source) throw new ApiError(400, `Unknown data source: ${spec.source}`);

@@ -142,6 +142,9 @@ model User {
 
   stockItemAttachmentsUploaded StockItemAttachment[]
   stockIssuancesReceived       StockIssuance[]
+  recordComments               RecordComment[]
+  customColumnsCreated         CustomColumn[]
+  assetIntakeSubmissionsReviewed AssetIntakeSubmission[] @relation("AssetIntakeReviewedBy")
 }
 
 model RefreshSession {
@@ -384,6 +387,13 @@ model AssetCategory {
   // string array of independently toggleable capacity keys ("components","contracts","documents",
   // "financialInfo") once an admin opts a category into explicit control via Configure Capacities.
   capacities        Json?
+  // Public intake: when enabled, publicIntakeToken becomes a shareable, unauthenticated link
+  // (see server/src/modules/assets/assetIntake.routes.ts) where anyone can submit a proposed new
+  // asset for this category. Submissions land as AssetIntakeSubmission rows (status PENDING) and
+  // only become real Assets once an admin approves them — never written directly.
+  publicIntakeEnabled Boolean                 @default(false)
+  publicIntakeToken   String?                 @unique
+  intakeSubmissions   AssetIntakeSubmission[]
 }
 
 model AssetCollection {
@@ -538,9 +548,40 @@ model Asset {
   customFieldValues  AssetCustomFieldValue[]
   switchPorts        SwitchPort[]            @relation("SwitchOwnedPorts")
   connectedViaPorts  SwitchPort[]            @relation("SwitchPortConnectedAsset")
+  intakeSubmission   AssetIntakeSubmission?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// A pending proposal from the public (unauthenticated) intake form — see
+// AssetCategory.publicIntakeToken above. Never auto-creates an Asset; an admin must review and
+// approve() it (server/src/modules/assets/assetIntake.routes.ts), at which point resultingAssetId
+// is set and status becomes APPROVED. fieldValues holds { [fieldKey]: value } for whatever custom
+// fields the category's AssetFormTemplate defines at submission time.
+model AssetIntakeSubmission {
+  id               Int                @id @default(autoincrement())
+  categoryId       Int
+  category         AssetCategory      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name             String
+  submitterName    String?
+  submitterEmail   String?
+  fieldValues      Json
+  status           AssetIntakeStatus  @default(PENDING)
+  reviewedById     Int?
+  reviewedBy       User?              @relation("AssetIntakeReviewedBy", fields: [reviewedById], references: [id])
+  reviewNotes      String?
+  resultingAssetId Int?               @unique
+  resultingAsset   Asset?             @relation(fields: [resultingAssetId], references: [id])
+  ipAddress        String?
+  createdAt        DateTime           @default(now())
+  reviewedAt       DateTime?
+}
+
+enum AssetIntakeStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 // ───────────────────────── Switching (switches/routers port mapping) ─────────────────────────
@@ -1521,6 +1562,72 @@ model TicketRule {
   createdAt  DateTime @default(now())
 }
 
+// Generalizes TicketRule's condition-list -> action-list shape (above) into a reusable, per-module
+// engine — same polymorphic `entityType` tag as RecordAccessGrant/RecordComment rather than a
+// typed relation. Unlike TicketRule (create-time only), this also fires on update via `trigger`,
+// which is the actual gap: Helpdesk already had "when field is X, set field Y" at creation; Assets
+// and Stock had no equivalent at all, and none of the three could react to an existing record being
+// edited. See server/src/lib/recordRules.ts for the evaluator.
+model RecordRule {
+  id         Int               @id @default(autoincrement())
+  entityType String
+  name       String
+  isActive   Boolean           @default(true)
+  order      Int               @default(0)
+  trigger    RecordRuleTrigger @default(ON_CREATE_OR_UPDATE)
+  conditions Json
+  actions    Json
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([entityType])
+}
+
+enum RecordRuleTrigger {
+  ON_CREATE
+  ON_UPDATE
+  ON_CREATE_OR_UPDATE
+}
+
+// User-addable extra columns on Assets/Stock — distinct from AssetFormTemplate (admin-defined,
+// per-category, filled in on the asset form) and from AssetCategory.tableColumns (admin toggles
+// visibility of *existing* fields). Here, any permitted user can add an ad-hoc column from the
+// list page itself, spanning every row of that entityType regardless of category, edited inline
+// in the table. Same polymorphic entityType tag as RecordRule/RecordComment.
+model CustomColumn {
+  id          Int                    @id @default(autoincrement())
+  entityType  String
+  name        String
+  fieldType   CustomColumnFieldType  @default(TEXT)
+  order       Int                    @default(0)
+  createdById Int
+  createdBy   User                   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime               @default(now())
+
+  values CustomColumnValue[]
+
+  @@index([entityType])
+}
+
+enum CustomColumnFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+}
+
+model CustomColumnValue {
+  id             Int          @id @default(autoincrement())
+  customColumnId Int
+  customColumn   CustomColumn @relation(fields: [customColumnId], references: [id], onDelete: Cascade)
+  entityId       Int
+  value          String?
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([customColumnId, entityId])
+  @@index([entityId])
+}
+
 // Relates two tickets — e.g. a PROBLEM aggregating several INCIDENTs, or a CHANGE resolving a
 // PROBLEM. Directional (ticketId -> linkedTicketId) with a typed relationship.
 model TicketLink {
@@ -2402,6 +2509,7 @@ model ProjectCard {
   status      ProjectCardStatus @default(TODO)
   assigneeId  Int?
   assignee    User?             @relation("ProjectCardAssignee", fields: [assigneeId], references: [id])
+  startDate   DateTime?
   dueDate     DateTime?
   order       Int               @default(0)
   createdById Int
@@ -2464,6 +2572,23 @@ model RecordAccessGrant {
 
   @@unique([entityType, entityId, userId, level])
   @@unique([entityType, entityId, teamId, level])
+  @@index([entityType, entityId])
+}
+
+// App-wide comment/update thread, keyed the same polymorphic way as RecordAccessGrant above
+// (a plain `entityType` string tag rather than a typed relation per entity). Mirrors
+// TicketComment's shape (author + body + timestamp) without the ticket-specific isInternal/
+// attachments fields, which have no equivalent on a plain Asset/StockItem detail-page thread.
+model RecordComment {
+  id         Int      @id @default(autoincrement())
+  entityType String
+  entityId   Int
+  authorId   Int
+  author     User     @relation(fields: [authorId], references: [id])
+  body       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
   @@index([entityType, entityId])
 }
 

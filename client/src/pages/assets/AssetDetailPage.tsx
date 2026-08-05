@@ -21,6 +21,7 @@ import { NetworkSettingsCard } from "./detail/NetworkSettingsCard";
 import { FileResourceTab } from "./detail/FileResourceTab";
 import { ReportTab } from "./detail/ReportTab";
 import { ActivityLogTab } from "./detail/ActivityLogTab";
+import { CommentThread } from "../../components/CommentThread";
 import { AssetFinancialTab } from "./detail/AssetFinancialTab";
 import { Skeleton, SkeletonText } from "../../components/Skeleton";
 import { hasCapacity } from "./assetCapacities";
@@ -42,7 +43,7 @@ function parseDiskInfo(diskInfo: string | null | undefined): { label: string; to
 type TabKey =
   | "profile" | "impact" | "location" | "os" | "components" | "volumes" | "software"
   | "connections" | "networkPorts" | "sockets" | "remoteManagement" | "management"
-  | "contracts" | "documents" | "financialInfo" | "virtualization" | "antivirus" | "reports" | "logs";
+  | "contracts" | "documents" | "financialInfo" | "virtualization" | "antivirus" | "reports" | "logs" | "comments";
 
 // Nav is assembled by buildNavItems() below. The IT-specific tabs (Operating Systems, Volumes,
 // Software, Connections, Network Ports, Sockets, Remote Management, Virtualization, Antiviruses)
@@ -80,6 +81,7 @@ const COMPUTER_NAV_ITEMS_LATE: { key: TabKey; label: string; icon: string }[] = 
 const TAIL_ITEMS: { key: TabKey; label: string; icon: string }[] = [
   { key: "reports", label: "Reports", icon: "activity" },
   { key: "logs", label: "Logs", icon: "clock" },
+  { key: "comments", label: "Comments", icon: "chat" },
 ];
 
 function buildNavItems(category: { isComputerAsset: boolean; capacities?: unknown } | null | undefined) {
@@ -338,6 +340,7 @@ export function AssetDetailPage() {
           {tab === "antivirus" && <AntivirusTab asset={asset} onUpdated={invalidate} />}
           {tab === "reports" && <ReportTab asset={asset} />}
           {tab === "logs" && <ActivityLogTab asset={asset} />}
+          {tab === "comments" && <CommentThread entityType="Asset" entityId={asset.id} />}
         </div>
       </div>
     </div>

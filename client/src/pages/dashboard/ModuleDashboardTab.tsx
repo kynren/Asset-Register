@@ -10,6 +10,8 @@ import { WidgetDef } from "./widgets";
 import { Skeleton } from "../../components/Skeleton";
 import { CustomQueryConfig, CustomQueryConfigModal } from "./CustomQueryConfigModal";
 import { CustomQueryWidget } from "./CustomQueryWidget";
+import { ComparisonQueryConfig, ComparisonConfigModal } from "./ComparisonConfigModal";
+import { ComparisonWidget } from "./ComparisonWidget";
 import { WidgetFilterModal } from "./WidgetFilterModal";
 import { getSource } from "./dataExplorerConfig";
 import { DashboardPickerBar, DashboardSummary } from "./DashboardPickerBar";
@@ -22,6 +24,8 @@ interface LayoutItem {
   // Only set on "custom-*" widgets (the home dashboard's ad-hoc query builder) or on
   // module-dashboard catalog widgets a user has narrowed with "Configure filters".
   config?: CustomQueryConfig;
+  // Only set on "comparison-*" widgets (the home dashboard's cross-module comparison chart).
+  comparisonConfig?: ComparisonQueryConfig;
   filters?: Record<string, string>;
 }
 
@@ -73,6 +77,8 @@ export function ModuleDashboardTab({
   const [showAddWidget, setShowAddWidget] = useState(false);
   const [showCustomQueryModal, setShowCustomQueryModal] = useState(false);
   const [editingCustomWidgetId, setEditingCustomWidgetId] = useState<string | null>(null);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [editingComparisonWidgetId, setEditingComparisonWidgetId] = useState<string | null>(null);
   const [filteringWidgetId, setFilteringWidgetId] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showSharedWithMeModal, setShowSharedWithMeModal] = useState(false);
@@ -200,6 +206,19 @@ export function ModuleDashboardTab({
     setEditingCustomWidgetId(null);
   }
 
+  function addComparisonWidget(comparisonConfig: ComparisonQueryConfig) {
+    if (!layout) return;
+    updateLayout([...layout, { id: `comparison-${Date.now()}`, cols: 2, comparisonConfig }]);
+    setShowAddWidget(false);
+    setShowComparisonModal(false);
+  }
+
+  function saveComparisonWidgetConfig(id: string, comparisonConfig: ComparisonQueryConfig) {
+    if (!layout) return;
+    updateLayout(layout.map((w) => (w.id === id ? { ...w, comparisonConfig } : w)));
+    setEditingComparisonWidgetId(null);
+  }
+
   function saveWidgetFilters(id: string, filters: Record<string, string>) {
     if (!layout) return;
     updateLayout(layout.map((w) => (w.id === id ? { ...w, filters } : w)));
@@ -210,6 +229,10 @@ export function ModuleDashboardTab({
     if (item.id.startsWith("custom-")) {
       if (!item.config) return null;
       return <CustomQueryWidget config={item.config} />;
+    }
+    if (item.id.startsWith("comparison-")) {
+      if (!item.comparisonConfig) return null;
+      return <ComparisonWidget config={item.comparisonConfig} />;
     }
     const def = catalog.find((w) => w.id === item.id);
     if (!def) return null;
@@ -280,6 +303,7 @@ export function ModuleDashboardTab({
                 const body = renderWidgetBody(item);
                 if (!body) return null;
                 const isCustom = item.id.startsWith("custom-");
+                const isComparison = item.id.startsWith("comparison-");
                 return (
                   <SortableWidget
                     key={item.id}
@@ -287,8 +311,22 @@ export function ModuleDashboardTab({
                     cols={item.cols}
                     onExpandToggle={() => toggleExpand(item.id)}
                     onRemove={() => removeWidget(item.id)}
-                    onConfigure={isCustom ? () => setEditingCustomWidgetId(item.id) : filterSource ? () => setFilteringWidgetId(item.id) : undefined}
-                    configureActive={isCustom ? (item.config?.conditions.length ?? 0) > 0 : Boolean(item.filters && Object.keys(item.filters).length > 0)}
+                    onConfigure={
+                      isCustom
+                        ? () => setEditingCustomWidgetId(item.id)
+                        : isComparison
+                          ? () => setEditingComparisonWidgetId(item.id)
+                          : filterSource
+                            ? () => setFilteringWidgetId(item.id)
+                            : undefined
+                    }
+                    configureActive={
+                      isCustom
+                        ? (item.config?.conditions.length ?? 0) > 0
+                        : isComparison
+                          ? (item.comparisonConfig?.sources.length ?? 0) > 0
+                          : Boolean(item.filters && Object.keys(item.filters).length > 0)
+                    }
                   >
                     {body}
                   </SortableWidget>
@@ -318,6 +356,7 @@ export function ModuleDashboardTab({
           onClose={() => setShowAddWidget(false)}
           onAdd={addWidget}
           onAddCustomQuery={module === "home" ? () => setShowCustomQueryModal(true) : undefined}
+          onAddComparison={module === "home" ? () => setShowComparisonModal(true) : undefined}
         />
       )}
 
@@ -328,6 +367,16 @@ export function ModuleDashboardTab({
           initial={layout.find((w) => w.id === editingCustomWidgetId)?.config}
           onClose={() => setEditingCustomWidgetId(null)}
           onSave={(config) => saveCustomWidgetConfig(editingCustomWidgetId, config)}
+        />
+      )}
+
+      {showComparisonModal && <ComparisonConfigModal onClose={() => setShowComparisonModal(false)} onSave={addComparisonWidget} />}
+
+      {editingComparisonWidgetId && (
+        <ComparisonConfigModal
+          initial={layout.find((w) => w.id === editingComparisonWidgetId)?.comparisonConfig}
+          onClose={() => setEditingComparisonWidgetId(null)}
+          onSave={(config) => saveComparisonWidgetConfig(editingComparisonWidgetId, config)}
         />
       )}
 

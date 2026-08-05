@@ -27,4 +27,5 @@ export interface Asset {
   gridPowered: boolean;
   remoteManagementEnabled: boolean;
   customFieldValues?: AssetCustomFieldValue[];
+  customColumnValues?: Record<number, string | null>;
 }

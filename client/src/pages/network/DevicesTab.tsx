@@ -7,6 +7,7 @@ import { DataTable } from "../../components/DataTable";
 import { FilterBar } from "../../components/FilterBar";
 import { PermissionGate } from "../../auth/PermissionGate";
 import { DeviceLinkModal } from "./DeviceLinkModal";
+import { SavedViewBar } from "../../components/savedViews/SavedViewBar";
 
 interface Device {
   id: number;
@@ -50,6 +51,16 @@ export function DevicesTab() {
 
   return (
     <div>
+      <div style={{ marginBottom: 14 }}>
+        <SavedViewBar
+          tableId="network.devices"
+          currentFilters={{ search }}
+          onApply={(saved) => {
+            setSearch(typeof saved.search === "string" ? saved.search : "");
+            setPage(1);
+          }}
+        />
+      </div>
       <FilterBar search={search} onSearchChange={(v) => { setSearch(v); setPage(1); }} searchPlaceholder="Search by hostname or MAC..." />
       <div className="card">
         <DataTable
