@@ -42,6 +42,20 @@ export async function hasRecordAccess(
   return grant !== null;
 }
 
+// Level-agnostic variant of hasRecordAccess: true for the creator/bypass roles, or if the user
+// holds *any* grant on the record regardless of level (an EDIT or DELETE grant implies you can
+// also see the thing you're allowed to edit/delete). Used to decide whether a RESTRICTED record
+// should even appear in a list for someone who isn't its creator — see ProjectVisibility in
+// schema.prisma and its enforcement in projects.routes.ts's GET "/".
+export async function hasAnyRecordAccess(entityType: string, entityId: number, record: OwnedRecord, userId: number, roleName: string): Promise<boolean> {
+  if (BYPASS_ROLE_NAMES.includes(roleName)) return true;
+  if (record.createdById === userId) return true;
+  const grant = await prisma.recordAccessGrant.findFirst({
+    where: { entityType, entityId, OR: [{ userId }, { team: { members: { some: { userId } } } }] },
+  });
+  return grant !== null;
+}
+
 export async function requireRecordAccess(
   entityType: string,
   entityId: number,

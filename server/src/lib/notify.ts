@@ -1,6 +1,7 @@
 import { EmailEventType, NotificationEventKind } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import { sendEventEmail } from "./emailNotify";
+import { sendPushToUsers } from "./pushNotify";
 
 interface NotifyInput {
   userIds: number[];
@@ -43,6 +44,10 @@ export async function notifyUsers({ userIds, excludeUserId, type, message, linkU
     await prisma.notification.createMany({
       data: inAppRecipients.map((userId) => ({ userId, type, message, linkUrl })),
     });
+    // Push mirrors the in-app feed 1:1 — same recipient list, same "kind" opt-out gate — rather
+    // than being a separately configurable channel. Fire-and-forget: never block the caller on
+    // Expo's push service being slow or unreachable.
+    void sendPushToUsers(inAppRecipients, { title: type, body: message, data: linkUrl ? { linkUrl } : undefined });
   }
 
   if (!email || emailRecipients.length === 0) return;

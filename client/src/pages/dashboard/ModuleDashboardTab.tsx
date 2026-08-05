@@ -17,6 +17,20 @@ import { getSource } from "./dataExplorerConfig";
 import { DashboardPickerBar, DashboardSummary } from "./DashboardPickerBar";
 import { ShareDashboardModal } from "./ShareDashboardModal";
 import { SharedWithMeModal } from "./SharedWithMeModal";
+import { OnboardingTour } from "../../components/OnboardingTour";
+
+const DASHBOARD_TOUR_STEPS = [
+  {
+    target: '[data-tour="dashboard-add-widget"]',
+    title: "Customize your layout",
+    description: "Drag widgets to reorder them, use the size toggle to resize, or remove ones you don't need. Click here to add more.",
+  },
+  {
+    target: '[data-tour="dashboard-new-btn"]',
+    title: "Multiple dashboards",
+    description: "Create separate dashboard layouts for different needs, then rename, share, or set one as your default.",
+  },
+];
 
 interface LayoutItem {
   id: string;
@@ -271,9 +285,11 @@ export function ModuleDashboardTab({
           <p className="muted" style={{ fontSize: 13, margin: 0 }}>{subtitle}</p>
         )}
         {canEdit && (
-          <button className="btn btn-primary" onClick={() => setShowAddWidget(true)}><Icon name="plus" size={14} /> Add Widget</button>
+          <button className="btn btn-primary" data-tour="dashboard-add-widget" onClick={() => setShowAddWidget(true)}><Icon name="plus" size={14} /> Add Widget</button>
         )}
       </div>
+
+      {module === "home" && canEdit && <OnboardingTour storageKey="onboarding.dashboardTourSeen" steps={DASHBOARD_TOUR_STEPS} />}
 
       <DashboardPickerBar
         dashboards={dashboardsList ?? []}

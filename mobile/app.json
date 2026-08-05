@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "Kynren Asset Register",
+    "slug": "kynren",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "kynrenassetregister",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/22ec8606-835b-4750-bc37-71279771f465"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kynren.assetregister",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to scan QR/barcodes on assets and stock items, and to attach photos to records.",
+        "NSPhotoLibraryUsageDescription": "Used to attach photos to assets, stock items, and tickets.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.kynren.assetregister",
+      "adaptiveIcon": {
+        "backgroundColor": "#1a0938",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "POST_NOTIFICATIONS",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Used to scan QR/barcodes on assets and stock items, and to attach photos to records."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-foreground.png",
+          "color": "#1d4ed8"
+        }
+      ],
+      "expo-sharing",
+      "expo-video"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "22ec8606-835b-4750-bc37-71279771f465"
+      }
+    },
+    "owner": "kynrenadmins-team"
+  }
+}

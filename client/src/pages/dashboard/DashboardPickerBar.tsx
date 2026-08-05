@@ -71,7 +71,7 @@ export function DashboardPickerBar({
         </>
       ) : (
         <>
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowNewInput(true)}>
+          <button className="btn btn-secondary btn-sm" data-tour="dashboard-new-btn" onClick={() => setShowNewInput(true)}>
             <Icon name="plus" size={12} /> New
           </button>
           {active?.isOwner && (

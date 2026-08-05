@@ -20,6 +20,7 @@ const KNOWN_KEYS = new Set([
   "network.ipRangeScanner.range",
   "network.icmpPinger.host",
   "changelog.lastSeenId",
+  "onboarding.dashboardTourSeen",
 ]);
 // Prefixes cover key families with unbounded suffixes (e.g. one viewMode key per DataTable
 // instance) that can't be hand-enumerated in KNOWN_KEYS.

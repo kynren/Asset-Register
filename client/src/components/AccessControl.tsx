@@ -5,7 +5,7 @@ import { Icon } from "./Icon";
 import { FormModal } from "./FormModal";
 import { ChipSelect } from "./ChipSelect";
 
-export type AccessLevel = "EDIT" | "DELETE";
+export type AccessLevel = "EDIT" | "DELETE" | "VIEW";
 export type AccessTargetKind = "user" | "team";
 
 export interface AccessGrant {
@@ -41,6 +41,8 @@ export function canDeleteRecord(createdById: number, access: AccessGrant[], user
 export function canManageRecordAccess(createdById: number, userId: number, roleName: string) {
   return createdById === userId || BYPASS_ROLE_NAMES.includes(roleName);
 }
+
+const LEVEL_LABELS: Record<AccessLevel, string> = { EDIT: "Can edit", DELETE: "Can delete", VIEW: "Can view" };
 
 function grantLabel(a: { userId: number | null; teamId: number | null; user: { firstName: string; lastName: string } | null; team: { name: string } | null }) {
   if (a.teamId != null) return a.team ? `${a.team.name} (team)` : `Team #${a.teamId}`;
@@ -95,15 +97,22 @@ export function AccessGrantPicker({
   teams,
   value,
   onChange,
+  levels = ["EDIT", "DELETE"],
 }: {
   users: DirectoryUser[];
   teams: DirectoryTeam[];
   value: { userId?: string; teamId?: string; level: AccessLevel }[];
   onChange: (next: { userId?: string; teamId?: string; level: AccessLevel }[]) => void;
+  // Which levels this consumer's record type actually understands — VIEW only means something
+  // where the record has a restrictable visibility (currently just ProjectCard, see
+  // ProjectVisibility in schema.prisma). Defaults to the original EDIT/DELETE-only set so Docs,
+  // Knowledge Base, and Reports (which have no visibility concept) don't offer a "Can view" option
+  // that would silently do nothing.
+  levels?: AccessLevel[];
 }) {
   const [kind, setKind] = useState<AccessTargetKind>("user");
   const [pickedId, setPickedId] = useState("");
-  const [pickedLevel, setPickedLevel] = useState<AccessLevel>("EDIT");
+  const [pickedLevel, setPickedLevel] = useState<AccessLevel>(levels[0]);
 
   const grantableUsers = users.filter((u) => !value.some((a) => a.userId === String(u.id)));
   const grantableTeams = teams.filter((t) => !value.some((a) => a.teamId === String(t.id)));
@@ -112,8 +121,8 @@ export function AccessGrantPicker({
     <div className="field">
       <label>Give other users or teams access (optional)</label>
       <p className="muted" style={{ fontSize: 11.5, marginTop: 2, marginBottom: 8 }}>
-        You'll always have full access as the creator. Grant edit and/or delete access to specific people or whole
-        teams now, or later from "Manage Access". A team grant applies to everyone currently on that team.
+        You'll always have full access as the creator. Grant access to specific people or whole teams now, or later
+        from "Manage Access". A team grant applies to everyone currently on that team.
       </p>
       {value.length > 0 && (
         <div className="stack gap-1" style={{ marginBottom: 8 }}>
@@ -123,7 +132,7 @@ export function AccessGrantPicker({
               : (() => { const u = users.find((usr) => String(usr.id) === a.userId); return u ? `${u.firstName} ${u.lastName}` : a.userId; })();
             return (
               <div key={`${a.userId ?? a.teamId}-${a.level}`} className="row gap-2" style={{ justifyContent: "space-between", alignItems: "center", fontSize: 12.5 }}>
-                <span>{label}{a.teamId ? " (team)" : ""} — <span className="muted">{a.level === "EDIT" ? "Can edit" : "Can delete"}</span></span>
+                <span>{label}{a.teamId ? " (team)" : ""} — <span className="muted">{LEVEL_LABELS[a.level]}</span></span>
                 <button type="button" className="btn btn-secondary btn-sm btn-icon" onClick={() => onChange(value.filter((x) => x !== a))}>
                   <Icon name="close" size={11} />
                 </button>
@@ -137,8 +146,7 @@ export function AccessGrantPicker({
           <TargetPicker kind={kind} onKindChange={setKind} users={grantableUsers} teams={grantableTeams} pickedId={pickedId} onPickedIdChange={setPickedId} />
         </div>
         <select className="select" style={{ width: 110 }} value={pickedLevel} onChange={(e) => setPickedLevel(e.target.value as AccessLevel)}>
-          <option value="EDIT">Can edit</option>
-          <option value="DELETE">Can delete</option>
+          {levels.map((l) => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
         </select>
         <button
           type="button"
@@ -167,6 +175,7 @@ export function ManageAccessModal({
   teams,
   queryKey,
   onClose,
+  levels = ["EDIT", "DELETE"],
 }: {
   title: string;
   apiBasePath: string;
@@ -176,11 +185,13 @@ export function ManageAccessModal({
   teams: DirectoryTeam[];
   queryKey: unknown[];
   onClose: () => void;
+  // See AccessGrantPicker's `levels` prop — same reasoning.
+  levels?: AccessLevel[];
 }) {
   const queryClient = useQueryClient();
   const [kind, setKind] = useState<AccessTargetKind>("user");
   const [pickedId, setPickedId] = useState("");
-  const [pickedLevel, setPickedLevel] = useState<AccessLevel>("EDIT");
+  const [pickedLevel, setPickedLevel] = useState<AccessLevel>(levels[0]);
 
   const addMutation = useMutation({
     mutationFn: (params: { userId?: number; teamId?: number; level: AccessLevel }) => axiosClient.post(`${apiBasePath}/access`, params),
@@ -205,7 +216,7 @@ export function ManageAccessModal({
         {access.map((a) => (
           <div key={`${a.userId ?? a.teamId}-${a.level}`} className="row gap-2" style={{ justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--color-border)" }}>
             <span style={{ fontSize: 13 }}>
-              {grantLabel(a)} <span className="muted" style={{ fontSize: 11.5 }}>({a.level === "EDIT" ? "Can edit" : "Can delete"})</span>
+              {grantLabel(a)} <span className="muted" style={{ fontSize: 11.5 }}>({LEVEL_LABELS[a.level]})</span>
             </span>
             <button
               className="btn btn-danger btn-sm btn-icon"
@@ -223,8 +234,7 @@ export function ManageAccessModal({
           <TargetPicker kind={kind} onKindChange={setKind} users={grantableUsers} teams={teams} pickedId={pickedId} onPickedIdChange={setPickedId} />
         </div>
         <select className="select" style={{ width: 110 }} value={pickedLevel} onChange={(e) => setPickedLevel(e.target.value as AccessLevel)}>
-          <option value="EDIT">Can edit</option>
-          <option value="DELETE">Can delete</option>
+          {levels.map((l) => <option key={l} value={l}>{LEVEL_LABELS[l]}</option>)}
         </select>
         <button
           className="btn btn-primary"
