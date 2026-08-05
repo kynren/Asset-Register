@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
@@ -137,13 +137,47 @@ export function ModuleDashboardTab({
     queryClient.invalidateQueries({ queryKey: ["dashboards-shared-with-me", module] });
   }
 
+  // Every drag reorder, resize toggle, add, and remove funnels through updateLayout below, which
+  // can fire in rapid succession (e.g. resize one card then immediately remove another). Two
+  // in-flight PUTs racing each other could otherwise land on the server out of order and silently
+  // discard the newer change. isSavingRef/pendingLayoutRef serialize writes to one in-flight PUT
+  // at a time, always coalescing to the LATEST layout rather than queuing every intermediate one.
+  const isSavingRef = useRef(false);
+  const pendingLayoutRef = useRef<LayoutItem[] | null>(null);
+
+  useEffect(() => {
+    isSavingRef.current = false;
+    pendingLayoutRef.current = null;
+  }, [dashboardId]);
+
   const saveLayoutMutation = useMutation({
     mutationFn: (next: LayoutItem[]) => axiosClient.put(`/dashboard/dashboards/${dashboardId}/layout`, { layout: next }),
+    meta: { errorTitle: "Layout not saved", errorMessage: "Your dashboard changes couldn't be saved and were reverted." },
+    onError: () => {
+      // The write didn't actually land — resync from the server instead of trusting the
+      // optimistic local state, so the UI never keeps showing a change that failed to persist.
+      pendingLayoutRef.current = null;
+      queryClient.invalidateQueries({ queryKey: ["dashboard-detail", dashboardId] });
+    },
+    onSettled: () => {
+      isSavingRef.current = false;
+      if (pendingLayoutRef.current) {
+        const next = pendingLayoutRef.current;
+        pendingLayoutRef.current = null;
+        isSavingRef.current = true;
+        saveLayoutMutation.mutate(next);
+      }
+    },
   });
 
   function updateLayout(next: LayoutItem[]) {
     if (!canEdit || dashboardId == null) return;
     setLayout(next);
+    if (isSavingRef.current) {
+      pendingLayoutRef.current = next;
+      return;
+    }
+    isSavingRef.current = true;
     saveLayoutMutation.mutate(next);
   }
 
