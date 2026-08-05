@@ -6,10 +6,11 @@ import { KnowledgeBaseTab } from "./tabs/KnowledgeBaseTab";
 import { AssetBookingsTab } from "./tabs/AssetBookingsTab";
 import { SavedQueriesTab } from "./tabs/SavedQueriesTab";
 import { ResourceSchedulingTab } from "./tabs/ResourceSchedulingTab";
+import { TimelineTab } from "./tabs/TimelineTab";
 import { LegacyToolsTab } from "./tabs/LegacyToolsTab";
 import { LicensesTab } from "./tabs/LicensesTab";
 
-type TabKey = "projects" | "rss" | "knowledge" | "bookings" | "queries" | "scheduling" | "licenses" | "legacy";
+type TabKey = "projects" | "rss" | "knowledge" | "bookings" | "queries" | "scheduling" | "timeline" | "licenses" | "legacy";
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "projects", label: "IT Projects", icon: "kanban" },
@@ -18,6 +19,7 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "bookings", label: "Asset Bookings", icon: "calendar" },
   { key: "queries", label: "Saved Queries", icon: "bookmark" },
   { key: "scheduling", label: "Resource Scheduling", icon: "clock" },
+  { key: "timeline", label: "Timeline", icon: "sliders" },
   { key: "licenses", label: "Software Licenses", icon: "key" },
   { key: "legacy", label: "Bulk & Reports", icon: "settings" },
 ];
@@ -51,6 +53,7 @@ export function OperationsPage() {
         {tab === "bookings" && <AssetBookingsTab />}
         {tab === "queries" && <SavedQueriesTab />}
         {tab === "scheduling" && <ResourceSchedulingTab />}
+        {tab === "timeline" && <TimelineTab />}
         {tab === "licenses" && <LicensesTab />}
         {tab === "legacy" && <LegacyToolsTab />}
       </div>

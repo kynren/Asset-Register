@@ -33,6 +33,7 @@ interface ProjectCard {
   status: ProjectStatus;
   assigneeId: number | null;
   assignee: { id: number; firstName: string; lastName: string } | null;
+  startDate: string | null;
   dueDate: string | null;
   createdById: number;
   createdBy: { id: number; firstName: string; lastName: string };
@@ -367,6 +368,7 @@ function ProjectFormModal({
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [assigneeId, setAssigneeId] = useState(initial?.assigneeId ? String(initial.assigneeId) : "");
+  const [startDate, setStartDate] = useState(initial?.startDate ? dayjs(initial.startDate).format("YYYY-MM-DD") : "");
   const [dueDate, setDueDate] = useState(initial?.dueDate ? dayjs(initial.dueDate).format("YYYY-MM-DD") : "");
   // Creation-time access grants — only relevant when creating (the creator can always manage
   // access afterward for existing cards via the Manage Access modal instead).
@@ -378,6 +380,7 @@ function ProjectFormModal({
         title,
         description: description || undefined,
         assigneeId: assigneeId ? Number(assigneeId) : null,
+        startDate: startDate ? dayjs(startDate).toISOString() : null,
         dueDate: dueDate ? dayjs(dueDate).toISOString() : null,
         ...(initial ? {} : { access: newAccess.map((a) => (a.userId != null ? { userId: Number(a.userId), level: a.level } : { teamId: Number(a.teamId), level: a.level })) }),
       };
@@ -399,7 +402,10 @@ function ProjectFormModal({
           options={[{ value: "", label: "Unassigned" }, ...users.map((u: any) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` }))]}
         />
       </div>
-      <div className="field"><label>Due Date</label><input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
+      <div className="row gap-2">
+        <div className="field" style={{ flex: 1 }}><label>Start Date</label><input className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+        <div className="field" style={{ flex: 1 }}><label>Due Date</label><input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></div>
+      </div>
 
       {!initial && <AccessGrantPicker users={users} teams={teams} value={newAccess} onChange={setNewAccess} />}
     </FormModal>

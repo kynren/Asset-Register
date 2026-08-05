@@ -10,6 +10,10 @@ import { getPagination, paginatedResponse } from "../../lib/pagination";
 import { notifyUsers, getUserIdsWithPermission } from "../../lib/notify";
 import { generateSku } from "../../lib/stockSku";
 import { drawPdfCopyrightFooter } from "../../lib/docExport";
+import { applyRecordRules } from "../../lib/recordRules";
+import { listCustomColumnValuesBatch } from "../../lib/customColumns";
+
+const STOCK_NUMERIC_FIELDS = new Set(["stockItemTypeId", "reorderLevel", "quantityOnHand"]);
 
 export async function list(req: Request, res: Response) {
   const { page, pageSize, skip, take } = getPagination(req);
@@ -27,7 +31,10 @@ export async function list(req: Request, res: Response) {
     items = items.filter((i) => i.quantityOnHand <= i.reorderLevel);
   }
 
-  res.json(paginatedResponse(items, total, page, pageSize));
+  const customColumnValues = await listCustomColumnValuesBatch("StockItem", items.map((i) => i.id));
+  const itemsWithCustomColumns = items.map((i) => ({ ...i, customColumnValues: customColumnValues.get(i.id) ?? {} }));
+
+  res.json(paginatedResponse(itemsWithCustomColumns, total, page, pageSize));
 }
 
 export async function getOne(req: Request, res: Response) {
@@ -53,6 +60,7 @@ export async function getOne(req: Request, res: Response) {
 
 export async function create(req: Request, res: Response) {
   const data = { ...req.body } as typeof req.body;
+  await applyRecordRules("StockItem", data, "ON_CREATE", STOCK_NUMERIC_FIELDS);
 
   let stockItemType = null;
   if (data.stockItemTypeId) {
@@ -75,8 +83,10 @@ export async function create(req: Request, res: Response) {
 
 export async function update(req: Request, res: Response) {
   const id = Number(req.params.id);
-  const item = await prisma.stockItem.update({ where: { id }, data: req.body });
-  await logAudit({ userId: req.user!.id, action: "stockItem.update", entityType: "StockItem", entityId: id, metadata: req.body });
+  const data = { ...req.body } as typeof req.body;
+  await applyRecordRules("StockItem", data, "ON_UPDATE", STOCK_NUMERIC_FIELDS);
+  const item = await prisma.stockItem.update({ where: { id }, data });
+  await logAudit({ userId: req.user!.id, action: "stockItem.update", entityType: "StockItem", entityId: id, metadata: data });
   res.json(item);
 }
 

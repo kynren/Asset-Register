@@ -7,7 +7,7 @@ import { DataTable } from "../../components/DataTable";
 import { FilterBar } from "../../components/FilterBar";
 import { Icon } from "../../components/Icon";
 import { SimpleBarChart } from "../../components/ChartWrapper";
-import { PermissionGate } from "../../auth/PermissionGate";
+import { PermissionGate, usePermission } from "../../auth/PermissionGate";
 import { StockItemFormModal, StockItemFormValues } from "./StockItemFormModal";
 import { FormModal } from "../../components/FormModal";
 import { QrCodeModal } from "../../components/QrCodeModal";
@@ -20,6 +20,10 @@ import { StockQrScannerModal } from "./StockQrScannerModal";
 import { StockItemDetailModal } from "./StockItemDetailModal";
 import { ReportsListPage } from "../reports/ReportsListPage";
 import { ReportBuilderModal } from "../reports/ReportBuilderModal";
+import { SavedViewBar } from "../../components/savedViews/SavedViewBar";
+import { CustomColumnsModal } from "../../components/CustomColumnsModal";
+import { buildCustomColumnDefs } from "../../components/customColumnDefs";
+import { useCustomColumns } from "../../hooks/useCustomColumns";
 
 interface StockItem {
   id: number;
@@ -29,6 +33,7 @@ interface StockItem {
   unit: string;
   quantityOnHand: number;
   reorderLevel: number;
+  customColumnValues?: Record<number, string | null>;
 }
 
 export function StockPage() {
@@ -42,7 +47,10 @@ export function StockPage() {
   const [showScanner, setShowScanner] = useState(false);
   const [detailItemId, setDetailItemId] = useState<number | null>(null);
   const [showReportBuilder, setShowReportBuilder] = useState(false);
+  const [showCustomColumns, setShowCustomColumns] = useState(false);
   const queryClient = useQueryClient();
+  const canEditStock = usePermission("stock", "edit");
+  const { columns: customColumns, setValueMutation: setCustomColumnValue } = useCustomColumns("StockItem");
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Lets the command palette's "Add Stock Item" quick action deep-link straight into the create form.
@@ -93,6 +101,9 @@ export function StockPage() {
       ),
     },
     { header: "Reorder Level", accessorKey: "reorderLevel" },
+    ...buildCustomColumnDefs<StockItem>(customColumns, canEditStock, (columnId, entityId, value) =>
+      setCustomColumnValue.mutate({ columnId, entityId, value })
+    ),
     {
       header: "",
       id: "actions",
@@ -127,6 +138,9 @@ export function StockPage() {
           {tab === "register" && (
             <>
               <button className="btn btn-secondary" onClick={() => setShowScanner(true)}><Icon name="grid" size={14} /> Scan</button>
+              <PermissionGate module="stock" action="edit">
+                <button className="btn btn-secondary" onClick={() => setShowCustomColumns(true)}><Icon name="sliders" size={14} /> Custom Columns</button>
+              </PermissionGate>
               <PermissionGate module="stock" action="create">
                 <button className="btn btn-primary" onClick={() => setShowForm(true)}><Icon name="plus" size={14} /> Add Item</button>
               </PermissionGate>
@@ -142,6 +156,17 @@ export function StockPage() {
 
       {tab === "register" ? (
         <>
+          <div style={{ marginBottom: 14 }}>
+            <SavedViewBar
+              tableId="stock.items"
+              currentFilters={{ search, lowStockOnly }}
+              onApply={(saved) => {
+                setSearch(typeof saved.search === "string" ? saved.search : "");
+                setLowStockOnly(typeof saved.lowStockOnly === "boolean" ? saved.lowStockOnly : false);
+                setPage(1);
+              }}
+            />
+          </div>
           <FilterBar search={search} onSearchChange={(v) => { setSearch(v); setPage(1); }} searchPlaceholder="Search by SKU or name...">
             <label className="row gap-1" style={{ fontSize: 13, cursor: "pointer" }}>
               <input type="checkbox" checked={lowStockOnly} onChange={(e) => { setLowStockOnly(e.target.checked); setPage(1); }} />
@@ -193,6 +218,7 @@ export function StockPage() {
       {showScanner && <StockQrScannerModal onClose={() => setShowScanner(false)} onFound={(id) => setDetailItemId(id)} />}
       {detailItemId !== null && <StockItemDetailModal stockItemId={detailItemId} onClose={() => setDetailItemId(null)} />}
       {showReportBuilder && <ReportBuilderModal defaultSource="stock" onClose={() => setShowReportBuilder(false)} />}
+      {showCustomColumns && <CustomColumnsModal entityType="StockItem" title="Stock Custom Columns" onClose={() => setShowCustomColumns(false)} />}
     </div>
   );
 }

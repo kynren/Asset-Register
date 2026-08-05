@@ -13,18 +13,21 @@ import {
   YAxis,
 } from "recharts";
 
-const PALETTE = ["#1d4ed8", "#0f9d58", "#b45309", "#d92d20", "#7c3aed", "#0891b2", "#667085"];
+// Kynren's own brand tokens (see client/src/styles/global.css) rather than a hardcoded palette,
+// so chart colors track dark mode and a user's custom AppearanceTheme primary color the same way
+// every other themed element already does (see RadialGauge.tsx for the same pattern).
+const PALETTE = ["var(--color-primary)", "var(--color-success)", "var(--color-warning)", "var(--color-danger)", "var(--color-text-muted)"];
 
 export function SimpleBarChart({ data, xKey, yKey, height = 260, glow = false }: { data: any[]; xKey: string; yKey: string; height?: number; glow?: boolean }) {
   return (
-    <div style={glow ? { filter: "drop-shadow(0 0 6px rgba(29,78,216,0.4))" } : undefined}>
+    <div style={glow ? { filter: "drop-shadow(0 0 6px var(--color-primary-soft))" } : undefined}>
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={data} margin={{ left: -20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e6ec" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis dataKey={xKey} tick={{ fontSize: 12 }} />
           <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
           <Tooltip />
-          <Bar dataKey={yKey} fill="#1d4ed8" radius={[4, 4, 0, 0]} animationDuration={800} />
+          <Bar dataKey={yKey} fill="var(--color-primary)" radius={[4, 4, 0, 0]} animationDuration={800} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -35,7 +38,7 @@ export function SimpleLineChart({ data, xKey, lines, height = 260 }: { data: any
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ left: -20 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e6ec" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
         <XAxis dataKey={xKey} tick={{ fontSize: 12 }} />
         <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
         <Tooltip />
@@ -49,7 +52,7 @@ export function SimpleLineChart({ data, xKey, lines, height = 260 }: { data: any
 
 export function SimplePieChart({ data, dataKey, nameKey, height = 260, glow = false }: { data: any[]; dataKey: string; nameKey: string; height?: number; glow?: boolean }) {
   return (
-    <div style={glow ? { filter: "drop-shadow(0 0 8px rgba(29,78,216,0.35))" } : undefined}>
+    <div style={glow ? { filter: "drop-shadow(0 0 8px var(--color-primary-soft))" } : undefined}>
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
           <Tooltip />

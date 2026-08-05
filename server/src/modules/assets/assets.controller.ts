@@ -15,6 +15,10 @@ import { sendEventEmail } from "../../lib/emailNotify";
 import { generateTempPassword } from "../../lib/passwords";
 import { relayAwarePing } from "../../lib/relayTransport";
 import { getAssetHeartbeatSnapshot, subscribeToAssetHeartbeat } from "../../lib/assetHeartbeat";
+import { applyRecordRules } from "../../lib/recordRules";
+import { listCustomColumnValuesBatch } from "../../lib/customColumns";
+
+const ASSET_NUMERIC_FIELDS = new Set(["categoryId", "locationId", "assignedToId"]);
 
 const include = {
   category: true,
@@ -64,7 +68,10 @@ export async function list(req: Request, res: Response) {
     prisma.asset.count({ where }),
   ]);
 
-  res.json(paginatedResponse(items, total, page, pageSize));
+  const customColumnValues = await listCustomColumnValuesBatch("Asset", items.map((i) => i.id));
+  const itemsWithCustomColumns = items.map((i) => ({ ...i, customColumnValues: customColumnValues.get(i.id) ?? {} }));
+
+  res.json(paginatedResponse(itemsWithCustomColumns, total, page, pageSize));
 }
 
 export async function getByTag(req: Request, res: Response) {
@@ -526,6 +533,7 @@ export async function harnessReportPdf(req: Request, res: Response) {
 
 export async function create(req: Request, res: Response) {
   const { customFieldValues, ...data } = req.body;
+  await applyRecordRules("Asset", data, "ON_CREATE", ASSET_NUMERIC_FIELDS);
   const asset = await prisma.asset.create({ data, include });
   if (customFieldValues?.length) {
     await saveCustomFieldValues(asset.id, customFieldValues);
@@ -553,6 +561,7 @@ export async function update(req: Request, res: Response) {
   const id = Number(req.params.id);
   const before = await prisma.asset.findUnique({ where: { id }, select: { assignedToId: true } });
   const { customFieldValues, ...data } = req.body;
+  await applyRecordRules("Asset", data, "ON_UPDATE", ASSET_NUMERIC_FIELDS);
   const asset = await prisma.asset.update({ where: { id }, data, include });
   if (customFieldValues?.length) {
     await saveCustomFieldValues(id, customFieldValues);

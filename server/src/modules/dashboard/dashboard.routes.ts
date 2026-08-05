@@ -8,7 +8,7 @@ import { ModuleName } from "../../constants/modules";
 import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { getPagination, paginatedResponse } from "../../lib/pagination";
-import { runQuery, SOURCES } from "./dataExplorer";
+import { runMultiQuery, runQuery, SOURCES } from "./dataExplorer";
 import * as dashboards from "./dashboards.controller";
 import { createDashboardSchema, layoutSchema, renameDashboardSchema, shareDashboardSchema } from "./dashboards.schema";
 
@@ -217,6 +217,40 @@ router.post("/query", validateBody(dataExplorerQuerySchema), async (req, res) =>
     return res.status(403).json({ error: `Not permitted to view ${source.module}` });
   }
   const result = await runQuery(req.body, { id: req.user!.id, roleId: req.user!.roleId, roleName: req.user!.roleName });
+  res.json(result);
+});
+
+// Backs the home dashboard's cross-module "Comparison" widget — one KPI count per named source,
+// folded into a single chart result. Reuses the exact same per-source module "view" permission
+// check as /query above so a comparison widget can never surface a source the caller couldn't
+// already see on its own.
+const dataExplorerMultiQuerySchema = z.object({
+  sources: z
+    .array(
+      z.object({
+        source: z.string(),
+        label: z.string().optional(),
+        filters: z
+          .object({
+            combinator: z.enum(["AND", "OR"]).default("AND"),
+            conditions: z.array(dataExplorerConditionSchema).default([]),
+          })
+          .optional(),
+      })
+    )
+    .min(2)
+    .max(6),
+});
+
+router.post("/query-multi", validateBody(dataExplorerMultiQuerySchema), async (req, res) => {
+  for (const s of req.body.sources) {
+    const source = SOURCES[s.source];
+    if (!source) throw new ApiError(400, `Unknown data source: ${s.source}`);
+    if (req.user!.roleName !== "System Admin" && !(await hasPermission(req.user!.roleId, source.module, "view"))) {
+      return res.status(403).json({ error: `Not permitted to view ${source.module}` });
+    }
+  }
+  const result = await runMultiQuery(req.body.sources, { id: req.user!.id, roleId: req.user!.roleId, roleName: req.user!.roleName });
   res.json(result);
 });
 

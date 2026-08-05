@@ -322,6 +322,32 @@ export async function getDoorStatus(
 }
 
 /**
+ * Best-effort door/lock state inference from an AcsEvent's own free-text eventType/message —
+ * the fallback used when getDoorStatus's direct status read isn't supported by a controller's
+ * firmware (see that function's doc comment: no live status GET is genuinely documented or
+ * confirmed against real hardware). Hikvision access panels DO reliably report door-open/closed
+ * and lock/unlock as access-control events (searchAcsEvents below), which is the mechanism
+ * real-world ISAPI integrations actually rely on for door state — but the exact subEventName/
+ * minor-code enum isn't independently documented either, so rather than hardcode unverified
+ * numeric codes, this does the same defensive case-insensitive substring matching getDoorStatus
+ * itself already uses on doorState/lockState XML fields, just applied to whatever text the event
+ * carries. A door-control-initiated event (see controlDoor) naturally reads back through here too
+ * since this app's own "REMOTE_OPEN"/"REMOTE_CLOSE" AccessEvent rows contain those same words.
+ */
+export function inferDoorLockStateFromEventText(
+  eventType: string,
+  message: string | null
+): { doorState?: "open" | "closed"; lockState?: "locked" | "unlocked" } {
+  const text = `${eventType} ${message ?? ""}`.toLowerCase();
+  const result: { doorState?: "open" | "closed"; lockState?: "locked" | "unlocked" } = {};
+  if (text.includes("dooropen") || text.includes("door open") || text.includes("door_open")) result.doorState = "open";
+  else if (text.includes("doorclos") || text.includes("door clos") || text.includes("door_clos")) result.doorState = "closed";
+  if (text.includes("unlock")) result.lockState = "unlocked";
+  else if (text.includes("lock")) result.lockState = "locked";
+  return result;
+}
+
+/**
  * Asks the controller how many physical doors it actually supports (e.g. a DS-K2604 reports 4,
  * a DS-K2601 reports 1). discoverDoors (accessControl.routes.ts) calls this first and then reads
  * every door number in that range via getDoorStatus, so a multi-door panel's doors are all

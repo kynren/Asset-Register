@@ -6,6 +6,8 @@ import { LoginPage } from "./pages/auth/LoginPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { MagicLoginPage } from "./pages/auth/MagicLoginPage";
+import { AssetIntakeFormPage } from "./pages/public/AssetIntakeFormPage";
+import { AssetIntakeQueuePage } from "./pages/assets/AssetIntakeQueuePage";
 import { ForceChangePasswordPage } from "./pages/auth/ForceChangePasswordPage";
 import { DashboardPage } from "./pages/dashboard/DashboardPage";
 import { AssetListPage } from "./pages/assets/AssetListPage";
@@ -40,6 +42,7 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
       <Route path="/magic-login/:token" element={<MagicLoginPage />} />
+      <Route path="/intake/:token" element={<AssetIntakeFormPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/force-change-password" element={<ForceChangePasswordPage />} />
@@ -49,6 +52,7 @@ function App() {
 
           <Route path="/assets" element={<PermissionGate module="assets" redirect><AssetListPage /></PermissionGate>} />
           <Route path="/assets/:id" element={<PermissionGate module="assets" redirect><AssetDetailPage /></PermissionGate>} />
+          <Route path="/asset-intake" element={<PermissionGate module="assets" redirect><AssetIntakeQueuePage /></PermissionGate>} />
 
           <Route path="/network" element={<PermissionGate module="network" redirect><NetworkMapPage /></PermissionGate>} />
 

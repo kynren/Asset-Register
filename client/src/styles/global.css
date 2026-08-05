@@ -142,8 +142,9 @@
      utilities layer, generated from the class names already used across the app. */
 
   .app-shell {
-    @apply flex overflow-hidden m-4;
-    height: calc(100vh - 2rem);
+    @apply flex overflow-hidden;
+    margin: 2px;
+    height: calc(100vh - 4px);
     border-radius: var(--shell-radius);
     box-shadow: var(--shell-shadow);
   }
@@ -396,13 +397,38 @@
   }
 
   .kpi-card {
-    @apply bg-surface border border-border rounded px-[18px] py-4 flex flex-col gap-1.5 shadow-sm;
+    @apply relative border border-transparent px-[18px] py-4 pr-16 flex flex-col gap-1.5 shadow-sm;
+    border-radius: 18px;
+    background: var(--color-surface);
+  }
+  .kpi-card-neutral {
+    @apply bg-surface border-border;
+  }
+  .kpi-card-primary {
+    background: var(--color-primary-soft);
+  }
+  .kpi-card-success {
+    background: var(--color-success-soft);
+  }
+  .kpi-card-warning {
+    background: var(--color-warning-soft);
+  }
+  .kpi-card-danger {
+    background: var(--color-danger-soft);
   }
   .kpi-label {
     @apply text-xs text-text-muted font-semibold uppercase tracking-wide;
   }
   .kpi-value {
     @apply text-[26px] font-bold tabular-nums;
+  }
+  .kpi-icon-badge {
+    @apply absolute flex items-center justify-center text-white;
+    top: 14px;
+    right: 14px;
+    width: 36px;
+    height: 36px;
+    border-radius: 9999px;
   }
 
   /* ---------- Dashboard: ambient glow + live-data animation ---------- */
@@ -471,21 +497,17 @@
     box-shadow: 0 10px 28px -10px var(--color-primary-soft), var(--shadow-sm);
   }
 
-  .kpi-icon-glow {
-    @apply relative inline-flex items-center justify-center rounded-full;
-    width: 28px;
-    height: 28px;
-  }
-  .kpi-icon-glow::before {
+  .kpi-icon-badge::before {
     content: "";
-    @apply absolute inset-0 rounded-full;
-    background: currentColor;
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background-color: inherit;
     animation: kynren-breathe 3.2s ease-in-out infinite;
   }
-  .kpi-icon-glow svg {
+  .kpi-icon-badge svg {
     position: relative;
     z-index: 1;
-    filter: drop-shadow(0 0 3px currentColor);
   }
 
   .live-dot {

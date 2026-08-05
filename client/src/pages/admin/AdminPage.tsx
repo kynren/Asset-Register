@@ -8,6 +8,7 @@ import { AuditLogTab } from "./AuditLogTab";
 import { EmailTemplatesTab } from "./EmailTemplatesTab";
 import { ToastSettingsTab } from "./ToastSettingsTab";
 import { HelpdeskConfigTab } from "./HelpdeskConfigTab";
+import { AutomationRulesTab } from "./AutomationRulesTab";
 import { BrandingTab } from "../appSettings/BrandingTab";
 import { DocsImportLimitCard } from "../docs/DocsImportLimitCard";
 
@@ -17,6 +18,7 @@ const TABS = [
   { key: "teams", label: "Teams" },
   { key: "catalog", label: "Categories & Locations" },
   { key: "helpdesk-config", label: "Helpdesk Config" },
+  { key: "automation-rules", label: "Automation Rules" },
   { key: "email-ingest", label: "Email Ingestion" },
   { key: "email-templates", label: "Email Templates" },
   { key: "toasts", label: "Toast Designer" },
@@ -54,6 +56,7 @@ export function AdminPage() {
       {tab === "teams" && <TeamsTab />}
       {tab === "catalog" && <CategoriesLocationsTab />}
       {tab === "helpdesk-config" && <HelpdeskConfigTab />}
+      {tab === "automation-rules" && <AutomationRulesTab />}
       {tab === "email-ingest" && <EmailIngestSettingsTab />}
       {tab === "email-templates" && <EmailTemplatesTab />}
       {tab === "toasts" && <ToastSettingsTab />}

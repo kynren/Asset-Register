@@ -17,6 +17,7 @@ import {
   getDeviceInfo,
   getDoorCapabilities,
   getDoorStatus,
+  inferDoorLockStateFromEventText,
   IsapiDoorStatus,
   searchAcsEvents,
 } from "../../lib/hikvisionIsapi";
@@ -143,6 +144,39 @@ async function upsertDoorPlaceholder(deviceId: number, doorNumber: number) {
   });
 }
 
+// Fallback door/lock state source for when getDoorStatus's direct read isn't supported by this
+// controller's firmware (see that function's doc comment — no live status GET is genuinely
+// documented, and real hardware returns HTTP 400 for it). Hikvision panels do reliably report
+// door-open/closed and lock/unlock as AcsEvents, so this pulls a recent window of them live from
+// the controller (one call covers every door on the device, not one per door) and keeps the most
+// recent state-bearing event per door number. A device that's genuinely unreachable (the same
+// relay-timeout/connection failure a live status read would also hit) surfaces here as an empty
+// map, same as "no usable events found" — the caller falls back to its existing unsupported
+// messaging either way.
+async function fetchRecentDoorEventStates(
+  ipAddress: string,
+  port: number | null,
+  username: string,
+  password: string
+): Promise<Map<number, { doorState?: "open" | "closed"; lockState?: "locked" | "unlocked"; occurredAt: Date }>> {
+  const byDoor = new Map<number, { doorState?: "open" | "closed"; lockState?: "locked" | "unlocked"; occurredAt: Date }>();
+  const endTime = new Date();
+  const startTime = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  const result = await searchAcsEvents(ipAddress, port, username, password, { startTime, endTime, maxResults: 50 });
+  if (!result.ok) return byDoor;
+
+  for (const e of result.events) {
+    if (e.doorNumber === null) continue;
+    const inferred = inferDoorLockStateFromEventText(e.eventType, e.message);
+    if (!inferred.doorState && !inferred.lockState) continue;
+    const existing = byDoor.get(e.doorNumber);
+    if (!existing || e.occurredAt > existing.occurredAt) {
+      byDoor.set(e.doorNumber, { ...inferred, occurredAt: e.occurredAt });
+    }
+  }
+  return byDoor;
+}
+
 // A Hikvision access controller comes with one or more physical doors wired to it — this creates
 // a Door row per doorNumber the controller's capabilities report, so the user doesn't have to
 // know or manually enter how many doors a given controller has. Existing doors get their
@@ -169,7 +203,26 @@ async function discoverDoors(deviceId: number, ipAddress: string, port: number |
 
   let doorsFound = 0;
   let statusReadFailures = 0;
+  let eventInferredCount = 0;
   let firstFailureMessage: string | null = null;
+
+  // Fetched at most once, lazily, only if a direct status read actually fails — most controllers
+  // that answer getDoorStatus correctly never need this extra round trip.
+  let eventStates: Map<number, { doorState?: "open" | "closed"; lockState?: "locked" | "unlocked"; occurredAt: Date }> | null = null;
+  async function eventStateFor(doorNumber: number) {
+    if (eventStates === null) eventStates = await fetchRecentDoorEventStates(ipAddress, port, username, password);
+    return eventStates.get(doorNumber) ?? null;
+  }
+
+  async function registerDoorAfterStatusFailure(doorNumber: number) {
+    const inferred = await eventStateFor(doorNumber);
+    if (inferred) {
+      await upsertDoorFromStatus(deviceId, { doorNumber, doorState: inferred.doorState ?? "unknown", lockState: inferred.lockState ?? "unknown" });
+      eventInferredCount++;
+    } else {
+      await upsertDoorPlaceholder(deviceId, doorNumber);
+    }
+  }
 
   if (capabilities.count) {
     const doorLimit = Math.min(capabilities.count, MAX_DOORS_PER_DEVICE);
@@ -182,7 +235,7 @@ async function discoverDoors(deviceId: number, ipAddress: string, port: number |
         // A per-door 404 despite capabilities claiming this doorNumber exists is left alone
         // rather than guessed at — Refresh Doors will pick it up once the device reports it.
       } else {
-        await upsertDoorPlaceholder(deviceId, doorNumber);
+        await registerDoorAfterStatusFailure(doorNumber);
         doorsFound++;
         statusReadFailures++;
         firstFailureMessage = firstFailureMessage ?? result.message;
@@ -213,7 +266,7 @@ async function discoverDoors(deviceId: number, ipAddress: string, port: number |
       // never answers this endpoint successfully still get all 4 doors added instead of just
       // door 1 (or none) — the user has to be able to see and control every physical door, not
       // just the first one this probe happened to reach before giving up.
-      await upsertDoorPlaceholder(deviceId, doorNumber);
+      await registerDoorAfterStatusFailure(doorNumber);
       doorsFound++;
       statusReadFailures++;
       firstFailureMessage = firstFailureMessage ?? result.message;
@@ -222,9 +275,10 @@ async function discoverDoors(deviceId: number, ipAddress: string, port: number |
 
   if (doorsFound === 0 && firstFailureMessage) return { ok: false, message: firstFailureMessage };
   if (statusReadFailures > 0) {
+    const inferredNote = eventInferredCount > 0 ? ` ${eventInferredCount} door(s) got a best-effort state from the recent access-event log instead.` : "";
     return {
       ok: true,
-      message: `Added ${doorsFound} door(s), but live status couldn't be read (${firstFailureMessage}) — shown as unknown until this succeeds.`,
+      message: `Added ${doorsFound} door(s), but live status couldn't be read (${firstFailureMessage}) — shown as unknown until this succeeds.${inferredNote}`,
     };
   }
   return { ok: true, message: doorsFound > 0 ? `Read status for ${doorsFound} door(s).` : "This controller did not report any doors." };
@@ -391,18 +445,33 @@ router.post("/doors/:doorId/refresh-status", requirePermission("access-control",
   if (!device.ipAddress) throw new ApiError(400, "This device has no IP address set");
 
   const result = await getDoorStatus(device.ipAddress, device.port, device.username ?? "", devicePassword(device), door.doorNumber);
+  let responseMessage = result.message;
+  let statusUnsupported = false;
   if (result.ok && result.door) {
     await upsertDoorFromStatus(device.id, result.door);
   } else {
-    await prisma.door.update({ where: { id: doorId }, data: { lastCheckedAt: new Date() } });
+    // A non-ok result that's neither unreachable, an auth failure, nor a 404 means the device
+    // answered but this specific status resource isn't implemented by its firmware (see the doc
+    // comment on getDoorStatus) — a known, permanent capability gap on some controllers. Rather
+    // than just reporting that, fall back to the controller's own access-event log (the mechanism
+    // Hikvision panels actually use to report door-open/closed and lock/unlock in practice).
+    const unsupported = !result.unreachable && !result.authFailed && !result.notFound;
+    if (unsupported) {
+      const eventStates = await fetchRecentDoorEventStates(device.ipAddress, device.port, device.username ?? "", devicePassword(device));
+      const inferred = eventStates.get(door.doorNumber);
+      if (inferred) {
+        await upsertDoorFromStatus(device.id, { doorNumber: door.doorNumber, doorState: inferred.doorState ?? "unknown", lockState: inferred.lockState ?? "unknown" });
+        responseMessage = `Live status read isn't supported by this controller — inferred from the most recent access event (${inferred.occurredAt.toLocaleString()}).`;
+      } else {
+        await prisma.door.update({ where: { id: doorId }, data: { lastCheckedAt: new Date() } });
+        statusUnsupported = true;
+      }
+    } else {
+      await prisma.door.update({ where: { id: doorId }, data: { lastCheckedAt: new Date() } });
+    }
   }
   const updated = await prisma.door.findUnique({ where: { id: doorId } });
-  // A non-ok result that's neither unreachable, an auth failure, nor a 404 means the device
-  // answered but this specific status resource isn't implemented by its firmware (see the doc
-  // comment on getDoorStatus) — that's a known, permanent capability gap on some controllers, not
-  // something the user can act on, so the client renders it calmly rather than as an alarm.
-  const statusUnsupported = !result.ok && !result.unreachable && !result.authFailed && !result.notFound;
-  res.json({ ok: result.ok, message: result.message, statusUnsupported, door: updated });
+  res.json({ ok: result.ok || !statusUnsupported, message: responseMessage, statusUnsupported, door: updated });
 });
 
 router.delete("/doors/:doorId", requirePermission("access-control", "delete"), async (req, res) => {
