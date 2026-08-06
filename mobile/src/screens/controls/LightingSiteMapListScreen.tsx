@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, FlatList, Image, Text, TouchableOpacity, View } from "react-native";
+import { FlatList, Image, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerList } from "../../components/Shimmer";
 import { API_ORIGIN } from "../../config/env";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -29,7 +30,7 @@ export function LightingSiteMapListScreen() {
     queryFn: async () => (await axiosClient.get("/lighting/site-maps")).data as SiteMapSummary[],
   });
 
-  if (isLoading) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />;
+  if (isLoading) return <ShimmerList />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

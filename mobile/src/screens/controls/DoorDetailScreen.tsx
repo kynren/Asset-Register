@@ -7,6 +7,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerDetail } from "../../components/Shimmer";
 import { AccessControlDevice, DoorControlAction, DoorLockState } from "../../types/controls";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -59,11 +60,7 @@ export function DoorDetailScreen() {
   }, [navigation, found]);
 
   if (isLoading || !found) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    return <ShimmerDetail />;
   }
 
   const { door, device } = found;

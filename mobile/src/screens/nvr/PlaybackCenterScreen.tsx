@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ActivityIndicator, FlatList, Modal, Text, TouchableOpacity, View } from "react-native";
+import { FlatList, Modal, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { VideoView, useVideoPlayer } from "expo-video";
 import dayjs from "dayjs";
@@ -8,6 +8,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { getAccessToken } from "../../api/tokenStore";
 import { API_ORIGIN } from "../../config/env";
+import { ShimmerList } from "../../components/Shimmer";
 
 interface Recording {
   id: number;
@@ -40,7 +41,7 @@ export function PlaybackCenterScreen() {
     queryFn: async () => (await axiosClient.get("/nvr/recordings")).data as Recording[],
   });
 
-  if (isLoading) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />;
+  if (isLoading) return <ShimmerList />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

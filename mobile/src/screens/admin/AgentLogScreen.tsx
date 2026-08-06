@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from "react-native";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerListItem } from "../../components/Shimmer";
 
 interface AgentLogEntry {
   id: number;
@@ -28,7 +29,13 @@ export function AgentLogScreen() {
       <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: spacing.md }}>
         Recent log lines uploaded by the on-prem network relay agent. Updates every 5 seconds. Entries older than 24 hours are pruned automatically.
       </Text>
-      {isLoading && <Text style={{ color: colors.textMuted }}>Loading...</Text>}
+      {isLoading && (
+        <View style={{ gap: spacing.sm }}>
+          <ShimmerListItem />
+          <ShimmerListItem />
+          <ShimmerListItem />
+        </View>
+      )}
       {!isLoading && entries.length === 0 && <Text style={{ color: colors.textMuted }}>No log entries yet — the relay agent hasn't reported in.</Text>}
       {entries.length > 0 && (
         <View style={{ backgroundColor: "#0d1117", borderRadius: radius.md, padding: 12 }}>

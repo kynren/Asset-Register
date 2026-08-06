@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
@@ -50,6 +50,13 @@ export function TicketLinksTab({ ticketId, linksFrom, linksTo, canEdit }: { tick
   ];
   const inputStyle = { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.text, backgroundColor: colors.bg };
 
+  function confirmUnlink(link: (typeof combined)[number]) {
+    Alert.alert("Unlink ticket", `Remove the link to ${link.ticket.ticketNumber} — ${link.ticket.title}?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Unlink", style: "destructive", onPress: () => unlinkMutation.mutate(link.id) },
+    ]);
+  }
+
   return (
     <View>
       {combined.length === 0 && <Text style={{ color: colors.textMuted, fontSize: 12.5 }}>No linked tickets.</Text>}
@@ -63,7 +70,7 @@ export function TicketLinksTab({ ticketId, linksFrom, linksTo, canEdit }: { tick
             </View>
           </TouchableOpacity>
           {l.deletable && canEdit && (
-            <TouchableOpacity style={{ width: 28, height: 28, alignItems: "center", justifyContent: "center", borderRadius: radius.md, borderWidth: 1, borderColor: colors.danger, marginLeft: 8 }} onPress={() => unlinkMutation.mutate(l.id)}>
+            <TouchableOpacity style={{ width: 28, height: 28, alignItems: "center", justifyContent: "center", borderRadius: radius.md, borderWidth: 1, borderColor: colors.danger, marginLeft: 8 }} onPress={() => confirmUnlink(l)}>
               <Ionicons name="trash-outline" size={13} color={colors.danger} />
             </TouchableOpacity>
           )}

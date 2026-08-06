@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerDetail } from "../../components/Shimmer";
 import { MonitoredNetworkDevice, PingResult } from "../../types/network";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -38,11 +39,7 @@ export function NetworkDeviceDetailScreen() {
   }
 
   if (isLoading || !device) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    return <ShimmerDetail />;
   }
 
   const rows: [string, string | null][] = [

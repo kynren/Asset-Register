@@ -2,9 +2,10 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, FlatList, RefreshControl, Text, TouchableOpacity, View } from "react-native";
+import { FlatList, RefreshControl, Text, TouchableOpacity, View } from "react-native";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerList } from "../../components/Shimmer";
 import { AccessControlDevice, AccessDoor, DoorLockState } from "../../types/controls";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -32,7 +33,7 @@ export function DoorListScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+        <ShimmerList />
       ) : (
         <FlatList
           data={doors}

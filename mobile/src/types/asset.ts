@@ -18,6 +18,39 @@ export interface AssetUserRef {
   email: string;
 }
 
+export interface AssetDevice {
+  id: number;
+  hostname: string;
+  macAddress: string;
+  ipAddresses: string[];
+  os: string | null;
+  osVersion: string | null;
+  cpu: string | null;
+  ramGb: number | null;
+  diskInfo: string | null;
+  loggedInUser: string | null;
+  lastSeen: string;
+  batteryPresent: boolean | null;
+  batteryPercent: number | null;
+  batteryCharging: boolean | null;
+}
+
+export interface AssetCustomFieldValue {
+  id: number;
+  value: string | null;
+  field: { id: number; label: string; fieldKey: string; fieldType: string };
+}
+
+export interface AssetTicketRef {
+  id: number;
+  ticketNumber: string;
+  title: string;
+  status: "OPEN" | "IN_PROGRESS" | "PENDING" | "RESOLVED" | "CLOSED";
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  itilType: "INCIDENT" | "REQUEST" | "PROBLEM" | "CHANGE";
+  createdAt: string;
+}
+
 export interface Asset {
   id: number;
   assetTag: string;
@@ -37,8 +70,29 @@ export interface Asset {
   purchaseCost: number | null;
   warrantyExpiresAt: string | null;
   supplier: string | null;
+  featuredImageUrl: string | null;
+  device: AssetDevice | null;
+  customFieldValues: AssetCustomFieldValue[];
+  tickets: AssetTicketRef[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AssetPhoto {
+  id: number;
+  url: string;
+  createdAt: string;
+}
+
+export interface AssetCheckout {
+  id: number;
+  checkedOutAt: string;
+  dueBackAt: string | null;
+  checkedInAt: string | null;
+  notes: string | null;
+  checkedOutTo: { id: number; firstName: string; lastName: string } | null;
+  checkedOutBy: { id: number; firstName: string; lastName: string } | null;
+  checkedInBy: { id: number; firstName: string; lastName: string } | null;
 }
 
 export interface PaginatedResponse<T> {

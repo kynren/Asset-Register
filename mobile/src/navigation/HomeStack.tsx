@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { DashboardScreen } from "../screens/dashboard/DashboardScreen";
+import { AppHeader } from "../components/AppHeader";
 import { useTheme } from "../theme/ThemeContext";
 import { HomeStackParamList } from "./types";
 
@@ -9,7 +10,7 @@ export function HomeStack() {
   const { colors } = useTheme();
   return (
     <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text, headerShadowVisible: false }}>
-      <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: "Dashboard" }} />
+      <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: "Dashboard", headerRight: () => <AppHeader /> }} />
     </Stack.Navigator>
   );
 }

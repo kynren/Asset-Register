@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import dayjs, { Dayjs } from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerList } from "../../components/Shimmer";
 import { MoreStackParamList } from "../../navigation/types";
 
 export interface Schedule {
@@ -64,29 +65,33 @@ export function ResourceSchedulingScreen() {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        contentContainerStyle={{ padding: spacing.lg, paddingTop: 0, gap: spacing.sm }}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
-        data={dayBlocks}
-        keyExtractor={(item) => String(item.id)}
-        ListEmptyComponent={!isLoading ? <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 24 }}>Nothing scheduled for this day.</Text> : null}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={{ flexDirection: "row", backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: item.color ?? colors.primary, padding: spacing.md, marginBottom: 6 }}
-            onPress={() => navigation.navigate("ScheduleBlockForm", { id: item.id })}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.text, fontSize: 13, fontWeight: "700" }}>{item.title || "Shift"}</Text>
-              <Text style={{ color: colors.textMuted, fontSize: 11.5, marginTop: 2 }}>
-                {item.resourceName}{item.role ? ` · ${item.role}` : ""} · {dayjs(item.startAt).format("HH:mm")}–{dayjs(item.endAt).format("HH:mm")}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => confirmDelete(item)} style={{ padding: 4 }}>
-              <Ionicons name="trash-outline" size={16} color={colors.danger} />
+      {isLoading ? (
+        <ShimmerList />
+      ) : (
+        <FlatList
+          contentContainerStyle={{ padding: spacing.lg, paddingTop: 0, gap: spacing.sm }}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
+          data={dayBlocks}
+          keyExtractor={(item) => String(item.id)}
+          ListEmptyComponent={<Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 24 }}>Nothing scheduled for this day.</Text>}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={{ flexDirection: "row", backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: item.color ?? colors.primary, padding: spacing.md, marginBottom: 6 }}
+              onPress={() => navigation.navigate("ScheduleBlockForm", { id: item.id })}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontSize: 13, fontWeight: "700" }}>{item.title || "Shift"}</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 11.5, marginTop: 2 }}>
+                  {item.resourceName}{item.role ? ` · ${item.role}` : ""} · {dayjs(item.startAt).format("HH:mm")}–{dayjs(item.endAt).format("HH:mm")}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => confirmDelete(item)} style={{ padding: 4 }}>
+                <Ionicons name="trash-outline" size={16} color={colors.danger} />
+              </TouchableOpacity>
             </TouchableOpacity>
-          </TouchableOpacity>
-        )}
-      />
+          )}
+        />
+      )}
 
       <TouchableOpacity
         style={{ position: "absolute", right: spacing.lg, bottom: spacing.lg, backgroundColor: colors.primary, borderRadius: 28, width: 56, height: 56, alignItems: "center", justifyContent: "center", elevation: 4 }}

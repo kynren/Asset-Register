@@ -75,7 +75,8 @@ import mediaCenterRoutes from "./modules/mediaCenter/mediaCenter.routes";
 export function createApp() {
   const app = express();
 
-  app.use(cors({ origin: env.CLIENT_ORIGIN, credentials: true }));
+  const allowedOrigins = env.CLIENT_ORIGIN.split(",").map((o) => o.trim());
+  app.use(cors({ origin: allowedOrigins, credentials: true }));
   app.use(express.json());
   app.use(cookieParser());
   app.use(morgan("dev"));

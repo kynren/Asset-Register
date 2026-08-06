@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerList } from "../../components/Shimmer";
 import { MoreStackParamList } from "../../navigation/types";
 
 export interface License {
@@ -54,6 +55,8 @@ export function LicenseListScreen() {
   }
 
   const inputStyle = { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, color: colors.text, backgroundColor: colors.surface };
+
+  if (isLoading) return <ShimmerList />;
 
   return (
     <FlatList

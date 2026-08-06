@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerDetail } from "../../components/Shimmer";
 import { VaultEntry, VaultSettings } from "../../types/vault";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -102,11 +103,7 @@ export function VaultDetailScreen() {
   }, [navigation, entry, id, colors.primary]);
 
   if (isLoading || !entry) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    return <ShimmerDetail />;
   }
 
   const rows: [string, string | null][] = [

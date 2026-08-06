@@ -9,6 +9,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { TicketPriorityPill, TicketStatusPill } from "../../components/TicketPills";
+import { ShimmerList } from "../../components/Shimmer";
 import { PaginatedResponse } from "../../types/asset";
 import { Ticket, TicketStatus, TICKET_STATUS_OPTIONS } from "../../types/ticket";
 import { HelpdeskStackParamList } from "../../navigation/types";
@@ -80,7 +81,7 @@ export function TicketListScreen() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+        <ShimmerList />
       ) : (
         <FlatList
           data={tickets}

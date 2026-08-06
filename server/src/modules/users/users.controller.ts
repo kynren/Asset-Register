@@ -11,6 +11,7 @@ import { getPagination, paginatedResponse } from "../../lib/pagination";
 import { generateOpaqueToken, getViewingOrganization, hashToken } from "../auth/auth.service";
 
 const SYSTEM_ADMIN_ROLE_NAME = "System Admin";
+const SUPER_ADMIN_ROLE_NAME = "Super Admin";
 
 // Only an existing System Admin can hand the role to someone else — otherwise a Super Admin
 // (who already has full operational access) could self-escalate into the platform-level role
@@ -21,6 +22,15 @@ async function assertCanAssignRole(req: Request, roleId: number | undefined): Pr
   const role = await prisma.role.findUnique({ where: { id: roleId }, select: { name: true } });
   if (role?.name === SYSTEM_ADMIN_ROLE_NAME && req.user!.roleName !== SYSTEM_ADMIN_ROLE_NAME) {
     throw new ApiError(403, "Only a System Admin can grant the System Admin role.");
+  }
+}
+
+// Deliberately a hard role-name check rather than the generic admin:create RBAC permission —
+// "Admin" holds that permission by default too, but inviting a new user is restricted to the two
+// top-tier roles specifically, regardless of what a given org's RolePermission table grants.
+function assertCanInvite(req: Request): void {
+  if (req.user!.roleName !== SYSTEM_ADMIN_ROLE_NAME && req.user!.roleName !== SUPER_ADMIN_ROLE_NAME) {
+    throw new ApiError(403, "Only a System Admin or Super Admin can invite new users.");
   }
 }
 
@@ -111,6 +121,45 @@ export async function create(req: Request, res: Response) {
     fallbackText: `Hello ${user.firstName},\n\nAn account was created for you on the Kynren Asset Register.\n\nEmail: ${user.email}\nTemporary password: ${tempPassword}\n\nYou'll be asked to set a new password on first login: ${env.CLIENT_ORIGIN}/login`,
   });
   res.status(201).json({ user, tempPassword });
+}
+
+// Creates a pending UserInvite rather than the User row itself — the row only gets created when
+// the recipient completes POST /auth/accept-invite and sets their own password (see
+// auth.controller.ts). This is the only user-creation path exposed by the "Add User" UI on web
+// and mobile; the direct create() above stays in place for CSV import's bulk auto-create flow.
+export async function invite(req: Request, res: Response) {
+  assertCanInvite(req);
+  const { email, firstName, lastName, roleId } = req.body;
+  await assertCanAssignRole(req, roleId);
+
+  const normalizedEmail = email.toLowerCase();
+  const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+  if (existingUser) throw new ApiError(409, "A user with this email already exists.");
+
+  const rawToken = generateOpaqueToken();
+  const tokenHash = hashToken(rawToken);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  // Replace any earlier pending invite for the same email so re-inviting doesn't leave stale,
+  // still-valid tokens floating around alongside the new one.
+  await prisma.userInvite.deleteMany({ where: { email: normalizedEmail, acceptedAt: null } });
+  const invite = await prisma.userInvite.create({
+    data: { email: normalizedEmail, firstName, lastName, roleId, tokenHash, invitedById: req.user!.id, expiresAt },
+  });
+  await registerToken(tokenHash, currentSchemaName(), "invite");
+
+  const organization = await getViewingOrganization(currentSchemaName());
+  const acceptUrl = `${env.CLIENT_ORIGIN}/accept-invite/${rawToken}`;
+  await sendEventEmail({
+    eventType: "USER_INVITED",
+    to: normalizedEmail,
+    variables: { firstName, organizationName: organization?.name ?? "Kynren Asset Register", acceptUrl },
+    fallbackSubject: "You're invited to Kynren Asset Register",
+    fallbackText: `Hello ${firstName},\n\nYou've been invited to join ${organization?.name ?? "Kynren Asset Register"}. Click the link below to set up your account and choose a password:\n\n${acceptUrl}\n\nThis invite link expires in 7 days.`,
+  });
+
+  await logAudit({ userId: req.user!.id, action: "user.invite", entityType: "UserInvite", entityId: invite.id, metadata: { email: normalizedEmail, roleId } });
+  res.status(201).json({ ok: true, email: normalizedEmail });
 }
 
 export async function update(req: Request, res: Response) {

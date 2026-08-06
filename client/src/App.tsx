@@ -6,6 +6,7 @@ import { LoginPage } from "./pages/auth/LoginPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { MagicLoginPage } from "./pages/auth/MagicLoginPage";
+import { AcceptInvitePage } from "./pages/auth/AcceptInvitePage";
 import { AssetIntakeFormPage } from "./pages/public/AssetIntakeFormPage";
 import { AssetIntakeQueuePage } from "./pages/assets/AssetIntakeQueuePage";
 import { ForceChangePasswordPage } from "./pages/auth/ForceChangePasswordPage";
@@ -42,6 +43,7 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
       <Route path="/magic-login/:token" element={<MagicLoginPage />} />
+      <Route path="/accept-invite/:token" element={<AcceptInvitePage />} />
       <Route path="/intake/:token" element={<AssetIntakeFormPage />} />
 
       <Route element={<ProtectedRoute />}>

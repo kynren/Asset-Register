@@ -1,11 +1,12 @@
 import { useLayoutEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import { ActivityIndicator, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerDetail } from "../../components/Shimmer";
 import { KnowledgeArticle } from "../../types/operations";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -26,11 +27,7 @@ export function KnowledgeDetailScreen() {
   }, [navigation, article]);
 
   if (isLoading || !article) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    return <ShimmerDetail />;
   }
 
   // The article body is stored as sanitized rich-text HTML (see server's KnowledgeArticle.content,

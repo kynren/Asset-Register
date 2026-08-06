@@ -16,7 +16,8 @@
     "db:import-docs": "npm run docs:import -w server",
     "desktop:dev": "npm run dev --prefix desktop",
     "desktop:build": "npm run build --prefix desktop",
-    "mobile:dev": "npm run start --prefix mobile"
+    "mobile:dev": "npm run start --prefix mobile",
+    "mobile:web": "npm run web --prefix mobile"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

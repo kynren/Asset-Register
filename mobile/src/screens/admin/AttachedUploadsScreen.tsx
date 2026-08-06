@@ -7,6 +7,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { ShimmerList } from "../../components/Shimmer";
 import { downloadAndShare } from "../../lib/downloadFile";
 
 interface AttachedItem {
@@ -87,7 +88,7 @@ export function AttachedUploadsScreen() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+        <ShimmerList />
       ) : (
         <FlatList
           data={items ?? []}

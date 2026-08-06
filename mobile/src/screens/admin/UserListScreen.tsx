@@ -10,13 +10,16 @@ import { useAuth } from "../../auth/AuthContext";
 import { AdminUser } from "../../types/admin";
 import { PaginatedResponse } from "../../types/asset";
 import { MoreStackParamList } from "../../navigation/types";
+import { ShimmerList } from "../../components/Shimmer";
 
 const PAGE_SIZE = 25;
+const INVITER_ROLE_NAMES = new Set(["System Admin", "Super Admin"]);
 
 export function UserListScreen() {
   const { colors, spacing, radius } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<MoreStackParamList>>();
-  const { hasPermission } = useAuth();
+  const { user } = useAuth();
+  const canInvite = INVITER_ROLE_NAMES.has(user?.roleName ?? "");
   const [search, setSearch] = useState("");
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch, isRefetching } = useInfiniteQuery({
@@ -47,7 +50,7 @@ export function UserListScreen() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+        <ShimmerList />
       ) : (
         <FlatList
           data={users}
@@ -78,7 +81,7 @@ export function UserListScreen() {
         />
       )}
 
-      {hasPermission("admin", "create") && (
+      {canInvite && (
         <TouchableOpacity
           style={{ position: "absolute", right: spacing.lg, bottom: spacing.lg, backgroundColor: colors.primary, borderRadius: 28, width: 56, height: 56, alignItems: "center", justifyContent: "center", elevation: 4 }}
           onPress={() => navigation.navigate("UserForm")}

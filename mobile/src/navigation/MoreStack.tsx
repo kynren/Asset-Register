@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { MoreScreen } from "../screens/more/MoreScreen";
+import { AppHeader } from "../components/AppHeader";
 import { NotificationsScreen } from "../screens/notifications/NotificationsScreen";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { NetworkListScreen } from "../screens/network/NetworkListScreen";
@@ -83,7 +84,7 @@ export function MoreStack() {
         headerShadowVisible: false,
       }}
     >
-      <Stack.Screen name="MoreRoot" component={MoreScreen} options={{ title: "More" }} />
+      <Stack.Screen name="MoreRoot" component={MoreScreen} options={{ title: "More", headerRight: () => <AppHeader /> }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Notifications" }} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
       <Stack.Screen name="NetworkList" component={NetworkListScreen} options={{ title: "Network Topology Map" }} />
@@ -135,7 +136,7 @@ export function MoreStack() {
       <Stack.Screen name="AdminHome" component={AdminHomeScreen} options={{ title: "Admin & Setup" }} />
       <Stack.Screen name="UserList" component={UserListScreen} options={{ title: "Users" }} />
       <Stack.Screen name="UserDetail" component={UserDetailScreen} options={{ title: "User" }} />
-      <Stack.Screen name="UserForm" component={UserFormScreen} options={{ title: "New User" }} />
+      <Stack.Screen name="UserForm" component={UserFormScreen} options={{ title: "Invite User" }} />
       <Stack.Screen name="RoleList" component={RoleListScreen} options={{ title: "Roles & Permissions" }} />
       <Stack.Screen name="RolePermissions" component={RolePermissionsScreen} options={{ title: "Role" }} />
       <Stack.Screen name="SystemSettings" component={SystemSettingsScreen} options={{ title: "System Settings" }} />

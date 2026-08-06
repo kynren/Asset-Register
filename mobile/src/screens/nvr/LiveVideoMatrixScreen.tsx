@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { ShimmerList } from "../../components/Shimmer";
 import { NvrMatrixTile } from "./NvrMatrixTile";
 import { Camera, Nvr } from "../../types/nvr";
 
@@ -35,7 +36,7 @@ export function LiveVideoMatrixScreen() {
     setSelectedIds((prev) => (prev.length >= MAX_TILES ? prev : [...prev, Number(id)]));
   }
 
-  if (isLoading) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />;
+  if (isLoading) return <ShimmerList />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

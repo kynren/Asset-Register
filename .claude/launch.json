@@ -21,6 +21,13 @@
       "runtimeArgs": ["run", "mobile:dev"],
       "port": 8081,
       "autoPort": true
+    },
+    {
+      "name": "asset-register-mobile-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "mobile:web"],
+      "port": 8081,
+      "autoPort": true
     }
   ]
 }

@@ -4,7 +4,8 @@ import { z } from "zod";
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   PORT: z.coerce.number().default(4000),
-  CLIENT_ORIGIN: z.string().default("http://localhost:5173"),
+  // Comma-separated list — the web client and the Expo web preview run on different ports in dev.
+  CLIENT_ORIGIN: z.string().default("http://localhost:5173,http://localhost:8081"),
   JWT_SECRET: z.string().min(1),
   JWT_EXPIRES_IN: z.string().default("15m"),
   REFRESH_JWT_SECRET: z.string().min(1),

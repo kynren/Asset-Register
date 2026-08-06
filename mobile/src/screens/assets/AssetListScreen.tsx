@@ -8,6 +8,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { StatusBadge } from "../../components/StatusBadge";
+import { ShimmerList } from "../../components/Shimmer";
 import { Asset, AssetCategory, PaginatedResponse } from "../../types/asset";
 import { AssetsStackParamList } from "../../navigation/types";
 
@@ -93,7 +94,7 @@ export function AssetListScreen() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+        <ShimmerList />
       ) : (
         <FlatList
           data={assets}

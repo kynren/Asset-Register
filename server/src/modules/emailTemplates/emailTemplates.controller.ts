@@ -108,6 +108,7 @@ const SAMPLE_VARIABLES: Record<EmailEventType, Record<string, string>> = {
   TICKET_ASSIGNED: { firstName: "Jordan", ticketNumber: "TCK-00142", ticketTitle: "Printer on 3rd floor not responding", priority: "HIGH", ticketUrl: "https://app-assets.kynren.com/helpdesk/142" },
   PROJECT_UPDATED: { editorName: "Jordan Ellis", projectTitle: "Lake Projector Calibration", projectUrl: "https://app-assets.kynren.com/operations" },
   STOCK_ISSUED: { firstName: "Jordan", itemName: "Dell Latitude 5440 Charger", sku: "KYN-LAPTOP-435717", quantity: "2", stockUrl: "https://app-assets.kynren.com/stock" },
+  USER_INVITED: { firstName: "Jordan", organizationName: "Acme Testing Co", acceptUrl: "https://app-assets.kynren.com/accept-invite/sample-token" },
 };
 
 export async function sendTest(req: Request, res: Response) {

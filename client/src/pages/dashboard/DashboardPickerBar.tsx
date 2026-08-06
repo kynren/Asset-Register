@@ -24,6 +24,8 @@ export function DashboardPickerBar({
   onShare,
   onShowSharedWithMe,
   sharedWithMeCount,
+  isDirty,
+  onReset,
 }: {
   dashboards: DashboardSummary[];
   activeId: number | null;
@@ -36,6 +38,9 @@ export function DashboardPickerBar({
   onShare: () => void;
   onShowSharedWithMe: () => void;
   sharedWithMeCount: number;
+  /** Whether the active dashboard's layout has diverged from the module's built-in default. */
+  isDirty: boolean;
+  onReset: () => void;
 }) {
   const [showNewInput, setShowNewInput] = useState(false);
   const [newName, setNewName] = useState("");
@@ -93,6 +98,11 @@ export function DashboardPickerBar({
                 </button>
               )}
             </>
+          )}
+          {isDirty && (
+            <button className="btn btn-secondary btn-sm" onClick={onReset} title="Discard layout changes and restore the default widgets">
+              <Icon name="refresh" size={12} /> Reset to Default
+            </button>
           )}
           <button className="btn btn-secondary btn-sm" onClick={onDuplicate}>
             <Icon name="paperclip" size={12} /> Duplicate
