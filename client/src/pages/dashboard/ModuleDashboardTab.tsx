@@ -52,6 +52,19 @@ interface DashboardDetail {
   canEdit: boolean;
 }
 
+// Normalizes a layout item to a stable shape before comparison — runtime edits (drag reorder,
+// resize, add/remove, filter/config saves) build items via object spreads that can leave optional
+// keys undefined-but-present, which would make a raw JSON.stringify diff report a false positive
+// against the plain {id, cols} literals the default catalogs are written as.
+function normalizeLayoutItem(item: LayoutItem) {
+  return { id: item.id, cols: item.cols, config: item.config ?? null, comparisonConfig: item.comparisonConfig ?? null, filters: item.filters ?? null };
+}
+
+function layoutsEqual(a: LayoutItem[], b: LayoutItem[]): boolean {
+  if (a.length !== b.length) return false;
+  return JSON.stringify(a.map(normalizeLayoutItem)) === JSON.stringify(b.map(normalizeLayoutItem));
+}
+
 // Maps a module dashboard to the data-explorer source whose field registry drives that module's
 // per-widget filter panel — the home dashboard has no entry since it uses the full query builder
 // (a different source per custom widget) instead of one fixed source.
@@ -131,6 +144,11 @@ export function ModuleDashboardTab({
   }, [detail]);
 
   const canEdit = detail?.canEdit ?? true;
+  const isDirty = canEdit && layout != null && !layoutsEqual(layout, defaultLayout);
+
+  function resetToDefault() {
+    updateLayout(defaultLayout);
+  }
 
   function invalidateLists() {
     queryClient.invalidateQueries({ queryKey: ["dashboards-list", module] });
@@ -337,6 +355,8 @@ export function ModuleDashboardTab({
         onShare={() => setShowShareModal(true)}
         onShowSharedWithMe={() => setShowSharedWithMeModal(true)}
         sharedWithMeCount={sharedWithMe?.length ?? 0}
+        isDirty={isDirty}
+        onReset={resetToDefault}
       />
 
       {!canEdit && (

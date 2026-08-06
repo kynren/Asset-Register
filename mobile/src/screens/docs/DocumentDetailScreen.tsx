@@ -10,6 +10,7 @@ import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { downloadAndShare } from "../../lib/downloadFile";
 import { canDeleteRecord, canEditRecord, canManageRecordAccess } from "../../lib/accessControl";
+import { ShimmerDetail } from "../../components/Shimmer";
 import { DOC_TYPE_LABELS, DocumentDetail } from "../../types/docs";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -143,11 +144,7 @@ export function DocumentDetailScreen() {
   const canManageAccess = !!user && !!doc && canManageRecordAccess(doc.createdById, user.id, user.roleName);
 
   if (isLoading || !doc) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    return <ShimmerDetail />;
   }
 
   const sectionEntries = Object.entries(doc.sections ?? {}).filter(([, v]) => v !== null && v !== undefined && v !== "");

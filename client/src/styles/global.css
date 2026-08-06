@@ -397,8 +397,9 @@
   }
 
   .kpi-card {
-    @apply relative border border-transparent px-[18px] py-4 pr-16 flex flex-col gap-1.5 shadow-sm;
-    border-radius: 18px;
+    @apply relative border border-transparent p-5 flex flex-col gap-2 shadow-sm;
+    border-radius: 20px;
+    min-height: 150px;
     background: var(--color-surface);
   }
   .kpi-card-neutral {
@@ -409,7 +410,8 @@
   .kpi-card-warning,
   .kpi-card-danger {
     color: #fff;
-    --kpi-label-color: rgba(255, 255, 255, 0.82);
+    --kpi-label-color: rgba(255, 255, 255, 0.88);
+    --kpi-link-color: rgba(255, 255, 255, 0.92);
   }
   .kpi-card-primary {
     background: var(--color-primary);
@@ -424,19 +426,27 @@
     background: var(--color-danger);
   }
   .kpi-label {
-    @apply text-xs font-semibold uppercase tracking-wide;
+    @apply text-sm font-bold;
     color: var(--kpi-label-color, var(--color-text-muted));
   }
   .kpi-value {
-    @apply text-[26px] font-bold tabular-nums;
+    @apply text-[32px] font-extrabold tabular-nums leading-none;
+  }
+  .kpi-footer {
+    @apply flex items-center justify-between gap-2 mt-auto pt-1;
+  }
+  .kpi-view-all {
+    @apply inline-flex items-center gap-1 text-xs font-semibold no-underline transition-opacity;
+    color: var(--kpi-link-color, var(--color-primary));
+  }
+  .kpi-view-all:hover {
+    opacity: 0.75;
   }
   .kpi-icon-badge {
-    @apply absolute flex items-center justify-center text-white;
-    top: 14px;
-    right: 14px;
-    width: 36px;
-    height: 36px;
-    border-radius: 9999px;
+    @apply relative flex items-center justify-center text-white shrink-0;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
   }
 
   /* ---------- Dashboard: ambient glow + live-data animation ---------- */
@@ -509,7 +519,7 @@
     content: "";
     position: absolute;
     inset: 0;
-    border-radius: 9999px;
+    border-radius: 12px;
     background-color: inherit;
     animation: kynren-breathe 3.2s ease-in-out infinite;
   }

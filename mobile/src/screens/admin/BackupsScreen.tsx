@@ -8,6 +8,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
+import { ShimmerListItem } from "../../components/Shimmer";
 import { MoreStackParamList } from "../../navigation/types";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -200,7 +201,13 @@ export function BackupsScreen() {
 
       <View style={panel}>
         <Text style={sectionTitle}>Run History</Text>
-        {runsLoading && <ActivityIndicator color={colors.primary} />}
+        {runsLoading && (
+          <View style={{ gap: spacing.sm }}>
+            <ShimmerListItem />
+            <ShimmerListItem />
+            <ShimmerListItem />
+          </View>
+        )}
         {(runsPage?.runs ?? []).map((r) => (
           <View key={r.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>

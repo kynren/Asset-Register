@@ -55,6 +55,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, credential: { password: string } | { pin: string }, mfaToken?: string) => Promise<{ mfaRequired: boolean }>;
   magicLogin: (token: string) => Promise<void>;
+  acceptInvite: (token: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   hasPermission: (module: ModuleName, action: ActionName) => boolean;
@@ -150,6 +151,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function magicLogin(token: string) {
     const res = await axiosClient.post("/auth/magic-login", { token });
+    setAccessToken(res.data.accessToken);
+    setUser(res.data.user);
+    setMyTeamIds(res.data.myTeamIds ?? []);
+    setActiveTheme(res.data.activeTheme ?? null);
+    setPermissions(res.data.permissions);
+    setOrganization(res.data.organization ?? null);
+    setViewingOrgId(res.data.organization?.id ?? null);
+    setOrgSwitchConfirmedOrgId(null);
+    setOrgSwitchConfirmedUntil(null);
+  }
+
+  async function acceptInvite(token: string, password: string) {
+    const res = await axiosClient.post("/auth/accept-invite", { token, password });
     setAccessToken(res.data.accessToken);
     setUser(res.data.user);
     setMyTeamIds(res.data.myTeamIds ?? []);

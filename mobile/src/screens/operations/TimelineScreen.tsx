@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import dayjs, { Dayjs } from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerList } from "../../components/Shimmer";
 
 type ProjectStatus = "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
 interface ProjectCard {
@@ -104,7 +105,7 @@ export function TimelineScreen() {
       </View>
 
       {isLoading ? (
-        <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 24 }}>Loading timeline...</Text>
+        <ShimmerList />
       ) : projectRows.length === 0 && resourceRows.length === 0 ? (
         <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 24, paddingHorizontal: spacing.lg }}>
           Nothing scheduled in this window.

@@ -7,7 +7,11 @@ import { AuthProvider } from "./src/auth/AuthContext";
 import { ThemeProvider, useTheme } from "./src/theme/ThemeContext";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { OfflineBanner } from "./src/components/OfflineBanner";
+import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { queryClient } from "./src/lib/queryClient";
+import { installGlobalErrorHandlers } from "./src/lib/globalErrorHandling";
+
+installGlobalErrorHandlers();
 
 function AppShell() {
   const { isDark } = useTheme();
@@ -26,9 +30,11 @@ export default function App() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
-            <AuthProvider>
-              <AppShell />
-            </AuthProvider>
+            <ErrorBoundary>
+              <AuthProvider>
+                <AppShell />
+              </AuthProvider>
+            </ErrorBoundary>
           </ThemeProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

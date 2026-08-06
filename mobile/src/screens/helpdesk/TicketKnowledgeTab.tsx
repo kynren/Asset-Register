@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
@@ -40,6 +40,13 @@ export function TicketKnowledgeTab({ ticketId, knowledgeArticles, canEdit }: { t
 
   const attachedIds = new Set((knowledgeArticles ?? []).map((k) => k.article.id));
 
+  function confirmDetach(link: TicketKnowledgeLink) {
+    Alert.alert("Detach article", `Detach "${link.article.title}" from this ticket?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Detach", style: "destructive", onPress: () => detachMutation.mutate(link.id) },
+    ]);
+  }
+
   return (
     <View>
       {(!knowledgeArticles || knowledgeArticles.length === 0) && <Text style={{ color: colors.textMuted, fontSize: 12.5 }}>No knowledge base articles attached.</Text>}
@@ -50,7 +57,7 @@ export function TicketKnowledgeTab({ ticketId, knowledgeArticles, canEdit }: { t
             <Text style={{ color: colors.text, fontSize: 13, flex: 1 }} numberOfLines={1}>{k.article.title}</Text>
           </View>
           {canEdit && (
-            <TouchableOpacity style={{ width: 28, height: 28, alignItems: "center", justifyContent: "center", borderRadius: radius.md, borderWidth: 1, borderColor: colors.danger }} onPress={() => detachMutation.mutate(k.id)}>
+            <TouchableOpacity style={{ width: 28, height: 28, alignItems: "center", justifyContent: "center", borderRadius: radius.md, borderWidth: 1, borderColor: colors.danger }} onPress={() => confirmDetach(k)}>
               <Ionicons name="trash-outline" size={13} color={colors.danger} />
             </TouchableOpacity>
           )}

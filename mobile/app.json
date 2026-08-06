@@ -41,7 +41,8 @@
     },
     "platforms": [
       "ios",
-      "android"
+      "android",
+      "web"
     ],
     "plugins": [
       "expo-secure-store",
@@ -59,7 +60,14 @@
         }
       ],
       "expo-sharing",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Used to attach photos and videos to assets, stock items, and tickets.",
+          "cameraPermission": "Used to capture photos and videos of assets, stock items, and tickets."
+        }
+      ]
     ],
     "extra": {
       "eas": {

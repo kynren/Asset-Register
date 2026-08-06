@@ -16,6 +16,7 @@ model Role {
   isSystem    Boolean          @default(false)
   permissions RolePermission[]
   users       User[]
+  invites     UserInvite[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 }
@@ -146,6 +147,7 @@ model User {
   recordComments               RecordComment[]
   customColumnsCreated         CustomColumn[]
   assetIntakeSubmissionsReviewed AssetIntakeSubmission[] @relation("AssetIntakeReviewedBy")
+  userInvitesSent                UserInvite[]             @relation("UserInviteInvitedBy")
 }
 
 model RefreshSession {
@@ -188,6 +190,26 @@ model MagicLoginToken {
   usedAt      DateTime?
   createdById Int
   createdBy   User      @relation("MagicLoginTokenCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+}
+
+// A pending user account: created only when the recipient completes the accept-invite form (sets
+// their own password), unlike users.controller.ts's direct create() which makes the User row
+// immediately with an admin-generated temp password. Only System Admin / Super Admin can send one
+// (see users.controller.ts assertCanInvite) — stricter than the generic admin:create RBAC
+// permission, which "Admin" also holds by default.
+model UserInvite {
+  id          Int       @id @default(autoincrement())
+  email       String
+  firstName   String
+  lastName    String
+  roleId      Int
+  role        Role      @relation(fields: [roleId], references: [id])
+  tokenHash   String    @unique
+  invitedById Int
+  invitedBy   User      @relation("UserInviteInvitedBy", fields: [invitedById], references: [id])
+  expiresAt   DateTime
+  acceptedAt  DateTime?
   createdAt   DateTime  @default(now())
 }
 
@@ -2411,6 +2433,7 @@ enum EmailEventType {
   TICKET_ASSIGNED
   PROJECT_UPDATED
   STOCK_ISSUED
+  USER_INVITED
 }
 
 // Blocks is an ordered array of { id, type, ...type-specific fields } — rendered to HTML by

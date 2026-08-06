@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, ActivityIndicator, FlatList, Linking, RefreshControl, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, Linking, RefreshControl, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerListItem } from "../../components/Shimmer";
 
 interface RssSource {
   id: number;
@@ -29,7 +30,7 @@ export function RssFeedScreen() {
     queryFn: async () => (await axiosClient.get("/operations/rss/sources")).data as RssSource[],
   });
 
-  const { data: feed, isLoading, isFetching, refetch } = useQuery({
+  const { data: feed, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ["mobile-rss-items"],
     queryFn: async () => (await axiosClient.get("/operations/rss/items")).data as { items: FeedItem[]; failedSources: string[] },
     enabled: Boolean(sources && sources.length > 0),
@@ -74,7 +75,7 @@ export function RssFeedScreen() {
     <FlatList
       style={{ flex: 1, backgroundColor: colors.bg }}
       contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
-      refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.primary} />}
+      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
       ListHeaderComponent={
         <View style={{ gap: spacing.md, marginBottom: spacing.md }}>
           <View style={{ backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: 8 }}>
@@ -107,7 +108,13 @@ export function RssFeedScreen() {
           )}
 
           <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", textTransform: "uppercase", marginTop: 4 }}>Latest Headlines</Text>
-          {isLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} />}
+          {isLoading && (
+            <View style={{ gap: spacing.sm, marginTop: 8 }}>
+              <ShimmerListItem />
+              <ShimmerListItem />
+              <ShimmerListItem />
+            </View>
+          )}
           {feed && feed.failedSources.length > 0 && (
             <Text style={{ color: colors.warning, fontSize: 11 }}>Could not fetch: {feed.failedSources.join(", ")}</Text>
           )}

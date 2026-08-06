@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
+import { ShimmerList } from "../../components/Shimmer";
 import { StockItem } from "../../types/stock";
 import { PaginatedResponse } from "../../types/asset";
 import { StockStackParamList } from "../../navigation/types";
@@ -76,7 +77,7 @@ export function StockListScreen() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+        <ShimmerList />
       ) : (
         <FlatList
           data={items}

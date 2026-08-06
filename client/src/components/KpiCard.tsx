@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Icon } from "./Icon";
 import { useCountUp } from "../hooks/useCountUp";
 
@@ -8,6 +9,9 @@ interface KpiCardProps {
   icon?: string;
   tone?: "primary" | "success" | "warning" | "danger" | "neutral";
   live?: boolean;
+  /** Route to the module this KPI summarizes — renders a "View all" link in the card footer.
+   * Omit on cards already embedded in that module's own dashboard. */
+  linkTo?: string;
 }
 
 const toneColors: Record<string, string> = {
@@ -29,7 +33,7 @@ const toneCardClass: Record<string, string> = {
   neutral: "kpi-card-neutral",
 };
 
-export function KpiCard({ label, value, icon, tone = "primary", live = false }: KpiCardProps) {
+export function KpiCard({ label, value, icon, tone = "primary", live = false, linkTo }: KpiCardProps) {
   const numericTarget = typeof value === "number" ? value : null;
   const animated = useCountUp(numericTarget);
   const displayValue = numericTarget !== null ? animated.toLocaleString() : value;
@@ -41,18 +45,27 @@ export function KpiCard({ label, value, icon, tone = "primary", live = false }: 
         {live && <span className="live-dot" title="Live" />}
       </div>
       <span className="kpi-value">{displayValue}</span>
-      {icon && (
-        <span
-          className="kpi-icon-badge"
-          style={
-            tone === "neutral"
-              ? { background: toneColors[tone] }
-              : { background: "rgba(255, 255, 255, 0.18)", color: "#fff" }
-          }
-        >
-          <Icon name={icon} size={16} />
-        </span>
-      )}
+      <div className="kpi-footer">
+        {linkTo ? (
+          <Link to={linkTo} className="kpi-view-all">
+            View all <Icon name="arrowRight" size={12} />
+          </Link>
+        ) : (
+          <span />
+        )}
+        {icon && (
+          <span
+            className="kpi-icon-badge"
+            style={
+              tone === "neutral"
+                ? { background: toneColors[tone] }
+                : { background: "rgba(255, 255, 255, 0.18)", color: "#fff" }
+            }
+          >
+            <Icon name={icon} size={18} />
+          </span>
+        )}
+      </div>
     </div>
   );
 }

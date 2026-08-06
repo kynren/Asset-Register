@@ -8,6 +8,7 @@ import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { ShimmerList } from "../../components/Shimmer";
 import { MainTabParamList } from "../../navigation/types";
 
 interface SavedQuery {
@@ -69,6 +70,8 @@ export function SavedQueriesScreen() {
 
   const moduleOptions: PickerOption[] = MODULES.map((m) => ({ id: m.value, label: m.label }));
   const inputStyle = { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, color: colors.text, backgroundColor: colors.surface };
+
+  if (isLoading) return <ShimmerList />;
 
   return (
     <Fragment>

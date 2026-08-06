@@ -8,6 +8,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { TicketPriorityPill, TicketStatusPill } from "../../components/TicketPills";
+import { ShimmerDetail } from "../../components/Shimmer";
 import { Ticket, TicketUserRef, TICKET_STATUS_OPTIONS } from "../../types/ticket";
 import { HelpdeskStackParamList } from "../../navigation/types";
 import { TicketTasksTab } from "./TicketTasksTab";
@@ -76,11 +77,7 @@ export function TicketDetailScreen() {
   });
 
   if (isLoading || !ticket) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    return <ShimmerDetail />;
   }
 
   const statusOptions: PickerOption[] = TICKET_STATUS_OPTIONS.map((s) => ({ id: s.value, label: s.label }));

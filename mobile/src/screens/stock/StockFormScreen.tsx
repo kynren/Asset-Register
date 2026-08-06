@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { ShimmerDetail } from "../../components/Shimmer";
 import { StockItem, StockItemType } from "../../types/stock";
 import { AssetLocation } from "../../types/asset";
 import { StockStackParamList } from "../../navigation/types";
@@ -79,11 +80,7 @@ export function StockFormScreen() {
   });
 
   if (editingId && loadingExisting) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    return <ShimmerDetail />;
   }
 
   const typeOptions: PickerOption[] = (types ?? []).map((t) => ({ id: t.id, label: t.name }));

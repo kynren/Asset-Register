@@ -29,17 +29,17 @@ export function UserFormScreen() {
   const { data: roles } = useQuery({ queryKey: ["mobile-roles"], queryFn: async () => (await axiosClient.get("/roles")).data as Role[] });
   const roleOptions: PickerOption[] = (roles ?? []).map((r) => ({ id: r.id, label: r.name }));
 
-  const createMutation = useMutation({
-    mutationFn: () => axiosClient.post("/users", { email: email.trim(), firstName: firstName.trim(), lastName: lastName.trim(), roleId }),
+  const inviteMutation = useMutation({
+    mutationFn: () => axiosClient.post("/users/invite", { email: email.trim(), firstName: firstName.trim(), lastName: lastName.trim(), roleId }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["mobile-users"] });
       Alert.alert(
-        "User created",
-        `Temporary password for ${res.data.user.email}:\n\n${res.data.tempPassword}\n\nShare this with the user securely — they'll be required to change it on next login.`,
-        [{ text: "OK", onPress: () => navigation.replace("UserDetail", { id: res.data.user.id }) }]
+        "Invite sent",
+        `An invite email was sent to ${res.data.email}. They'll appear in the user list once they follow the link to set up their own password.`,
+        [{ text: "OK", onPress: () => navigation.goBack() }]
       );
     },
-    onError: (err: any) => setError(err?.response?.data?.error ?? "Could not create user."),
+    onError: (err: any) => setError(err?.response?.data?.error ?? "Could not send invite."),
   });
 
   const canSave = email.trim().length > 0 && firstName.trim().length > 0 && lastName.trim().length > 0 && roleId != null;
@@ -69,12 +69,14 @@ export function UserFormScreen() {
         <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
       </TouchableOpacity>
 
+      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: spacing.md }}>They'll receive an email invite to set up their own password.</Text>
+
       <TouchableOpacity
         style={{ backgroundColor: colors.primary, borderRadius: radius.md, alignItems: "center", paddingVertical: 15, marginTop: spacing.xl, opacity: canSave ? 1 : 0.6 }}
-        disabled={!canSave || createMutation.isPending}
-        onPress={() => createMutation.mutate()}
+        disabled={!canSave || inviteMutation.isPending}
+        onPress={() => inviteMutation.mutate()}
       >
-        {createMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>Create User</Text>}
+        {inviteMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>Send Invite</Text>}
       </TouchableOpacity>
 
       <PickerModal visible={rolePickerOpen} title="Select role" options={roleOptions} selectedId={roleId} onSelect={(v) => setRoleId(v == null ? null : Number(v))} onClose={() => setRolePickerOpen(false)} />

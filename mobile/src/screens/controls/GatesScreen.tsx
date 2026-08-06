@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
+import { ShimmerList } from "../../components/Shimmer";
 
 interface Net2Server {
   id: number;
@@ -103,7 +104,7 @@ export function GatesScreen() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+        <ShimmerList />
       ) : (
         <FlatList
           data={servers ?? []}

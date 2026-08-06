@@ -8,6 +8,13 @@ export const createUserSchema = z.object({
   password: z.string().min(10).optional(),
 });
 
+export const inviteUserSchema = z.object({
+  email: z.string().email(),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  roleId: z.number().int(),
+});
+
 export const updateUserSchema = z.object({
   email: z.string().email().optional(),
   firstName: z.string().min(1).optional(),

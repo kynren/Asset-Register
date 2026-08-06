@@ -8,6 +8,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { downloadAndShare } from "../../lib/downloadFile";
+import { ShimmerDetail } from "../../components/Shimmer";
 import { ReportResult, ReportSummary } from "../../types/reports";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -51,11 +52,7 @@ export function ReportViewScreen() {
   }, [navigation, report]);
 
   if (isLoading || !result) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    return <ShimmerDetail />;
   }
 
   return (

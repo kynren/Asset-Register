@@ -7,6 +7,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { ShimmerList } from "../../components/Shimmer";
 import { EmailEventType, EVENT_DESCRIPTIONS, EVENT_LABELS, EVENT_TYPES } from "../../lib/emailTemplateConstants";
 
 interface EmailTemplate {
@@ -76,6 +77,8 @@ export function EmailTemplateListScreen() {
   const eventOptions: PickerOption[] = EVENT_TYPES.map((e) => ({ id: e, label: EVENT_LABELS[e] }));
   const inputStyle = { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.text, backgroundColor: colors.surface };
   const pickerStyle = { ...inputStyle, flexDirection: "row" as const, justifyContent: "space-between" as const, alignItems: "center" as const };
+
+  if (isLoading) return <ShimmerList />;
 
   return (
     <FlatList

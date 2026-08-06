@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRoute, RouteProp } from "@react-navigation/native";
-import { FlatList, Text, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { ShimmerList } from "../../components/Shimmer";
 import { AccessGrant, AccessLevel, LEVEL_LABELS, grantLabel } from "../../lib/accessControl";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -61,6 +62,15 @@ export function ManageAccessScreen() {
   const targetLabel = targetOptions.find((o) => o.id === pickedId)?.label ?? "Select...";
   const pickerStyle = { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, flexDirection: "row" as const, justifyContent: "space-between" as const, alignItems: "center" as const, backgroundColor: colors.surface };
 
+  function confirmRemove(item: AccessGrant) {
+    Alert.alert("Remove access", `Revoke access for ${grantLabel(item)}?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: () => removeMutation.mutate({ kind: item.teamId != null ? "team" : "user", targetId: (item.teamId ?? item.userId)!, level: item.level }) },
+    ]);
+  }
+
+  if (isLoading) return <ShimmerList />;
+
   return (
     <FlatList
       style={{ flex: 1, backgroundColor: colors.bg }}
@@ -114,7 +124,7 @@ export function ManageAccessScreen() {
           <Text style={{ color: colors.text, fontSize: 13 }}>
             {grantLabel(item)} <Text style={{ color: colors.textMuted, fontSize: 11.5 }}>({LEVEL_LABELS[item.level]})</Text>
           </Text>
-          <TouchableOpacity onPress={() => removeMutation.mutate({ kind: item.teamId != null ? "team" : "user", targetId: (item.teamId ?? item.userId)!, level: item.level })}>
+          <TouchableOpacity onPress={() => confirmRemove(item)}>
             <Ionicons name="trash-outline" size={16} color={colors.danger} />
           </TouchableOpacity>
         </View>

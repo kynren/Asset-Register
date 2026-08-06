@@ -3,6 +3,7 @@ import { verifyJwt } from "../../middleware/auth";
 import { validateBody } from "../../middleware/validate";
 import * as controller from "./auth.controller";
 import {
+  acceptInviteSchema,
   changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
@@ -27,6 +28,9 @@ router.post("/pin/remove", verifyJwt, validateBody(removePinSchema), controller.
 router.post("/forgot-password", validateBody(forgotPasswordSchema), controller.forgotPassword);
 router.post("/reset-password", validateBody(resetPasswordSchema), controller.resetPassword);
 router.post("/magic-login", validateBody(magicLoginSchema), controller.magicLogin);
+
+router.get("/invite/:token", controller.getInvite);
+router.post("/accept-invite", validateBody(acceptInviteSchema), controller.acceptInvite);
 
 router.post("/mfa/enroll/start", verifyJwt, controller.mfaEnrollStart);
 router.post("/mfa/enroll/verify", verifyJwt, validateBody(mfaVerifySchema), controller.mfaEnrollVerify);

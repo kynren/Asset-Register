@@ -34,22 +34,22 @@ function useSummary() {
 
 export function KpiTotalAssetsWidget() {
   const { data } = useSummary();
-  return <KpiCard label="Total Assets" value={data?.kpis.totalAssets ?? "—"} icon="assets" tone="primary" />;
+  return <KpiCard label="Total Assets" value={data?.kpis.totalAssets ?? "—"} icon="assets" tone="primary" linkTo="/assets" />;
 }
 
 export function KpiOpenTicketsWidget() {
   const { data } = useSummary();
-  return <KpiCard label="Open Tickets" value={data?.kpis.openTickets ?? "—"} icon="helpdesk" tone="warning" />;
+  return <KpiCard label="Open Tickets" value={data?.kpis.openTickets ?? "—"} icon="helpdesk" tone="warning" linkTo="/helpdesk" />;
 }
 
 export function KpiLowStockWidget() {
   const { data } = useSummary();
-  return <KpiCard label="Low Stock Items" value={data?.kpis.lowStockCount ?? "—"} icon="stock" tone="danger" />;
+  return <KpiCard label="Low Stock Items" value={data?.kpis.lowStockCount ?? "—"} icon="stock" tone="danger" linkTo="/stock" />;
 }
 
 export function KpiDevicesWidget() {
   const { data } = useSummary();
-  return <KpiCard label="Devices Seen (24h)" value={data ? `${data.kpis.devicesSeen24h} / ${data.kpis.devicesTotal}` : "—"} icon="network" tone="success" live />;
+  return <KpiCard label="Devices Seen (24h)" value={data ? `${data.kpis.devicesSeen24h} / ${data.kpis.devicesTotal}` : "—"} icon="network" tone="success" live linkTo="/network" />;
 }
 
 export function KpiDocsWidget() {
@@ -61,6 +61,7 @@ export function KpiDocsWidget() {
       value={data?.kpis.documentsTotal ?? "—"}
       icon="book"
       tone={overdue > 0 ? "warning" : "primary"}
+      linkTo="/docs"
     />
   );
 }

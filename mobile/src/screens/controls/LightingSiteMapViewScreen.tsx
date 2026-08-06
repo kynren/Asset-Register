@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
+import { ShimmerDetail } from "../../components/Shimmer";
 import { API_ORIGIN } from "../../config/env";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -49,7 +50,7 @@ export function LightingSiteMapViewScreen() {
 
   const canEdit = hasPermission("lighting", "edit");
 
-  if (isLoading || !data) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />;
+  if (isLoading || !data) return <ShimmerDetail />;
 
   const activeDevice = selected ? data.devices.find((d) => d.id === selected.id)?.device ?? selected.device : null;
 

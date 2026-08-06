@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRoute, RouteProp } from "@react-navigation/native";
-import { FlatList, Text, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
@@ -46,6 +46,13 @@ export function ShareReportScreen() {
     mutationFn: (shareId: number) => axiosClient.delete(`/reports/${id}/shares/${shareId}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mobile-report-shares", id] }),
   });
+
+  function confirmRemove(share: ShareRow) {
+    Alert.alert("Remove share", `Stop sharing this report with ${share.userName ?? `Team: ${share.teamName}`}?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: () => removeMutation.mutate(share.id) },
+    ]);
+  }
 
   const targetOptions: PickerOption[] =
     targetType === "user"
@@ -104,7 +111,7 @@ export function ShareReportScreen() {
               <Text style={{ color: colors.textMuted, fontSize: 10.5, fontWeight: "700" }}>{item.canEdit ? "Can edit" : "View only"}</Text>
             </View>
           </View>
-          <TouchableOpacity onPress={() => removeMutation.mutate(item.id)} style={{ padding: 4 }}>
+          <TouchableOpacity onPress={() => confirmRemove(item)} style={{ padding: 4 }}>
             <Ionicons name="close" size={16} color={colors.danger} />
           </TouchableOpacity>
         </View>

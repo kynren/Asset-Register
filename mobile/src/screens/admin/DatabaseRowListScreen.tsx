@@ -10,6 +10,7 @@ import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { DbFieldInfo, DbListResult, SENSITIVE_FIELD_PATTERN, SchemaRegistry } from "../../lib/databaseTypes";
 import { MoreStackParamList } from "../../navigation/types";
+import { ShimmerList } from "../../components/Shimmer";
 
 function formatCellValue(field: DbFieldInfo, value: unknown): string {
   if (value === null || value === undefined) return "—";
@@ -86,7 +87,7 @@ export function DatabaseRowListScreen() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+        <ShimmerList />
       ) : (
         <FlatList
           data={rowsResult?.rows ?? []}

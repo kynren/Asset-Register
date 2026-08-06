@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { Request, Response } from "express";
 import { env } from "../../config/env";
 import { DEFAULT_SCHEMA, currentSchemaName, prisma, runWithTenant } from "../../config/prisma";
-import { getOrganizationById, registerToken, resolveAccountSchema, resolveTokenSchema } from "../../config/controlPlane";
+import { getOrganizationById, registerAccount, registerToken, resolveAccountSchema, resolveTokenSchema } from "../../config/controlPlane";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
 import { sendEventEmail } from "../../lib/emailNotify";
@@ -377,6 +377,77 @@ export async function magicLogin(req: Request, res: Response) {
 
     const permissions = await getEffectivePermissionMap(user.roleId, user.role.name);
     const organization = await getViewingOrganization(schemaName);
+    res.json({ accessToken, user: sanitizeUser(user), myTeamIds: await getMyTeamIds(user.id), activeTheme: await getActiveTheme(user.id), permissions, organization });
+  });
+}
+
+// ───────────────────────── Invite acceptance ─────────────────────────
+// A System Admin / Super Admin sends the invite (see users.controller.ts invite()); these two
+// endpoints are what the recipient's own accept-invite page hits — first to prefill their name/
+// org before they've set a password, then to actually create the account. Modeled directly on
+// forgotPassword/resetPassword above, down to resolving the tenant schema from the opaque token
+// before any tenant-scoped query can run.
+
+export async function getInvite(req: Request, res: Response) {
+  const tokenHash = hashToken(req.params.token);
+  const schemaName = await resolveTokenSchema(tokenHash);
+  if (!schemaName) throw new ApiError(400, "This invite link is invalid or has expired.");
+
+  await runWithTenant(schemaName, async () => {
+    const invite = await prisma.userInvite.findUnique({ where: { tokenHash } });
+    if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
+      throw new ApiError(400, "This invite link is invalid or has expired.");
+    }
+    const organization = await getViewingOrganization(schemaName);
+    res.json({ email: invite.email, firstName: invite.firstName, lastName: invite.lastName, organizationName: organization?.name ?? null });
+  });
+}
+
+export async function acceptInvite(req: Request, res: Response) {
+  const { token, password } = req.body;
+  const tokenHash = hashToken(token);
+  const schemaName = await resolveTokenSchema(tokenHash);
+  if (!schemaName) throw new ApiError(400, "This invite link is invalid or has expired.");
+
+  await runWithTenant(schemaName, async () => {
+    const invite = await prisma.userInvite.findUnique({ where: { tokenHash } });
+    if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
+      throw new ApiError(400, "This invite link is invalid or has expired.");
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email: invite.email } });
+    if (existingUser) throw new ApiError(409, "An account with this email already exists.");
+
+    const settings = await getSecuritySettings();
+    const complexityError = validatePasswordComplexity(password, settings.passwordMinLength, settings.passwordRequireComplexity);
+    if (complexityError) throw new ApiError(400, complexityError);
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: {
+        email: invite.email,
+        firstName: invite.firstName,
+        lastName: invite.lastName,
+        roleId: invite.roleId,
+        passwordHash,
+        mustChangePassword: false,
+        passwordChangedAt: new Date(),
+      },
+      include: { role: true },
+    });
+    await prisma.userInvite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } });
+
+    const organization = await getViewingOrganization(schemaName);
+    if (organization) await registerAccount(user.email, schemaName, organization.id);
+
+    await logAudit({ userId: user.id, action: "auth.invite_accepted", entityType: "User", entityId: user.id, ipAddress: req.ip });
+
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    const accessToken = issueAccessToken(user, schemaName);
+    const refreshToken = await createRefreshSession(user.id, req.headers["user-agent"] as string | undefined, (await resolveClientIp(req.ip)) ?? undefined);
+    res.cookie(env.REFRESH_COOKIE_NAME, refreshToken, REFRESH_COOKIE_OPTIONS);
+
+    const permissions = await getEffectivePermissionMap(user.roleId, user.role.name);
     res.json({ accessToken, user: sanitizeUser(user), myTeamIds: await getMyTeamIds(user.id), activeTheme: await getActiveTheme(user.id), permissions, organization });
   });
 }

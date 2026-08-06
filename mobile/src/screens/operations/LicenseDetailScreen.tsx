@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { ShimmerDetail } from "../../components/Shimmer";
 import { MoreStackParamList } from "../../navigation/types";
 import { License } from "./LicenseListScreen";
 
@@ -71,6 +72,8 @@ export function LicenseDetailScreen() {
 
   const seatsFull = license ? license.seatsUsed >= license.seats : false;
   const userOptions: PickerOption[] = (users ?? []).map((u) => ({ id: u.id, label: `${u.firstName} ${u.lastName}` }));
+
+  if (isLoading) return <ShimmerDetail />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

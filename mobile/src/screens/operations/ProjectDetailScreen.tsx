@@ -9,6 +9,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { ShimmerDetail } from "../../components/Shimmer";
 import { PROJECT_STATUS_OPTIONS, ProjectCard, ProjectStatus } from "../../types/operations";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -52,11 +53,7 @@ export function ProjectDetailScreen() {
   }, [navigation, card]);
 
   if (isLoading || !card) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    return <ShimmerDetail />;
   }
 
   const canEdit = hasPermission("operations", "edit");

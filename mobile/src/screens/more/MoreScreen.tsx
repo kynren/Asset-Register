@@ -22,8 +22,8 @@ interface MoreItem {
 
 // Everything not promoted to a bottom tab lives here — same pattern as the web sidebar's grouped
 // nav, just collapsed into one flat list since a phone has no room for a persistent sidebar.
+// Notifications lives behind the bell icon in the header now (AppHeader.tsx), not in this list.
 const ITEMS: MoreItem[] = [
-  { key: "notifications", label: "Notifications", icon: "notifications-outline", route: "Notifications" },
   { key: "profile", label: "Profile", icon: "person-circle-outline", route: "Profile" },
   { key: "network", label: "Network Topology Map", icon: "git-network-outline", module: "network", route: "NetworkList" },
   { key: "operations", label: "Operations Tools", icon: "briefcase-outline", module: "operations", route: "OperationsHome" },
