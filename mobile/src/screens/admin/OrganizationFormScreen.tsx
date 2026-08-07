@@ -7,6 +7,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useToast } from "../../components/toast/ToastProvider";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { MoreStackParamList } from "../../navigation/types";
 
 interface OrganizationRow {
@@ -87,6 +88,7 @@ export function OrganizationFormScreen() {
   const inputStyle = { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.text, backgroundColor: colors.surface };
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -160,5 +162,6 @@ export function OrganizationFormScreen() {
         {saveMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>{orgId ? "Save Changes" : "Create Organization"}</Text>}
       </TouchableOpacity>
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

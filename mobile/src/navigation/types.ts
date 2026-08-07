@@ -26,7 +26,6 @@ export type HelpdeskStackParamList = {
 
 export type MoreStackParamList = {
   MoreRoot: undefined;
-  Notifications: undefined;
   Profile: undefined;
   NotificationPreferences: undefined;
   NetworkList: undefined;
@@ -105,4 +104,12 @@ export type MainTabParamList = {
   StockTab: { label?: string } | undefined;
   HelpdeskTab: { label?: string } | undefined;
   MoreTab: undefined;
+};
+
+// Wraps MainTabs so Notifications can be presented as a modal from anywhere, on top of whichever
+// tab/screen the user is currently on, and dismiss back to exactly that screen — see
+// navigationRef.ts for why this can't just be another screen inside MoreStack.
+export type RootStackParamList = {
+  MainTabs: undefined;
+  Notifications: undefined;
 };

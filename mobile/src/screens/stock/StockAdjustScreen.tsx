@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { StockItem } from "../../types/stock";
 import { AssetLocation } from "../../types/asset";
@@ -52,6 +53,7 @@ export function StockAdjustScreen() {
   const canSubmit = !!quantity && Number(quantity) > 0 && locationId != null;
 
   return (
+    <KeyboardAvoidingScreen>
     <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.lg }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -124,5 +126,6 @@ export function StockAdjustScreen() {
 
       <PickerModal visible={pickerOpen} title="Location" options={locationOptions} selectedId={locationId} onSelect={(idVal) => setLocationId(idVal as number)} onClose={() => setPickerOpen(false)} />
     </View>
+    </KeyboardAvoidingScreen>
   );
 }

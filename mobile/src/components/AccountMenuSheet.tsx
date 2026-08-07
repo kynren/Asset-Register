@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { API_ORIGIN } from "../config/env";
 import { useAuth } from "../auth/AuthContext";
 import { useTheme } from "../theme/ThemeContext";
+import { navigateToNotifications } from "../navigation/navigationRef";
 
 interface Props {
   visible: boolean;
@@ -32,6 +33,10 @@ export function AccountMenuSheet({ visible, onClose, onSync, isSyncing, unreadCo
 
   function go(screen: string) {
     onClose();
+    if (screen === "Notifications") {
+      navigateToNotifications();
+      return;
+    }
     navigation.getParent()?.navigate("MoreTab", { screen });
   }
 

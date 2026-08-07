@@ -6,6 +6,7 @@ import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View 
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { SignaturePad, SignaturePadHandle } from "../../components/SignaturePad";
 import { downloadAndShare } from "../../lib/downloadFile";
@@ -89,6 +90,7 @@ export function StockIssueScreen() {
   }
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
       {item && (
         <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: spacing.lg }}>
@@ -149,5 +151,6 @@ export function StockIssueScreen() {
       <PickerModal visible={locationPickerOpen} title="Location" options={locationOptions} selectedId={locationId} onSelect={(v) => setLocationId(v as number)} onClose={() => setLocationPickerOpen(false)} />
       <PickerModal visible={userPickerOpen} title="Received by" options={userOptions} selectedId={receivedById} searchable onSelect={(v) => setReceivedById(v as number)} onClose={() => setUserPickerOpen(false)} />
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }
