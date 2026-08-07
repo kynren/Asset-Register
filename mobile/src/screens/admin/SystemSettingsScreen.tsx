@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
@@ -8,6 +8,7 @@ import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../components/toast/ToastProvider";
 import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
+import { BottomSheet } from "../../components/BottomSheet";
 
 interface AgentKey {
   id: number;
@@ -30,6 +31,32 @@ interface ApiConnection {
   isActive: boolean;
   allOrganizations: boolean;
   lastUsedAt: string | null;
+  createdAt: string;
+}
+
+interface ApiConnectionLogItem {
+  id: number;
+  method: string;
+  path: string;
+  statusCode: number;
+  ip: string | null;
+  occurredAt: string;
+}
+
+interface ApiConnectionDetail extends ApiConnection {
+  firstUsedAt: string | null;
+  lastCall: ApiConnectionLogItem | null;
+  callCount: number;
+}
+
+function formatSpan(fromIso: string, toIso: string): string {
+  const totalMinutes = Math.max(0, dayjs(toIso).diff(dayjs(fromIso), "minute"));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
 }
 
 const API_CONNECTION_VERBS: { key: "canGet" | "canPost" | "canPut" | "canPatch" | "canDelete"; label: string }[] = [
@@ -39,6 +66,56 @@ const API_CONNECTION_VERBS: { key: "canGet" | "canPost" | "canPut" | "canPatch" 
   { key: "canPatch", label: "PATCH" },
   { key: "canDelete", label: "DELETE" },
 ];
+
+// Summary stats (registered / first connected / active-for / call count / last call) plus a
+// scrollable list of the most recent ~50 calls — no pagination UI on mobile, unlike the web
+// DataTable version, since a bottom sheet is a quick-glance surface, not a full audit screen.
+function ConnectionActivitySheet({ connectionId, onClose }: { connectionId: number; onClose: () => void }) {
+  const { colors, spacing } = useTheme();
+
+  const { data: detail } = useQuery({
+    queryKey: ["mobile-api-connection-detail", connectionId],
+    queryFn: async () => (await axiosClient.get(`/api-connections/${connectionId}`)).data as ApiConnectionDetail,
+  });
+
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ["mobile-api-connection-logs", connectionId],
+    queryFn: async () => (await axiosClient.get(`/api-connections/${connectionId}/logs`, { params: { pageSize: 50 } })).data as { items: ApiConnectionLogItem[] },
+  });
+
+  return (
+    <BottomSheet visible onClose={onClose} title={detail?.name ?? "Connection Activity"}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md }}>
+        <Text style={{ color: colors.textMuted, fontSize: 11 }}>
+          {detail ? `Registered ${dayjs(detail.createdAt).format("DD MMM YYYY, HH:mm")}` : "…"}
+        </Text>
+        <Text style={{ color: colors.textMuted, fontSize: 11 }}>
+          {detail?.firstUsedAt ? `First connected ${dayjs(detail.firstUsedAt).format("DD MMM YYYY, HH:mm")}` : detail ? "Never connected" : ""}
+        </Text>
+        {detail?.firstUsedAt && detail.lastCall && (
+          <Text style={{ color: colors.textMuted, fontSize: 11 }}>Active for {formatSpan(detail.firstUsedAt, detail.lastCall.occurredAt)}</Text>
+        )}
+        {detail && <Text style={{ color: colors.textMuted, fontSize: 11 }}>{detail.callCount} call{detail.callCount === 1 ? "" : "s"} total</Text>}
+      </View>
+      {isLoading && <ActivityIndicator color={colors.primary} />}
+      <FlatList
+        data={logs?.items ?? []}
+        keyExtractor={(item) => String(item.id)}
+        style={{ maxHeight: 320 }}
+        ListEmptyComponent={!isLoading ? <Text style={{ color: colors.textMuted, fontSize: 12 }}>No calls logged yet.</Text> : null}
+        renderItem={({ item }) => (
+          <View style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ color: colors.text, fontSize: 12, fontWeight: "600", fontFamily: "monospace" }}>{item.method} {item.path}</Text>
+              <Text style={{ color: item.statusCode < 400 ? colors.success : colors.danger, fontSize: 11, fontWeight: "700" }}>{item.statusCode}</Text>
+            </View>
+            <Text style={{ color: colors.textMuted, fontSize: 10.5 }}>{dayjs(item.occurredAt).format("DD MMM YYYY, HH:mm:ss")}{item.ip ? ` · ${item.ip}` : ""}</Text>
+          </View>
+        )}
+      />
+    </BottomSheet>
+  );
+}
 
 // Mirrors client/src/pages/appSettings/SystemSettingsTab.tsx — general settings, password/login
 // policy, network relay toggle, and agent API keys. The Change Management schedule-vs-publish-now
@@ -108,6 +185,7 @@ export function SystemSettingsScreen() {
       { text: "Delete", style: "destructive", onPress: () => deleteApiConnMutation.mutate(c.id) },
     ]);
   }
+  const [activityConnectionId, setActivityConnectionId] = useState<number | null>(null);
 
   function field(key: string, label: string, options?: { keyboardType?: "numeric" }) {
     return (
@@ -244,6 +322,9 @@ export function SystemSettingsScreen() {
               </View>
             )}
             <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
+              <TouchableOpacity onPress={() => setActivityConnectionId(c.id)}>
+                <Text style={{ color: colors.text, fontSize: 11, fontWeight: "700" }}>Activity</Text>
+              </TouchableOpacity>
               {canEdit && (
                 <TouchableOpacity onPress={() => toggleApiConnActiveMutation.mutate({ id: c.id, isActive: !c.isActive })}>
                   <Text style={{ color: colors.primary, fontSize: 11, fontWeight: "700" }}>{c.isActive ? "Revoke" : "Reactivate"}</Text>
@@ -297,6 +378,9 @@ export function SystemSettingsScreen() {
         )}
       </View>
     </ScrollView>
+    {activityConnectionId != null && (
+      <ConnectionActivitySheet connectionId={activityConnectionId} onClose={() => setActivityConnectionId(null)} />
+    )}
     </KeyboardAvoidingScreen>
   );
 }

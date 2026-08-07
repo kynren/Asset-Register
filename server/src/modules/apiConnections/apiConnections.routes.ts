@@ -41,6 +41,42 @@ router.get("/", requirePermission("app-settings", "view"), async (_req, res) => 
   res.json(connections);
 });
 
+// Summary for the "connected app" detail view: when the credential was first actually used (as
+// opposed to `createdAt`, when the admin issued it — those are commonly different moments), how
+// many calls it's made in total, and what the most recent call was (method + path), so the admin
+// can see at a glance what a connected app is doing without opening the full log.
+router.get("/:id", requirePermission("app-settings", "view"), async (req, res) => {
+  const id = Number(req.params.id);
+  const connection = await prisma.apiConnection.findUnique({ where: { id }, select: listSelect });
+  if (!connection) throw new ApiError(404, "Connection not found");
+
+  const [firstCall, lastCall, callCount] = await Promise.all([
+    prisma.apiConnectionLog.findFirst({ where: { connectionId: id }, orderBy: { occurredAt: "asc" } }),
+    prisma.apiConnectionLog.findFirst({ where: { connectionId: id }, orderBy: { occurredAt: "desc" } }),
+    prisma.apiConnectionLog.count({ where: { connectionId: id } }),
+  ]);
+
+  res.json({ ...connection, firstUsedAt: firstCall?.occurredAt ?? null, lastCall, callCount });
+});
+
+router.get("/:id/logs", requirePermission("app-settings", "view"), async (req, res) => {
+  const id = Number(req.params.id);
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
+
+  const [items, total] = await Promise.all([
+    prisma.apiConnectionLog.findMany({
+      where: { connectionId: id },
+      orderBy: { occurredAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.apiConnectionLog.count({ where: { connectionId: id } }),
+  ]);
+
+  res.json({ items, page, totalPages: Math.max(1, Math.ceil(total / pageSize)) });
+});
+
 router.post("/", requirePermission("app-settings", "create"), validateBody(createApiConnectionSchema), async (req, res) => {
   // Only a System Admin may mint a connection that can reach every organization, not just this
   // one — a regular org admin has no legitimate reason to set this, so it's silently dropped

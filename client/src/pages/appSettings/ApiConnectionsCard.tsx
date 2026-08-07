@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ColumnDef } from "@tanstack/react-table";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
+import { DataTable } from "../../components/DataTable";
 import { Icon } from "../../components/Icon";
 import { copyToClipboard } from "../../lib/clipboard";
 
@@ -22,6 +24,96 @@ interface ApiConnection {
   lastUsedIp: string | null;
   createdAt: string;
   createdBy: { id: number; firstName: string; lastName: string } | null;
+}
+
+interface ApiConnectionLogItem {
+  id: number;
+  method: string;
+  path: string;
+  statusCode: number;
+  ip: string | null;
+  occurredAt: string;
+}
+
+interface ApiConnectionDetail extends ApiConnection {
+  firstUsedAt: string | null;
+  lastCall: ApiConnectionLogItem | null;
+  callCount: number;
+}
+
+// "3d 4h", "12m", etc. — how long a connection has been actively calling in (span between its
+// first and most recent recorded call), not a network-level "connected" duration since REST calls
+// are stateless request/response with no persistent session to measure.
+function formatSpan(fromIso: string, toIso: string): string {
+  const totalMinutes = Math.max(0, dayjs(toIso).diff(dayjs(fromIso), "minute"));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function ConnectionActivityModal({ connectionId, onClose }: { connectionId: number; onClose: () => void }) {
+  const [page, setPage] = useState(1);
+
+  const { data: detail } = useQuery({
+    queryKey: ["api-connection-detail", connectionId],
+    queryFn: async () => (await axiosClient.get(`/api-connections/${connectionId}`)).data as ApiConnectionDetail,
+  });
+
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ["api-connection-logs", connectionId, page],
+    queryFn: async () => (await axiosClient.get(`/api-connections/${connectionId}/logs`, { params: { page, pageSize: 25 } })).data,
+  });
+
+  const columns: ColumnDef<ApiConnectionLogItem, any>[] = [
+    { header: "Time", accessorFn: (r) => dayjs(r.occurredAt).format("DD MMM YYYY, HH:mm:ss") },
+    { header: "Function", accessorFn: (r) => `${r.method} ${r.path}` },
+    { header: "Status", accessorFn: (r) => r.statusCode },
+    { header: "From IP", accessorFn: (r) => r.ip ?? "—" },
+  ];
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 760 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{detail?.name ?? "Connection"} — Activity</h3>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        {detail && (
+          <div className="row gap-3 flex-wrap" style={{ fontSize: 12, marginBottom: 14 }}>
+            <span className="muted">Registered {dayjs(detail.createdAt).format("DD MMM YYYY, HH:mm")}</span>
+            <span className="muted">
+              {detail.firstUsedAt ? `First connected ${dayjs(detail.firstUsedAt).format("DD MMM YYYY, HH:mm")}` : "Never connected"}
+            </span>
+            {detail.firstUsedAt && detail.lastCall && (
+              <span className="muted">Active for {formatSpan(detail.firstUsedAt, detail.lastCall.occurredAt)}</span>
+            )}
+            <span className="muted">{detail.callCount} call{detail.callCount === 1 ? "" : "s"} total</span>
+            {detail.lastCall && (
+              <span className="badge badge-neutral">
+                Last: {detail.lastCall.method} {detail.lastCall.path} ({detail.lastCall.statusCode})
+              </span>
+            )}
+          </div>
+        )}
+        <DataTable
+          tableId="appSettings.apiConnectionLogs"
+          defaultViewMode="list"
+          columns={columns}
+          data={logs?.items ?? []}
+          isLoading={isLoading}
+          page={logs?.page}
+          totalPages={logs?.totalPages}
+          onPageChange={setPage}
+        />
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const VERBS: { key: "canGet" | "canPost" | "canPut" | "canPatch" | "canDelete"; label: string }[] = [
@@ -62,6 +154,7 @@ export function ApiConnectionsCard() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(DEFAULT_FORM);
   const [justCreated, setJustCreated] = useState<{ apiKeyId: string; bearerToken: string; resources: string[] } | null>(null);
+  const [activityConnectionId, setActivityConnectionId] = useState<number | null>(null);
 
   const { data: connections } = useQuery({
     queryKey: ["api-connections"],
@@ -143,6 +236,9 @@ export function ApiConnectionsCard() {
               <div className="row gap-2" style={{ alignItems: "center" }}>
                 <span className={`badge ${c.isActive ? "badge-success" : "badge-neutral"}`}>{c.isActive ? "Active" : "Revoked"}</span>
                 {c.allOrganizations && <span className="badge badge-warning" title="Defaults to its home organization; a caller can target another via X-Organization-Id.">All organizations</span>}
+                <button className="btn btn-secondary btn-sm" onClick={() => setActivityConnectionId(c.id)}>
+                  Activity
+                </button>
                 <button className="btn btn-secondary btn-sm" onClick={() => toggleActiveMutation.mutate({ id: c.id, isActive: !c.isActive })}>
                   {c.isActive ? "Revoke" : "Reactivate"}
                 </button>
@@ -236,6 +332,10 @@ export function ApiConnectionsCard() {
   -H "Authorization: Bearer <apiKeyId>.<secret>"`}
         </pre>
       </div>
+
+      {activityConnectionId != null && (
+        <ConnectionActivityModal connectionId={activityConnectionId} onClose={() => setActivityConnectionId(null)} />
+      )}
     </div>
   );
 }

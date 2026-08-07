@@ -2578,7 +2578,25 @@ model McpApiKey {
   owner      User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   isActive   Boolean   @default(true)
   lastUsedAt DateTime?
+  lastUsedIp String?
   createdAt  DateTime  @default(now())
+  logs       McpAccessLog[]
+}
+
+// One row per tool call made through this key (external MCP clients only — the in-app assistant's
+// own in-process tool calls aren't tied to any key and aren't logged here). `args` is the raw tool
+// input as sent — e.g. an assetTag or search query — since that's what "which resource was pulled"
+// actually means for a tool-call API rather than a REST path.
+model McpAccessLog {
+  id         Int       @id @default(autoincrement())
+  keyId      Int
+  key        McpApiKey @relation(fields: [keyId], references: [id], onDelete: Cascade)
+  toolName   String
+  args       Json?
+  ok         Boolean   @default(true)
+  occurredAt DateTime  @default(now())
+
+  @@index([keyId, occurredAt])
 }
 
 // Admin-issued credential for an external application to call this organization's REST API
@@ -2616,6 +2634,25 @@ model ApiConnection {
   lastUsedIp  String?
   createdAt   DateTime  @default(now())
   revokedAt   DateTime?
+  logs        ApiConnectionLog[]
+}
+
+// One row per call made through this connection — method/path together are "which function /
+// which resource" the caller hit (e.g. GET /assets/123), matching the granularity the REST
+// gateway actually exposes. `statusCode` is only known once the handler finishes, so it's written
+// from a res.on("finish") listener rather than inline in the auth middleware — see
+// apiConnectionAuth.ts.
+model ApiConnectionLog {
+  id           Int           @id @default(autoincrement())
+  connectionId Int
+  connection   ApiConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  method       String
+  path         String
+  statusCode   Int
+  ip           String?
+  occurredAt   DateTime      @default(now())
+
+  @@index([connectionId, occurredAt])
 }
 
 // ───────────────────────── Operations Tools ─────────────────────────

@@ -103,6 +103,18 @@ export async function verifyApiConnection(req: ApiConnectionRequest, res: Respon
     () => undefined
   );
 
+  // Per-call history, always written against the connection's home schema (where the row lives)
+  // regardless of which org the call itself targeted — the status code isn't known until the
+  // downstream handler finishes, so this listens for "finish" rather than writing inline here.
+  const method = req.method;
+  const path = req.originalUrl;
+  const ip = req.ip;
+  res.on("finish", () => {
+    runWithTenant(scope.schemaName, () =>
+      prisma.apiConnectionLog.create({ data: { connectionId: record.id, method, path, statusCode: res.statusCode, ip } })
+    ).catch(() => undefined);
+  });
+
   req.apiConnection = record;
   await runWithTenant(targetSchema, async () => next());
 }

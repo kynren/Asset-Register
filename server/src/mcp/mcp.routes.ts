@@ -8,6 +8,7 @@ const router = Router();
 
 interface McpRequest extends Request {
   mcpOwnerId?: number;
+  mcpKeyId?: number;
 }
 
 // External MCP clients (Claude Desktop, Claude Code) authenticate with a per-user API key
@@ -25,8 +26,9 @@ async function verifyMcpKey(req: McpRequest, res: Response, next: NextFunction) 
     const record = await prisma.mcpApiKey.findUnique({ where: { key } });
     if (!record || !record.isActive) return res.status(401).json({ error: "Invalid or revoked MCP API key." });
 
-    prisma.mcpApiKey.update({ where: { id: record.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);
+    prisma.mcpApiKey.update({ where: { id: record.id }, data: { lastUsedAt: new Date(), lastUsedIp: req.ip } }).catch(() => undefined);
     req.mcpOwnerId = record.ownerId;
+    req.mcpKeyId = record.id;
     next();
   });
 }
@@ -35,7 +37,7 @@ async function verifyMcpKey(req: McpRequest, res: Response, next: NextFunction) 
 // tool calls, not long-lived streaming sessions, so there's no real cost to this simplicity and
 // it avoids having to manage session lifecycle/cleanup across requests.
 router.post("/", verifyMcpKey, async (req: McpRequest, res: Response) => {
-  const server = createMcpServer(req.mcpOwnerId!);
+  const server = createMcpServer(req.mcpOwnerId!, req.mcpKeyId);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
   res.on("close", () => {
