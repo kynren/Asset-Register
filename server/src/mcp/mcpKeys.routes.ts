@@ -18,6 +18,44 @@ router.get("/", async (req, res) => {
   res.json(keys.map((k) => ({ ...k, key: `${k.key.slice(0, 10)}...` })));
 });
 
+// Same "connected app" detail summary as ApiConnection's — first real usage vs. createdAt, most
+// recent tool call, and a total count. Still owner-scoped like every other route here: an MCP key
+// is self-service and per-user, not admin-managed.
+router.get("/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const existing = await prisma.mcpApiKey.findUnique({ where: { id } });
+  if (!existing || existing.ownerId !== req.user!.id) throw new ApiError(404, "Key not found");
+
+  const [firstCall, lastCall, callCount] = await Promise.all([
+    prisma.mcpAccessLog.findFirst({ where: { keyId: id }, orderBy: { occurredAt: "asc" } }),
+    prisma.mcpAccessLog.findFirst({ where: { keyId: id }, orderBy: { occurredAt: "desc" } }),
+    prisma.mcpAccessLog.count({ where: { keyId: id } }),
+  ]);
+
+  res.json({ ...existing, key: `${existing.key.slice(0, 10)}...`, firstUsedAt: firstCall?.occurredAt ?? null, lastCall, callCount });
+});
+
+router.get("/:id/logs", async (req, res) => {
+  const id = Number(req.params.id);
+  const existing = await prisma.mcpApiKey.findUnique({ where: { id } });
+  if (!existing || existing.ownerId !== req.user!.id) throw new ApiError(404, "Key not found");
+
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
+
+  const [items, total] = await Promise.all([
+    prisma.mcpAccessLog.findMany({
+      where: { keyId: id },
+      orderBy: { occurredAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.mcpAccessLog.count({ where: { keyId: id } }),
+  ]);
+
+  res.json({ items, page, totalPages: Math.max(1, Math.ceil(total / pageSize)) });
+});
+
 router.post("/", async (req, res) => {
   const key = generateApiKey();
   const label = (req.body?.label as string) || undefined;
