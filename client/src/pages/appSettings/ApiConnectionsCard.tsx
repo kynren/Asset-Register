@@ -29,7 +29,24 @@ const VERBS: { key: "canGet" | "canPost" | "canPut" | "canPatch" | "canDelete"; 
   { key: "canDelete", label: "DELETE" },
 ];
 
-const DEFAULT_FORM = { name: "", canGet: true, canPost: false, canPut: false, canPatch: false, canDelete: false };
+// The only resource family the gateway actually serves today (see apiIntegrations.routes.ts) —
+// add an entry here (and a matching route) to make a new one selectable and show its endpoint.
+const RESOURCES: { key: string; label: string }[] = [{ key: "assets", label: "Assets" }];
+
+const DEFAULT_FORM = { name: "", resources: ["assets"] as string[], canGet: true, canPost: false, canPut: false, canPatch: false, canDelete: false };
+
+// A little "endpoint + copy" row, reused for the live preview while picking data in the create
+// form and for each existing connection's granted resources in the list below.
+function EndpointRow({ url, onCopy }: { url: string; onCopy: () => void }) {
+  return (
+    <div className="row gap-2" style={{ alignItems: "center" }}>
+      <code style={{ fontSize: 11, wordBreak: "break-all" }}>{url}</code>
+      <button className="btn btn-secondary btn-sm btn-icon" title="Copy endpoint" onClick={onCopy}>
+        <Icon name="paperclip" size={11} />
+      </button>
+    </div>
+  );
+}
 
 // Admin-facing management for external REST API credentials — the "API Connections" card shown
 // on both App Settings' Integrations tab and Admin & Setup's System Settings tab (same component
@@ -39,7 +56,7 @@ const DEFAULT_FORM = { name: "", canGet: true, canPost: false, canPut: false, ca
 export function ApiConnectionsCard() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(DEFAULT_FORM);
-  const [justCreated, setJustCreated] = useState<{ apiKeyId: string; bearerToken: string } | null>(null);
+  const [justCreated, setJustCreated] = useState<{ apiKeyId: string; bearerToken: string; resources: string[] } | null>(null);
 
   const { data: connections } = useQuery({
     queryKey: ["api-connections"],
@@ -47,9 +64,9 @@ export function ApiConnectionsCard() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () => axiosClient.post("/api-connections", { name: form.name, resources: ["assets"], ...form }),
+    mutationFn: () => axiosClient.post("/api-connections", form),
     onSuccess: (res) => {
-      setJustCreated({ apiKeyId: res.data.apiKeyId, bearerToken: res.data.bearerToken });
+      setJustCreated({ apiKeyId: res.data.apiKeyId, bearerToken: res.data.bearerToken, resources: res.data.resources });
       setForm(DEFAULT_FORM);
       queryClient.invalidateQueries({ queryKey: ["api-connections"] });
     },
@@ -74,7 +91,12 @@ export function ApiConnectionsCard() {
     navigator.clipboard?.writeText(value).catch(() => undefined);
   }
 
+  function toggleResource(key: string, checked: boolean) {
+    setForm((f) => ({ ...f, resources: checked ? [...f.resources, key] : f.resources.filter((r) => r !== key) }));
+  }
+
   const gatewayUrl = `${window.location.origin}/api/integrations/v1`;
+  const resourceEndpoint = (resource: string) => `${gatewayUrl}/${resource}`;
 
   return (
     <div className="card">
@@ -88,13 +110,20 @@ export function ApiConnectionsCard() {
 
       {justCreated && (
         <div className="alert alert-success" style={{ wordBreak: "break-all" }}>
-          <strong>New credential (shown once — copy it now):</strong>
+          <strong>Bearer Token (shown once — copy it now):</strong>
           <div style={{ fontFamily: "monospace", marginTop: 6, fontSize: 12 }}>
             Authorization: Bearer {justCreated.bearerToken}
           </div>
           <button className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => copy(justCreated.bearerToken)}>
             <Icon name="paperclip" size={12} /> Copy bearer token
           </button>
+
+          <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", marginTop: 14, marginBottom: 6 }}>Endpoint(s)</div>
+          <div className="stack gap-1">
+            {justCreated.resources.map((r) => (
+              <EndpointRow key={r} url={resourceEndpoint(r)} onCopy={() => copy(resourceEndpoint(r))} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -128,8 +157,13 @@ export function ApiConnectionsCard() {
                 </label>
               ))}
             </div>
+            <div className="stack gap-1">
+              {c.resources.map((r) => (
+                <EndpointRow key={r} url={resourceEndpoint(r)} onCopy={() => copy(resourceEndpoint(r))} />
+              ))}
+            </div>
             <span className="muted" style={{ fontSize: 11 }}>
-              Resources: {c.resources.join(", ")} · {c.lastUsedAt ? `Last used ${dayjs(c.lastUsedAt).format("DD MMM, HH:mm")} from ${c.lastUsedIp ?? "unknown"}` : "Never used"}
+              {c.lastUsedAt ? `Last used ${dayjs(c.lastUsedAt).format("DD MMM, HH:mm")} from ${c.lastUsedIp ?? "unknown"}` : "Never used"}
               {c.createdBy && ` · Created by ${c.createdBy.firstName} ${c.createdBy.lastName}`}
             </span>
           </div>
@@ -146,6 +180,25 @@ export function ApiConnectionsCard() {
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
         />
+
+        <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", marginBottom: 6 }}>Data</div>
+        <div className="row gap-2 flex-wrap" style={{ marginBottom: 8 }}>
+          {RESOURCES.map((r) => (
+            <label key={r.key} className="row gap-1" style={{ alignItems: "center", fontSize: 12 }}>
+              <input type="checkbox" checked={form.resources.includes(r.key)} onChange={(e) => toggleResource(r.key, e.target.checked)} />
+              {r.label}
+            </label>
+          ))}
+        </div>
+        {form.resources.length > 0 && (
+          <div className="stack gap-1" style={{ marginBottom: 10 }}>
+            {form.resources.map((r) => (
+              <EndpointRow key={r} url={resourceEndpoint(r)} onCopy={() => copy(resourceEndpoint(r))} />
+            ))}
+          </div>
+        )}
+
+        <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", marginBottom: 6 }}>Permissions</div>
         <div className="row gap-2 flex-wrap" style={{ marginBottom: 10 }}>
           {VERBS.map((v) => (
             <label key={v.key} className="row gap-1" style={{ alignItems: "center", fontSize: 12 }}>
@@ -154,7 +207,11 @@ export function ApiConnectionsCard() {
             </label>
           ))}
         </div>
-        <button className="btn btn-primary btn-sm" disabled={!form.name.trim() || createMutation.isPending} onClick={() => createMutation.mutate()}>
+        <button
+          className="btn btn-primary btn-sm"
+          disabled={!form.name.trim() || !form.resources.length || createMutation.isPending}
+          onClick={() => createMutation.mutate()}
+        >
           <Icon name="plus" size={13} /> Create Connection
         </button>
       </div>
