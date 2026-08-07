@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
+import { copyToClipboard } from "../../lib/clipboard";
 
 interface McpKey {
   id: number;
@@ -64,7 +65,7 @@ export function McpConnectionCard() {
   }
 
   function copyKey(key: string) {
-    navigator.clipboard?.writeText(key).catch(() => undefined);
+    copyToClipboard(key, "API key copied to clipboard");
   }
 
   const mcpUrl = `${window.location.origin}/api/mcp`;

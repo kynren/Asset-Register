@@ -6,6 +6,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { DataTable } from "../../components/DataTable";
 import { useToast } from "../../components/toast/ToastProvider";
+import { copyToClipboard } from "../../lib/clipboard";
 import { PublishOrScheduleModal } from "./PublishOrScheduleModal";
 import { ScheduledChangeRow } from "./scheduledChangeTypes";
 import { PermissionGate } from "../../auth/PermissionGate";
@@ -70,7 +71,7 @@ export function SystemSettingsTab({
 
   async function copyNewKey() {
     if (!newKey) return;
-    await navigator.clipboard.writeText(newKey);
+    await copyToClipboard(newKey, "Agent key copied to clipboard");
     setKeyCopied(true);
     setTimeout(() => setKeyCopied(false), 1800);
   }

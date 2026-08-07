@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
+import { copyToClipboard } from "../../lib/clipboard";
 
 interface ApiConnection {
   id: number;
@@ -87,8 +88,8 @@ export function ApiConnectionsCard() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["api-connections"] }),
   });
 
-  function copy(value: string) {
-    navigator.clipboard?.writeText(value).catch(() => undefined);
+  function copy(value: string, label?: string) {
+    copyToClipboard(value, label);
   }
 
   function toggleResource(key: string, checked: boolean) {
@@ -114,14 +115,14 @@ export function ApiConnectionsCard() {
           <div style={{ fontFamily: "monospace", marginTop: 6, fontSize: 12 }}>
             Authorization: Bearer {justCreated.bearerToken}
           </div>
-          <button className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => copy(justCreated.bearerToken)}>
+          <button className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => copy(justCreated.bearerToken, "Bearer token copied to clipboard")}>
             <Icon name="paperclip" size={12} /> Copy bearer token
           </button>
 
           <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", marginTop: 14, marginBottom: 6 }}>Endpoint(s)</div>
           <div className="stack gap-1">
             {justCreated.resources.map((r) => (
-              <EndpointRow key={r} url={resourceEndpoint(r)} onCopy={() => copy(resourceEndpoint(r))} />
+              <EndpointRow key={r} url={resourceEndpoint(r)} onCopy={() => copy(resourceEndpoint(r), "Endpoint copied to clipboard")} />
             ))}
           </div>
         </div>
@@ -159,7 +160,7 @@ export function ApiConnectionsCard() {
             </div>
             <div className="stack gap-1">
               {c.resources.map((r) => (
-                <EndpointRow key={r} url={resourceEndpoint(r)} onCopy={() => copy(resourceEndpoint(r))} />
+                <EndpointRow key={r} url={resourceEndpoint(r)} onCopy={() => copy(resourceEndpoint(r), "Endpoint copied to clipboard")} />
               ))}
             </div>
             <span className="muted" style={{ fontSize: 11 }}>
@@ -193,7 +194,7 @@ export function ApiConnectionsCard() {
         {form.resources.length > 0 && (
           <div className="stack gap-1" style={{ marginBottom: 10 }}>
             {form.resources.map((r) => (
-              <EndpointRow key={r} url={resourceEndpoint(r)} onCopy={() => copy(resourceEndpoint(r))} />
+              <EndpointRow key={r} url={resourceEndpoint(r)} onCopy={() => copy(resourceEndpoint(r), "Endpoint copied to clipboard")} />
             ))}
           </div>
         )}

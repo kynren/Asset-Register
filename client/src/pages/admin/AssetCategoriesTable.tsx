@@ -10,6 +10,7 @@ import { PermissionGate } from "../../auth/PermissionGate";
 import { CategoryColumnsModal } from "./CategoryColumnsModal";
 import { ALL_CAPACITY_KEYS, CAPACITY_INFO, defaultCapacitiesFor, AssetCapacityKey } from "../assets/assetCapacities";
 import { ChipSelect } from "../../components/ChipSelect";
+import { copyToClipboard } from "../../lib/clipboard";
 
 interface FormTemplateRef {
   id: number;
@@ -358,7 +359,7 @@ function CategoryFormModal({
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
-                  onClick={() => { navigator.clipboard.writeText(intakeUrl); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 1500); }}
+                  onClick={() => { copyToClipboard(intakeUrl, "Intake link copied to clipboard"); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 1500); }}
                 >
                   <Icon name={linkCopied ? "check" : "paperclip"} size={12} /> {linkCopied ? "Copied" : "Copy"}
                 </button>

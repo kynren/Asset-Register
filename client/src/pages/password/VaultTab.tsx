@@ -65,6 +65,7 @@ export function VaultTab() {
     try {
       const res = await axiosClient.post(`/vault/${entry.id}/reveal`);
       await navigator.clipboard.writeText(res.data.password);
+      showToast({ variant: "success", message: "Password copied to clipboard" });
       setCopiedId(entry.id);
       setTimeout(() => setCopiedId((id) => (id === entry.id ? null : id)), 1800);
     } catch (err: any) {
