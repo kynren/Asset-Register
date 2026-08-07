@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigation } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Animated, Easing, Image, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,6 +8,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useTheme } from "../theme/ThemeContext";
 import { useToast } from "./toast/ToastProvider";
 import { AccountMenuSheet } from "./AccountMenuSheet";
+import { navigateToNotifications } from "../navigation/navigationRef";
 
 // Rendered as headerLeft/headerRight on the root screen of every bottom-tab stack (Home, Assets,
 // Stock, Helpdesk, More) — see the *Stack.tsx files. Not shown on nested/detail screens, which
@@ -17,7 +17,6 @@ export function AppHeader() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const { showToast } = useToast();
-  const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -66,7 +65,7 @@ export function AppHeader() {
           </Animated.View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.getParent()?.navigate("MoreTab", { screen: "Notifications" })} accessibilityLabel="Notifications" style={{ padding: 5 }}>
+        <TouchableOpacity onPress={navigateToNotifications} accessibilityLabel="Notifications" style={{ padding: 5 }}>
           <View>
             <Ionicons name="notifications-outline" size={22} color={colors.text} />
             {unreadCount > 0 && (

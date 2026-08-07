@@ -5,6 +5,7 @@ import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View 
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { DbFieldInfo, DbListResult, SENSITIVE_FIELD_PATTERN, SchemaRegistry } from "../../lib/databaseTypes";
 import { MoreStackParamList } from "../../navigation/types";
@@ -102,6 +103,7 @@ export function DatabaseRowFormScreen() {
   const editableFields = model.fields.filter((f) => f.editable);
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -182,5 +184,6 @@ export function DatabaseRowFormScreen() {
         {saveMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>{id != null ? "Save Changes" : `New ${model.name}`}</Text>}
       </TouchableOpacity>
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

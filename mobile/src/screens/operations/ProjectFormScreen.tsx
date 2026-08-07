@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { MoreStackParamList } from "../../navigation/types";
 
 // Quick-capture create form — title + description only. The web app's full ProjectFormModal also
@@ -29,6 +30,7 @@ export function ProjectFormScreen() {
   });
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -63,5 +65,6 @@ export function ProjectFormScreen() {
         {mutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>Create project</Text>}
       </TouchableOpacity>
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

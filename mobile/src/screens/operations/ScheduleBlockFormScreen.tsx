@@ -5,6 +5,7 @@ import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View 
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { MoreStackParamList } from "../../navigation/types";
 import { Schedule } from "./ResourceSchedulingScreen";
 
@@ -79,6 +80,7 @@ export function ScheduleBlockFormScreen() {
   const labelStyle = { color: colors.textMuted, fontSize: 12, fontWeight: "700" as const, marginBottom: 6, textTransform: "uppercase" as const };
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -125,5 +127,6 @@ export function ScheduleBlockFormScreen() {
         {mutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>{editingId ? "Save changes" : "Schedule block"}</Text>}
       </TouchableOpacity>
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

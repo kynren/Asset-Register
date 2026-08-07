@@ -53,6 +53,7 @@ export function AssistantScreen() {
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
       <FlatList
         ref={listRef}
+        style={{ flex: 1 }}
         data={messages}
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
@@ -86,14 +87,15 @@ export function AssistantScreen() {
       {!!quickActionsData?.quickActions.length && (
         <FlatList
           horizontal
+          style={{ flexGrow: 0 }}
           showsHorizontalScrollIndicator={false}
           data={quickActionsData.quickActions}
           keyExtractor={(q) => q}
-          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm }}
+          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm, alignItems: "flex-start" }}
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => send(item)}
-              style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primary }}
+              style={{ alignSelf: "flex-start", paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primary }}
             >
               <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "600" }}>{item}</Text>
             </TouchableOpacity>

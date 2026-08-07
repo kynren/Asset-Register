@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useToast } from "../../components/toast/ToastProvider";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -50,6 +51,7 @@ export function UserFormScreen() {
   const inputStyle = { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.text, backgroundColor: colors.surface };
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -84,5 +86,6 @@ export function UserFormScreen() {
 
       <PickerModal visible={rolePickerOpen} title="Select role" options={roleOptions} selectedId={roleId} onSelect={(v) => setRoleId(v == null ? null : Number(v))} onClose={() => setRolePickerOpen(false)} />
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

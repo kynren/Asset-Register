@@ -78,6 +78,14 @@ import apiIntegrationsRoutes from "./modules/apiIntegrations/apiIntegrations.rou
 export function createApp() {
   const app = express();
 
+  // The external API gateway (/api/integrations/v1/*) is deliberately open to any origin — it
+  // authenticates via a Bearer token (see apiConnectionAuth.ts), never cookies, so the
+  // same-origin protection CORS exists for session/cookie auth doesn't apply here. Registered
+  // before the app's own restrictive CORS below so another app's browser-side code calling this
+  // gateway directly isn't blocked with a generic "Failed to fetch" the way it otherwise would be
+  // — this route only ever serves credential-scoped data, not this app's own session.
+  app.use("/api/integrations/v1", cors());
+
   const allowedOrigins = env.CLIENT_ORIGIN.split(",").map((o) => o.trim());
   app.use(cors({ origin: allowedOrigins, credentials: true }));
   app.use(express.json());

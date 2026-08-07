@@ -6,6 +6,7 @@ import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View 
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { TicketCategory, TicketPriority, TICKET_PRIORITY_OPTIONS } from "../../types/ticket";
 import { HelpdeskStackParamList } from "../../navigation/types";
@@ -91,6 +92,7 @@ export function TicketFormScreen() {
   const canSubmit = (isHidden("title") || title.trim()) && (isHidden("description") || description.trim());
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -176,5 +178,6 @@ export function TicketFormScreen() {
       <PickerModal visible={openPicker === "priority"} title="Priority" options={priorityOptions} selectedId={priority} onSelect={(v) => setPriority(v as TicketPriority)} onClose={() => setOpenPicker(null)} />
       <PickerModal visible={openPicker === "category"} title="Category" options={categoryOptions} selectedId={categoryId} allowClear searchable onSelect={(v) => setCategoryId(v as number | null)} onClose={() => setOpenPicker(null)} />
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

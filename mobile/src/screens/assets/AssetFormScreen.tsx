@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { API_ORIGIN } from "../../config/env";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { ShimmerDetail } from "../../components/Shimmer";
 import { useToast } from "../../components/toast/ToastProvider";
@@ -164,6 +165,7 @@ export function AssetFormScreen() {
   const statusLabel = ASSET_STATUS_OPTIONS.find((s) => s.value === status)?.label ?? status;
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -304,6 +306,7 @@ export function AssetFormScreen() {
         onClose={() => setOpenPicker(null)}
       />
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }
 

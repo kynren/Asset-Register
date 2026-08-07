@@ -1,7 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { MoreScreen } from "../screens/more/MoreScreen";
 import { AppHeader } from "../components/AppHeader";
-import { NotificationsScreen } from "../screens/notifications/NotificationsScreen";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { NotificationPreferencesScreen } from "../screens/profile/NotificationPreferencesScreen";
 import { NetworkListScreen } from "../screens/network/NetworkListScreen";
@@ -88,7 +87,6 @@ export function MoreStack() {
       }}
     >
       <Stack.Screen name="MoreRoot" component={MoreScreen} options={{ title: "More", headerRight: () => <AppHeader /> }} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Notifications" }} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
       <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} options={{ title: "Notification Preferences" }} />
       <Stack.Screen name="NetworkList" component={NetworkListScreen} options={{ title: "Network Topology Map" }} />

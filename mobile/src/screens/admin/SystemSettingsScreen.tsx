@@ -7,6 +7,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../components/toast/ToastProvider";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 
 interface AgentKey {
   id: number;
@@ -89,6 +90,7 @@ export function SystemSettingsScreen() {
   );
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
       <View style={panel}>
         <Text style={sectionTitle}>General Settings</Text>
@@ -156,5 +158,6 @@ export function SystemSettingsScreen() {
         ))}
       </View>
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

@@ -6,6 +6,7 @@ import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View 
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { SectionsFormEditor } from "./SectionsFormEditor";
 import { DOC_CATEGORIES, DOC_TYPES, DOC_TYPE_DESCRIPTIONS, DOC_TYPE_FIELDS, DOC_TYPE_LABELS, DocType, emptySections } from "../../lib/docsConstants";
@@ -130,6 +131,7 @@ export function DocumentFormScreen() {
   const pickerStyle = { ...inputStyle, flexDirection: "row" as const, justifyContent: "space-between" as const, alignItems: "center" as const };
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -257,5 +259,6 @@ export function DocumentFormScreen() {
         onClose={() => setGrantPickerOpen(false)}
       />
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

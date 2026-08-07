@@ -5,9 +5,10 @@ import { requirePermission } from "../../middleware/rbac";
 import { validateBody } from "../../middleware/validate";
 import { ApiError } from "../../middleware/errorHandler";
 import { logAudit } from "../../lib/auditLogger";
-import { encryptSecret } from "../../lib/crypto";
+import { decryptSecret, encryptSecret } from "../../lib/crypto";
+import { setRelayState } from "../../lib/net2WebApi";
 import { discoverNet2Servers, testNet2Connection } from "./gates.service";
-import { createNet2ServerSchema, discoverNet2Schema, updateNet2ServerSchema } from "./gates.schema";
+import { createGateSchema, createNet2ServerSchema, discoverNet2Schema, gateControlSchema, updateGateSchema, updateNet2ServerSchema } from "./gates.schema";
 
 const router = Router();
 router.use(verifyJwt);
@@ -24,6 +25,7 @@ const select = {
   lastCheckedAt: true,
   createdAt: true,
   createdBy: { select: { id: true, firstName: true, lastName: true } },
+  gates: { select: { id: true, name: true, relayNumber: true, state: true, lastCheckedAt: true }, orderBy: { relayNumber: "asc" as const } },
 } as const;
 
 // Never send the stored credential back to the client — only whether one is on file, so the edit
@@ -103,6 +105,68 @@ router.post("/discover", requirePermission("gates", "view"), validateBody(discov
   } catch (err: any) {
     throw new ApiError(400, err.message || "Could not scan that range");
   }
+});
+
+// ───────────────────────── Gates ─────────────────────────
+// Individual openable gate entities wired to a relay on a registered Net2 server — see
+// net2WebApi.ts's header for the caveat on how "open"/"close" actually reach the controller.
+
+const gateSelect = { id: true, name: true, relayNumber: true, state: true, lastCheckedAt: true, net2ServerId: true, createdAt: true } as const;
+
+async function loadServerWithSecret(id: number) {
+  const server = await prisma.net2Server.findUnique({ where: { id } });
+  if (!server) throw new ApiError(404, "Net2 server not found");
+  return server;
+}
+
+router.post("/servers/:id/gates", requirePermission("gates", "create"), validateBody(createGateSchema), async (req, res) => {
+  const net2ServerId = Number(req.params.id);
+  await loadServerWithSecret(net2ServerId);
+  const gate = await prisma.gate.create({ data: { ...req.body, net2ServerId }, select: gateSelect });
+  await logAudit({ userId: req.user!.id, action: "gate.create", entityType: "Gate", entityId: gate.id });
+  res.status(201).json(gate);
+});
+
+router.patch("/gates/:gateId", requirePermission("gates", "edit"), validateBody(updateGateSchema), async (req, res) => {
+  const gate = await prisma.gate.update({ where: { id: Number(req.params.gateId) }, data: req.body, select: gateSelect });
+  await logAudit({ userId: req.user!.id, action: "gate.update", entityType: "Gate", entityId: gate.id });
+  res.json(gate);
+});
+
+router.delete("/gates/:gateId", requirePermission("gates", "delete"), async (req, res) => {
+  const id = Number(req.params.gateId);
+  await prisma.gate.delete({ where: { id } });
+  await logAudit({ userId: req.user!.id, action: "gate.delete", entityType: "Gate", entityId: id });
+  res.json({ ok: true });
+});
+
+// Remote open/close over the Net2 Web API — see net2WebApi.ts for the unverified-against-real-
+// hardware caveat. The local `state` is still updated optimistically on a successful HTTP
+// response, same pattern Access Control's door control route uses, so the UI reflects the command
+// that was just issued rather than waiting on a separate status poll.
+router.post("/gates/:gateId/control", requirePermission("gates", "edit"), validateBody(gateControlSchema), async (req, res) => {
+  const gateId = Number(req.params.gateId);
+  const gate = await prisma.gate.findUnique({ where: { id: gateId }, include: { net2Server: true } });
+  if (!gate) throw new ApiError(404, "Gate not found");
+  if (!gate.net2Server.username) throw new ApiError(400, "This Net2 server has no username/password configured");
+
+  const result = await setRelayState(
+    gate.net2Server.ipAddress,
+    gate.net2Server.port,
+    gate.net2Server.clientId ?? "",
+    gate.net2Server.username,
+    gate.net2Server.encryptedPassword ? decryptSecret(gate.net2Server.encryptedPassword) : "",
+    gate.relayNumber,
+    req.body.action
+  );
+
+  await logAudit({ userId: req.user!.id, action: `gate.${req.body.action}`, entityType: "Gate", entityId: gate.id, metadata: { ok: result.ok } });
+
+  if (result.ok) {
+    await prisma.gate.update({ where: { id: gate.id }, data: { state: req.body.action === "open" ? "OPEN" : "CLOSED", lastCheckedAt: new Date() } });
+  }
+  const updated = await prisma.gate.findUnique({ where: { id: gate.id }, select: gateSelect });
+  res.json({ ...result, gate: updated });
 });
 
 export default router;

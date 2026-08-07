@@ -6,6 +6,7 @@ import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View 
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { ModuleName } from "../../lib/permissions";
 import { QueryFilterBuilder, FilterCondition } from "../../components/QueryFilterBuilder";
 import { DATA_EXPLORER_SOURCES, getSource } from "../../lib/dataExplorerConfig";
@@ -144,6 +145,7 @@ export function ReportBuilderScreen() {
   const inputStyle = { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.text, backgroundColor: colors.surface };
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}>
       <Text style={[labelStyle, { marginTop: 0 }]}>Report Name</Text>
       <TextInput style={inputStyle} placeholder="e.g. Assets Due for Maintenance" placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} />
@@ -240,5 +242,6 @@ export function ReportBuilderScreen() {
         {saveMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>{reportId ? "Save Changes" : "Create Report"}</Text>}
       </TouchableOpacity>
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

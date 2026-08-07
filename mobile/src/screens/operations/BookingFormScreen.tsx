@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { Asset, PaginatedResponse } from "../../types/asset";
 import { MoreStackParamList } from "../../navigation/types";
@@ -58,6 +59,7 @@ export function BookingFormScreen() {
   const canSubmit = assetId != null && startAt.trim().length > 0 && endAt.trim().length > 0;
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -119,5 +121,6 @@ export function BookingFormScreen() {
         onClose={() => setAssetPickerOpen(false)}
       />
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

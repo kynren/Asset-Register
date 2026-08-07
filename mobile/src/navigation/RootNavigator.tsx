@@ -1,9 +1,15 @@
 import { ActivityIndicator, View } from "react-native";
 import { NavigationContainer, DarkTheme, DefaultTheme } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
 import { useTheme } from "../theme/ThemeContext";
 import { AuthStack } from "./AuthStack";
 import { MainTabs } from "./MainTabs";
+import { navigationRef } from "./navigationRef";
+import { RootStackParamList } from "./types";
+import { NotificationsScreen } from "../screens/notifications/NotificationsScreen";
+
+const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
   const { colors, isDark } = useTheme();
@@ -29,5 +35,20 @@ export function RootNavigator() {
     );
   }
 
-  return <NavigationContainer theme={navTheme}>{user ? <MainTabs /> : <AuthStack />}</NavigationContainer>;
+  return (
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
+      {user ? (
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          <RootStack.Screen name="MainTabs" component={MainTabs} />
+          <RootStack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{ headerShown: true, title: "Notifications", presentation: "modal" }}
+          />
+        </RootStack.Navigator>
+      ) : (
+        <AuthStack />
+      )}
+    </NavigationContainer>
+  );
 }

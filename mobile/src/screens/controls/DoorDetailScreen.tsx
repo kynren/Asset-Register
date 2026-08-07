@@ -8,6 +8,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { ShimmerDetail } from "../../components/Shimmer";
+import { OpeningAnimation } from "../../components/OpeningAnimation";
 import { AccessControlDevice, DoorControlAction, DoorLockState } from "../../types/controls";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -30,6 +31,7 @@ export function DoorDetailScreen() {
   const queryClient = useQueryClient();
   const [pendingAction, setPendingAction] = useState<DoorControlAction | null>(null);
   const [lastResult, setLastResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [playKey, setPlayKey] = useState(0);
 
   const { data: devices, isLoading } = useQuery({
     queryKey: ["mobile-access-control-devices"],
@@ -46,7 +48,10 @@ export function DoorDetailScreen() {
 
   const controlMutation = useMutation({
     mutationFn: (action: DoorControlAction) => axiosClient.post(`/access-control/doors/${id}/control`, { action }),
-    onMutate: (action) => setPendingAction(action),
+    onMutate: (action) => {
+      setPendingAction(action);
+      setPlayKey((k) => k + 1);
+    },
     onSuccess: (res) => {
       setLastResult({ ok: res.data.ok, message: res.data.message });
       queryClient.invalidateQueries({ queryKey: ["mobile-access-control-devices"] });
@@ -70,7 +75,8 @@ export function DoorDetailScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.lg }}>
       <View style={{ alignItems: "center", backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.lg }}>
-        <Text style={{ color: colors.text, fontSize: 17, fontWeight: "800" }}>{door.name}</Text>
+        <OpeningAnimation kind="door" playKey={playKey} active={door.lockState === "UNLOCKED"} size={48} />
+        <Text style={{ color: colors.text, fontSize: 17, fontWeight: "800", marginTop: 6 }}>{door.name}</Text>
         <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>{device.name}</Text>
         <View style={{ backgroundColor: tone + "22", borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 4, marginTop: 10 }}>
           <Text style={{ color: tone, fontSize: 12, fontWeight: "700" }}>{LOCK_LABEL[door.lockState]}</Text>

@@ -1853,6 +1853,26 @@ model Net2Server {
   createdById       Int
   createdBy         User         @relation(fields: [createdById], references: [id])
   createdAt         DateTime     @default(now())
+  gates             Gate[]
+}
+
+enum GateState {
+  OPEN
+  CLOSED
+  UNKNOWN
+}
+
+model Gate {
+  id            Int        @id @default(autoincrement())
+  net2ServerId  Int
+  net2Server    Net2Server @relation(fields: [net2ServerId], references: [id], onDelete: Cascade)
+  name          String
+  relayNumber   Int
+  state         GateState  @default(UNKNOWN)
+  lastCheckedAt DateTime?
+  createdAt     DateTime   @default(now())
+
+  @@unique([net2ServerId, relayNumber])
 }
 
 model AccessControlDevice {
@@ -2585,6 +2605,11 @@ model ApiConnection {
   canPatch    Boolean   @default(false)
   canDelete   Boolean   @default(false)
   isActive    Boolean   @default(true)
+  // System-Admin-only escalation, mirrored into the control plane's token_index (see
+  // controlPlane.ts's registerToken/resolveTokenScope) — that copy, not this one, is what the
+  // gateway middleware actually checks at request time; this column exists so the UI can show and
+  // edit the setting without a raw-SQL round trip to the control plane.
+  allOrganizations Boolean @default(false)
   createdById Int
   createdBy   User      @relation(fields: [createdById], references: [id])
   lastUsedAt  DateTime?
