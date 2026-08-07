@@ -124,9 +124,17 @@ const VERBS: { key: "canGet" | "canPost" | "canPut" | "canPatch" | "canDelete"; 
   { key: "canDelete", label: "DELETE" },
 ];
 
-// The only resource family the gateway actually serves today (see apiIntegrations.routes.ts) —
-// add an entry here (and a matching route) to make a new one selectable and show its endpoint.
-const RESOURCES: { key: string; label: string }[] = [{ key: "assets", label: "Assets" }];
+// Resource families the gateway serves (see apiIntegrations.routes.ts) — "assets" has full
+// GET/POST/PUT/PATCH/DELETE; the rest are read-only (GET) regardless of which verbs this
+// connection is granted. Add an entry here (and a matching route) to make a new one selectable.
+const RESOURCES: { key: string; label: string }[] = [
+  { key: "assets", label: "Assets" },
+  { key: "tickets", label: "Tickets" },
+  { key: "stock", label: "Stock Items" },
+  { key: "docs", label: "Docs & SOPs" },
+  { key: "network", label: "Network Devices" },
+  { key: "users", label: "Users" },
+];
 
 const DEFAULT_FORM = { name: "", resources: ["assets"] as string[], canGet: true, canPost: false, canPut: false, canPatch: false, canDelete: false, allOrganizations: false };
 
@@ -200,10 +208,11 @@ export function ApiConnectionsCard() {
     <div className="card">
       <h3 className="mt-0">API Connections</h3>
       <p className="muted" style={{ fontSize: 12, marginTop: -6 }}>
-        Let another application call this organization's data over REST — GET, POST, PUT, PATCH, and DELETE — using an admin-issued
-        credential. The secret is never stored in a recoverable form (only its SHA-256 hash is kept), is shown to you exactly once at
-        creation, and every call requires HTTPS. See the "REST API Integration & Security" SOP in Docs &amp; SOPs for the full
-        authentication spec and example requests.
+        Let another application pull this organization's data over REST — Assets, Tickets, Stock Items, Docs &amp; SOPs, Network
+        Devices, and Users — using an admin-issued credential. Assets also supports POST/PUT/PATCH/DELETE; every other resource is
+        read-only (GET) regardless of which verbs this connection is granted. The secret is never stored in a recoverable form (only
+        its SHA-256 hash is kept), is shown to you exactly once at creation, and every call requires HTTPS. See the "REST API
+        Integration &amp; Security" SOP in Docs &amp; SOPs for the full authentication spec and example requests.
       </p>
 
       {justCreated && (
