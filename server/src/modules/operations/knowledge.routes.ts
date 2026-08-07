@@ -35,7 +35,7 @@ router.get("/", requirePermission("operations", "view"), async (req, res) => {
 });
 
 const accessGrantSchema = z
-  .object({ userId: z.number().int().optional(), teamId: z.number().int().optional(), level: z.enum(["EDIT", "DELETE"]) })
+  .object({ userId: z.number().int().optional(), teamId: z.number().int().optional(), level: z.enum(["EDIT", "DELETE", "DUPLICATE"]) })
   .refine((v) => (v.userId != null) !== (v.teamId != null), { message: "Provide exactly one of userId or teamId" });
 
 const articleSchema = z.object({
@@ -87,10 +87,13 @@ router.delete("/:id", requirePermission("operations", "delete"), async (req, res
   res.json({ ok: true });
 });
 
-router.post("/:id/duplicate", requirePermission("operations", "create"), async (req, res) => {
+router.post("/:id/duplicate", requirePermission("operations", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.knowledgeArticle.findUnique({ where: { id } });
   if (!source) throw new ApiError(404, "Article not found");
+
+  const canDuplicate = await hasRecordAccess(ENTITY_TYPE, id, source, req.user!.id, req.user!.roleName, "DUPLICATE");
+  if (!canDuplicate) throw new ApiError(403, "Only the article's creator or someone they've granted duplicate access to can duplicate it");
 
   const clone = await prisma.knowledgeArticle.create({
     data: { title: `${source.title} (Copy)`, content: source.content, category: source.category, createdById: req.user!.id },
@@ -118,7 +121,7 @@ router.post("/:id/access", requirePermission("operations", "edit"), validateBody
 router.delete("/:id/access/:kind/:targetId/:level", requirePermission("operations", "edit"), async (req, res) => {
   const id = Number(req.params.id);
   const targetId = Number(req.params.targetId);
-  const level = req.params.level === "DELETE" ? "DELETE" : "EDIT";
+  const level = req.params.level === "DELETE" ? "DELETE" : req.params.level === "DUPLICATE" ? "DUPLICATE" : "EDIT";
   const target = req.params.kind === "team" ? { teamId: targetId } : { userId: targetId };
   const article = await prisma.knowledgeArticle.findUnique({ where: { id } });
   if (!article) throw new ApiError(404, "Article not found");

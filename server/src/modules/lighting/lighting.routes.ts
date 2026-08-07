@@ -196,7 +196,7 @@ router.delete("/devices/:id", requirePermission("lighting", "delete"), async (re
 // ipAddress and the on/off/status URLs (which are built from it) stay blank on the clone — same
 // reasoning as NVR/Camera/AccessControlDevice duplicate. ZigBee pairing fields are also dropped:
 // they identify one specific paired radio, not something a "copy" could legitimately inherit.
-router.post("/devices/:id/duplicate", requirePermission("lighting", "create"), async (req, res) => {
+router.post("/devices/:id/duplicate", requirePermission("lighting", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.lightingDevice.findUnique({ where: { id } });
   if (!source) throw new ApiError(404, "Lighting device not found");
@@ -461,7 +461,7 @@ router.delete("/scenes/:id", requirePermission("lighting", "delete"), async (req
   res.json({ ok: true });
 });
 
-router.post("/scenes/:id/duplicate", requirePermission("lighting", "create"), async (req, res) => {
+router.post("/scenes/:id/duplicate", requirePermission("lighting", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.lightingScene.findUnique({ where: { id }, include: { actions: true } });
   if (!source) throw new ApiError(404, "Scene not found");
@@ -559,7 +559,7 @@ router.delete("/automations/:id", requirePermission("lighting", "delete"), async
   res.json({ ok: true });
 });
 
-router.post("/automations/:id/duplicate", requirePermission("lighting", "create"), async (req, res) => {
+router.post("/automations/:id/duplicate", requirePermission("lighting", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.lightingAutomation.findUnique({ where: { id }, include: { actions: true } });
   if (!source) throw new ApiError(404, "Automation not found");

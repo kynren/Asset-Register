@@ -8,6 +8,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { useToast } from "../../components/toast/ToastProvider";
 import { API_ORIGIN } from "../../config/env";
 
 interface MediaAsset {
@@ -46,6 +47,7 @@ function formatBytes(n: number | null): string {
 export function MediaLibraryScreen() {
   const { colors, spacing, radius } = useTheme();
   const { hasPermission } = useAuth();
+  const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -105,7 +107,7 @@ export function MediaLibraryScreen() {
       await axiosClient.post("/media-center/library", fd, { headers: { "Content-Type": "multipart/form-data" } });
       queryClient.invalidateQueries({ queryKey: ["mobile-media-library"] });
     } catch {
-      Alert.alert("Upload failed", "Could not upload this file.");
+      showToast({ variant: "error", title: "Upload failed", message: "Could not upload this file." });
     } finally {
       setUploading(false);
     }

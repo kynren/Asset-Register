@@ -9,6 +9,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { ShimmerList } from "../../components/Shimmer";
 import { downloadAndShare } from "../../lib/downloadFile";
+import { useToast } from "../../components/toast/ToastProvider";
 
 interface AttachedItem {
   sourceKey: string;
@@ -34,6 +35,7 @@ function formatBytes(n: number | null): string {
 export function AttachedUploadsScreen() {
   const { colors, spacing, radius } = useTheme();
   const { hasPermission } = useAuth();
+  const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [sourceKey, setSourceKey] = useState("");
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
@@ -67,7 +69,7 @@ export function AttachedUploadsScreen() {
         await downloadAndShare(`/media-center/attached/${item.sourceKey}/${item.id}/preview`, item.displayName);
       }
     } catch {
-      Alert.alert("Preview failed", "Could not load this file.");
+      showToast({ variant: "error", title: "Preview failed", message: "Could not load this file." });
     } finally {
       setPreviewingKey(null);
     }

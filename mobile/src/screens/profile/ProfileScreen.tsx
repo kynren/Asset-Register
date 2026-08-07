@@ -1,10 +1,15 @@
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
+import { MoreStackParamList } from "../../navigation/types";
 
 export function ProfileScreen() {
   const { colors, spacing, radius } = useTheme();
   const { user, organization, logout } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<MoreStackParamList>>();
 
   function confirmLogout() {
     Alert.alert("Log out", "Are you sure you want to log out?", [
@@ -42,6 +47,25 @@ export function ProfileScreen() {
           </View>
         ))}
       </View>
+
+      <TouchableOpacity
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.md,
+          backgroundColor: colors.surface,
+          borderRadius: radius.md,
+          padding: spacing.md,
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginTop: spacing.lg,
+        }}
+        onPress={() => navigation.navigate("NotificationPreferences")}
+      >
+        <Ionicons name="notifications-outline" size={20} color={colors.primary} />
+        <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600", flex: 1 }}>Notification Preferences</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.logoutButton, { borderColor: colors.danger, borderRadius: radius.md, marginTop: spacing.xl }]}

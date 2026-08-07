@@ -48,6 +48,7 @@ export function ReportsListPage({ sourceFilter }: { sourceFilter?: string } = {}
 
   const canEditModule = hasPermission("reports", "edit");
   const canCreateModule = hasPermission("reports", "create");
+  const canDuplicateModule = hasPermission("reports", "duplicate");
   const canDeleteModule = hasPermission("reports", "delete");
 
   const columns: ColumnDef<ReportSummary, any>[] = [
@@ -70,7 +71,7 @@ export function ReportsListPage({ sourceFilter }: { sourceFilter?: string } = {}
             {r.canEdit && canEditModule && (
               <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={() => setEditingId(r.id)}><Icon name="edit" size={12} /></button>
             )}
-            {canCreateModule && (
+            {canDuplicateModule && (
               <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(r.id)}><Icon name="paperclip" size={12} /></button>
             )}
             {r.isOwner && canEditModule && (

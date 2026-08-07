@@ -169,6 +169,8 @@ export function DeviceManagementTab() {
               </PermissionGate>
               <PermissionGate module="nvr" action="create">
                 <button className="btn btn-secondary btn-sm" onClick={() => setCameraNvrId(nvr.id)}><Icon name="plus" size={12} /> Add Camera</button>
+              </PermissionGate>
+              <PermissionGate module="nvr" action="duplicate">
                 <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateNvrMutation.mutate(nvr.id)}><Icon name="paperclip" size={12} /></button>
               </PermissionGate>
               <PermissionGate module="nvr" action="delete">
@@ -207,7 +209,7 @@ export function DeviceManagementTab() {
                             <button className="btn btn-secondary btn-sm" onClick={() => setPtzCamera(cam)}>PTZ</button>
                           )}
                         </PermissionGate>
-                        <PermissionGate module="nvr" action="create">
+                        <PermissionGate module="nvr" action="duplicate">
                           <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateCameraMutation.mutate(cam.id)}>
                             <Icon name="paperclip" size={12} />
                           </button>

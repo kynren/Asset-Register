@@ -235,7 +235,7 @@ export async function grantAccess(req: Request, res: Response) {
   if (doc.createdById !== req.user!.id && !RECORD_ACCESS_BYPASS_ROLE_NAMES.includes(req.user!.roleName)) {
     throw new ApiError(403, "Only the document's creator can grant access");
   }
-  const { userId, teamId, level } = req.body as { userId?: number; teamId?: number; level: "EDIT" | "DELETE" };
+  const { userId, teamId, level } = req.body as { userId?: number; teamId?: number; level: "EDIT" | "DELETE" | "DUPLICATE" };
   const target = userId != null ? { userId } : { teamId: teamId! };
   await grantRecordAccess(ENTITY_TYPE, id, target, level, req.user!.id);
   await logAudit({ userId: req.user!.id, action: "docs.access.grant", entityType: "Document", entityId: id, metadata: { userId, teamId, level } });
@@ -245,7 +245,7 @@ export async function grantAccess(req: Request, res: Response) {
 export async function revokeAccess(req: Request, res: Response) {
   const id = Number(req.params.id);
   const targetId = Number(req.params.targetId);
-  const level = req.params.level === "DELETE" ? "DELETE" : "EDIT";
+  const level = req.params.level === "DELETE" ? "DELETE" : req.params.level === "DUPLICATE" ? "DUPLICATE" : "EDIT";
   const target = req.params.kind === "team" ? { teamId: targetId } : { userId: targetId };
   const doc = await prisma.document.findUnique({ where: { id } });
   if (!doc) throw new ApiError(404, "Document not found");
@@ -264,6 +264,9 @@ export async function duplicate(req: Request, res: Response) {
   const id = Number(req.params.id);
   const source = await prisma.document.findUnique({ where: { id } });
   if (!source) throw new ApiError(404, "Document not found");
+
+  const canDuplicate = await hasRecordAccess(ENTITY_TYPE, id, source, req.user!.id, req.user!.roleName, "DUPLICATE");
+  if (!canDuplicate) throw new ApiError(403, "Only the document's creator or someone they've granted duplicate access to can duplicate it");
 
   const title = `${source.title} (Copy)`;
   const sections = source.sections as Record<string, unknown>;

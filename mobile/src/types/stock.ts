@@ -6,11 +6,26 @@ export interface StockItemType {
 
 export interface StockTransaction {
   id: number;
-  type: "IN" | "OUT";
+  type: "IN" | "OUT" | "TRANSFER";
   quantity: number;
   reason: string | null;
   createdAt: string;
   performedBy: { firstName: string; lastName: string } | null;
+  issuance: { id: number; receivedBy: { firstName: string; lastName: string } } | null;
+}
+
+export interface StockLevel {
+  id: number;
+  locationId: number;
+  quantityOnHand: number;
+  location: { id: number; name: string };
+}
+
+export interface StockItemAttachment {
+  id: number;
+  url: string;
+  mimeType: string | null;
+  originalName: string | null;
 }
 
 export interface StockItem {
@@ -25,6 +40,8 @@ export interface StockItem {
   reorderLevel: number;
   unitCost: number | null;
   locationId: number | null;
+  stockLevels?: StockLevel[];
+  attachments?: StockItemAttachment[];
   transactions?: StockTransaction[];
   createdAt: string;
   updatedAt: string;

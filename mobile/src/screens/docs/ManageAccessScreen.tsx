@@ -98,7 +98,7 @@ export function ManageAccessScreen() {
             <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
           </TouchableOpacity>
           <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-            {(["EDIT", "DELETE"] as AccessLevel[]).map((lvl) => (
+            {(["EDIT", "DELETE", "DUPLICATE"] as AccessLevel[]).map((lvl) => (
               <TouchableOpacity
                 key={lvl}
                 style={{ borderWidth: 1, borderColor: pickedLevel === lvl ? colors.primary : colors.border, backgroundColor: pickedLevel === lvl ? colors.primary + "22" : colors.surface, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8 }}

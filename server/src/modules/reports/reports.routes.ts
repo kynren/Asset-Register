@@ -15,7 +15,7 @@ router.post("/", requirePermission("reports", "create"), validateBody(createRepo
 router.get("/:id", requirePermission("reports", "view"), reports.getReport);
 router.patch("/:id", requirePermission("reports", "edit"), validateBody(updateReportSchema), reports.updateReport);
 router.delete("/:id", requirePermission("reports", "delete"), reports.deleteReport);
-router.post("/:id/duplicate", requirePermission("reports", "create"), reports.duplicateReport);
+router.post("/:id/duplicate", requirePermission("reports", "duplicate"), reports.duplicateReport);
 router.get("/:id/run", requirePermission("reports", "view"), reports.runReport);
 router.get("/:id/export.csv", requirePermission("reports", "export"), reports.exportCsv);
 router.get("/:id/export.pdf", requirePermission("reports", "export"), reports.exportPdf);

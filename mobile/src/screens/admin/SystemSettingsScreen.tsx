@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
+import { useToast } from "../../components/toast/ToastProvider";
 
 interface AgentKey {
   id: number;
@@ -21,6 +22,7 @@ interface AgentKey {
 export function SystemSettingsScreen() {
   const { colors, spacing, radius } = useTheme();
   const { hasPermission } = useAuth();
+  const { showToast } = useToast();
   const queryClient = useQueryClient();
   const canEdit = hasPermission("app-settings", "edit");
 
@@ -35,7 +37,7 @@ export function SystemSettingsScreen() {
     mutationFn: () => axiosClient.put("/settings", { values }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mobile-system-settings"] });
-      Alert.alert("Settings saved");
+      showToast({ variant: "success", title: "Settings saved" });
     },
   });
 

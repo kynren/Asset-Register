@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { useToast } from "../../components/toast/ToastProvider";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -16,6 +17,7 @@ interface Role {
 
 export function UserFormScreen() {
   const { colors, spacing, radius } = useTheme();
+  const { showToast } = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<MoreStackParamList>>();
   const queryClient = useQueryClient();
 
@@ -33,11 +35,12 @@ export function UserFormScreen() {
     mutationFn: () => axiosClient.post("/users/invite", { email: email.trim(), firstName: firstName.trim(), lastName: lastName.trim(), roleId }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["mobile-users"] });
-      Alert.alert(
-        "Invite sent",
-        `An invite email was sent to ${res.data.email}. They'll appear in the user list once they follow the link to set up their own password.`,
-        [{ text: "OK", onPress: () => navigation.goBack() }]
-      );
+      showToast({
+        variant: "success",
+        title: "Invite sent",
+        message: `An invite email was sent to ${res.data.email}. They'll appear in the user list once they follow the link to set up their own password.`,
+      });
+      navigation.goBack();
     },
     onError: (err: any) => setError(err?.response?.data?.error ?? "Could not send invite."),
   });

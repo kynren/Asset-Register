@@ -1,15 +1,17 @@
 import { useRef, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { useToast } from "../../components/toast/ToastProvider";
 import { StockStackParamList } from "../../navigation/types";
 
 export function StockScanScreen() {
   const { colors, spacing, radius } = useTheme();
+  const { showToast } = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<StockStackParamList>>();
   const [permission, requestPermission] = useCameraPermissions();
   const [lookingUp, setLookingUp] = useState(false);
@@ -23,9 +25,9 @@ export function StockScanScreen() {
       const res = await axiosClient.get(`/stock/by-sku/${encodeURIComponent(data)}`);
       navigation.replace("StockDetail", { id: res.data.id });
     } catch {
-      Alert.alert("Not found", `No stock item found with SKU "${data}"`, [
-        { text: "OK", onPress: () => { scannedRef.current = false; setLookingUp(false); } },
-      ]);
+      showToast({ variant: "error", title: "Not found", message: `No stock item found with SKU "${data}"` });
+      scannedRef.current = false;
+      setLookingUp(false);
     }
   }
 

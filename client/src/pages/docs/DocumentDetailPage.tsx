@@ -6,7 +6,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { PermissionGate } from "../../auth/PermissionGate";
-import { AccessGrant, ManageAccessModal, canDeleteRecord, canEditRecord, canManageRecordAccess } from "../../components/AccessControl";
+import { AccessGrant, ManageAccessModal, canDeleteRecord, canDuplicateRecord, canEditRecord, canManageRecordAccess } from "../../components/AccessControl";
 import { useAuth } from "../../auth/AuthContext";
 import { SectionsView } from "./SectionsView";
 import { DocumentFormModal } from "./DocumentFormModal";
@@ -118,6 +118,7 @@ export function DocumentDetailPage() {
   const reviewOverdue = doc.reviewDueDate && dayjs(doc.reviewDueDate).isBefore(dayjs());
   const canEdit = !!user && canEditRecord(doc.createdById, doc.access, user.id, user.roleName, myTeamIds);
   const canDelete = !!user && canDeleteRecord(doc.createdById, doc.access, user.id, user.roleName, myTeamIds);
+  const canDuplicate = !!user && canDuplicateRecord(doc.createdById, doc.access, user.id, user.roleName, myTeamIds);
   const canManageAccess = !!user && canManageRecordAccess(doc.createdById, user.id, user.roleName);
 
   return (
@@ -179,11 +180,13 @@ export function DocumentDetailPage() {
           <button className="ad-btn" title="Export as Word document" onClick={() => exportDocument("docx")}>
             <Icon name="download" size={13} /> Word
           </button>
-          <PermissionGate module="docs" action="create">
-            <button className="ad-btn" title="Duplicate" onClick={() => duplicateMutation.mutate()}>
-              <Icon name="paperclip" size={13} /> Duplicate
-            </button>
-          </PermissionGate>
+          {canDuplicate && (
+            <PermissionGate module="docs" action="duplicate">
+              <button className="ad-btn" title="Duplicate" onClick={() => duplicateMutation.mutate()}>
+                <Icon name="paperclip" size={13} /> Duplicate
+              </button>
+            </PermissionGate>
+          )}
           {canDelete && (
             <PermissionGate module="docs" action="delete">
               <button className="ad-btn ad-btn-danger" onClick={() => setDeleting(true)}>
@@ -281,6 +284,7 @@ export function DocumentDetailPage() {
           users={users ?? []}
           teams={teams ?? []}
           queryKey={["doc", id]}
+          levels={["EDIT", "DELETE", "DUPLICATE"]}
           onClose={() => setManagingAccess(false)}
         />
       )}

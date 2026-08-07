@@ -205,7 +205,7 @@ export async function verifyMfaToken(secret: string, token: string): Promise<boo
 
 export async function getPermissionMap(roleId: number) {
   const permissions = await prisma.rolePermission.findMany({ where: { roleId } });
-  const map: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean; canImport: boolean }> = {};
+  const map: Record<string, { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canExport: boolean; canImport: boolean; canDuplicate: boolean }> = {};
   for (const p of permissions) {
     map[p.module] = {
       canView: p.canView,
@@ -214,12 +214,13 @@ export async function getPermissionMap(roleId: number) {
       canDelete: p.canDelete,
       canExport: p.canExport,
       canImport: p.canImport,
+      canDuplicate: p.canDuplicate,
     };
   }
   return map;
 }
 
-const ALL_TRUE_PERMISSION = { canView: true, canCreate: true, canEdit: true, canDelete: true, canExport: true, canImport: true };
+const ALL_TRUE_PERMISSION = { canView: true, canCreate: true, canEdit: true, canDelete: true, canExport: true, canImport: true, canDuplicate: true };
 
 // System Admin's roleId is only meaningful within its own home schema — the moment it's viewing
 // another organization (see appSettings.controller.ts switchOrganization), looking that id up in

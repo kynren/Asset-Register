@@ -5,7 +5,7 @@ import { Icon } from "./Icon";
 import { FormModal } from "./FormModal";
 import { ChipSelect } from "./ChipSelect";
 
-export type AccessLevel = "EDIT" | "DELETE" | "VIEW";
+export type AccessLevel = "EDIT" | "DELETE" | "VIEW" | "DUPLICATE";
 export type AccessTargetKind = "user" | "team";
 
 export interface AccessGrant {
@@ -38,11 +38,14 @@ export function canEditRecord(createdById: number, access: AccessGrant[], userId
 export function canDeleteRecord(createdById: number, access: AccessGrant[], userId: number, roleName: string, myTeamIds: number[]) {
   return createdById === userId || hasAccessGrant(access, userId, myTeamIds, "DELETE") || BYPASS_ROLE_NAMES.includes(roleName);
 }
+export function canDuplicateRecord(createdById: number, access: AccessGrant[], userId: number, roleName: string, myTeamIds: number[]) {
+  return createdById === userId || hasAccessGrant(access, userId, myTeamIds, "DUPLICATE") || BYPASS_ROLE_NAMES.includes(roleName);
+}
 export function canManageRecordAccess(createdById: number, userId: number, roleName: string) {
   return createdById === userId || BYPASS_ROLE_NAMES.includes(roleName);
 }
 
-const LEVEL_LABELS: Record<AccessLevel, string> = { EDIT: "Can edit", DELETE: "Can delete", VIEW: "Can view" };
+const LEVEL_LABELS: Record<AccessLevel, string> = { EDIT: "Can edit", DELETE: "Can delete", VIEW: "Can view", DUPLICATE: "Can duplicate" };
 
 function grantLabel(a: { userId: number | null; teamId: number | null; user: { firstName: string; lastName: string } | null; team: { name: string } | null }) {
   if (a.teamId != null) return a.team ? `${a.team.name} (team)` : `Team #${a.teamId}`;

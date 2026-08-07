@@ -10,6 +10,7 @@ import { BrandingTab } from "./BrandingTab";
 import { DatabaseManagerTab } from "./DatabaseManagerTab";
 import { MediaCenterTab } from "./MediaCenterTab";
 import { McpConnectionCard } from "./McpConnectionCard";
+import { ApiConnectionsCard } from "./ApiConnectionsCard";
 import { DocsImportLimitCard } from "../docs/DocsImportLimitCard";
 import { RolesTab } from "../admin/RolesTab";
 import { UsersTab } from "../admin/UsersTab";
@@ -142,12 +143,18 @@ export function AppSettingsPage() {
             onDoneEditingScheduledChange={() => setEditingChange(null)}
           />
           <DocsImportLimitCard />
+          <ApiConnectionsCard />
         </div>
       )}
       {activeTab === "branding" && <BrandingTab />}
       {activeTab === "database" && <DatabaseManagerTab />}
       {activeTab === "media" && <MediaCenterTab />}
-      {activeTab === "integrations" && <McpConnectionCard />}
+      {activeTab === "integrations" && (
+        <div className="stack gap-3">
+          <McpConnectionCard />
+          <ApiConnectionsCard />
+        </div>
+      )}
       {activeTab === "status" && <SystemStatusTab />}
       {activeTab === "changeManagement" && <ChangeManagementTab onEdit={handleEditScheduledChange} />}
       {activeTab === "agentLog" && <AgentLogTab />}

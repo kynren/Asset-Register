@@ -100,7 +100,7 @@ router.delete("/:id/public-intake", requirePermission("admin", "edit"), async (r
   res.json(category);
 });
 
-router.post("/:id/duplicate", requirePermission("admin", "create"), async (req, res) => {
+router.post("/:id/duplicate", requirePermission("admin", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.assetCategory.findUnique({ where: { id } });
   if (!source) throw new ApiError(404, "Category not found");

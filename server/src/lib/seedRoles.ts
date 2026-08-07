@@ -1,11 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import { MODULES } from "../constants/modules";
 
-type PermSet = Partial<Record<(typeof MODULES)[number], { canView?: boolean; canCreate?: boolean; canEdit?: boolean; canDelete?: boolean; canExport?: boolean; canImport?: boolean }>>;
+type PermSet = Partial<Record<(typeof MODULES)[number], { canView?: boolean; canCreate?: boolean; canEdit?: boolean; canDelete?: boolean; canExport?: boolean; canImport?: boolean; canDuplicate?: boolean }>>;
 
-const ALL_TRUE = { canView: true, canCreate: true, canEdit: true, canDelete: true, canExport: true, canImport: true };
-const VIEW_ONLY = { canView: true, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false };
-const NO_ACCESS = { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false };
+const ALL_TRUE = { canView: true, canCreate: true, canEdit: true, canDelete: true, canExport: true, canImport: true, canDuplicate: true };
+const VIEW_ONLY = { canView: true, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false, canDuplicate: false };
+const NO_ACCESS = { canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false, canDuplicate: false };
 
 // Shared by prisma/seed.ts (the original install) and tenantProvisioning.ts (every new
 // organization signed up afterwards) so the two never drift out of sync with each other.

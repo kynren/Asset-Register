@@ -16,15 +16,20 @@ interface MoreItem {
   // Lighting + Access Control) — visible if the user can view ANY of these, sub-navigation
   // handles filtering the individual items itself.
   anyModule?: ModuleName[];
+  // For items gated by exact role name rather than the generic RBAC permission system (e.g. the
+  // mobile loading screen settings, which mirrors requireSystemOrSuperAdmin server-side because no
+  // existing module permission maps to "System Admin + Super Admin only, excluding plain Admin").
+  roleNames?: string[];
   route: keyof MoreStackParamList;
   comingSoonLabel?: string;
 }
 
 // Everything not promoted to a bottom tab lives here — same pattern as the web sidebar's grouped
 // nav, just collapsed into one flat list since a phone has no room for a persistent sidebar.
-// Notifications lives behind the bell icon in the header now (AppHeader.tsx), not in this list.
+// Notifications and the account/profile menu live behind the top bar's avatar/bell (AppHeader.tsx),
+// not in this list. "Admin & Setup" and "App Settings" are two separate entries, mirroring web's
+// navConfig.ts treating them as distinct top-level nav items rather than one merged screen.
 const ITEMS: MoreItem[] = [
-  { key: "profile", label: "Profile", icon: "person-circle-outline", route: "Profile" },
   { key: "network", label: "Network Topology Map", icon: "git-network-outline", module: "network", route: "NetworkList" },
   { key: "operations", label: "Operations Tools", icon: "briefcase-outline", module: "operations", route: "OperationsHome" },
   { key: "controls", label: "Controls", icon: "options-outline", anyModule: ["lighting", "access-control"], route: "ControlsHome" },
@@ -33,15 +38,18 @@ const ITEMS: MoreItem[] = [
   { key: "reports", label: "Reports", icon: "bar-chart-outline", module: "reports", route: "ReportList" },
   { key: "virtual-assistant", label: "Virtual Assistant", icon: "sparkles-outline", module: "virtual-assistant", route: "Assistant" },
   { key: "password", label: "Password Management", icon: "lock-closed-outline", module: "password", route: "VaultList" },
-  { key: "admin", label: "Admin & Setup", icon: "settings-outline", anyModule: ["admin", "app-settings"], route: "AdminHome" },
+  { key: "admin", label: "Admin & Setup", icon: "settings-outline", module: "admin", route: "AdminHome" },
+  { key: "app-settings", label: "App Settings", icon: "construct-outline", module: "app-settings", route: "AppSettingsHome" },
+  { key: "mobile-splash", label: "App Loading Screen", icon: "phone-portrait-outline", roleNames: ["System Admin", "Super Admin"], route: "MobileSplashSettings" },
 ];
 
 export function MoreScreen() {
   const { colors, spacing, radius } = useTheme();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<MoreStackParamList>>();
 
   const visible = ITEMS.filter((item) => {
+    if (item.roleNames) return !!user && item.roleNames.includes(user.roleName);
     if (item.anyModule) return item.anyModule.some((m) => hasPermission(m, "view"));
     return !item.module || hasPermission(item.module, "view");
   });

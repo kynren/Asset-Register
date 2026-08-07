@@ -1,3 +1,5 @@
+import { Ionicons } from "@expo/vector-icons";
+
 export type DocType =
   | "SOP"
   | "WORK_INSTRUCTION"
@@ -39,6 +41,30 @@ export const DOC_TYPE_DESCRIPTIONS: Record<DocType, string> = {
   SHOW_PRODUCTION: "A cue sheet / show document — cues, descriptions, and department responsibilities for a live show.",
   TRAINING: "Induction or training material — objectives, content sections, and assessment criteria.",
   GENERAL: "A free-form document or note, for anything that doesn't fit a more specific type.",
+};
+
+// Mirrors client/src/pages/docs/docsConstants.ts's DOC_TYPE_COLORS/DOC_TYPE_ICONS — a book-cover
+// color + icon per type so the library shelves read as distinct "genres" at a glance, same as web.
+export const DOC_TYPE_COLORS: Record<DocType, { from: string; to: string }> = {
+  SOP: { from: "#2563eb", to: "#1e3a8a" },
+  WORK_INSTRUCTION: { from: "#059669", to: "#065f46" },
+  TECHNICAL_RUNBOOK: { from: "#7c3aed", to: "#4c1d95" },
+  MAINTENANCE_CHECKLIST: { from: "#d97706", to: "#92400e" },
+  POLICY: { from: "#dc2626", to: "#7f1d1d" },
+  SHOW_PRODUCTION: { from: "#db2777", to: "#831843" },
+  TRAINING: { from: "#0891b2", to: "#164e63" },
+  GENERAL: { from: "#475569", to: "#1e293b" },
+};
+
+export const DOC_TYPE_ICONS: Record<DocType, keyof typeof Ionicons.glyphMap> = {
+  SOP: "document-text-outline",
+  WORK_INSTRUCTION: "construct-outline",
+  TECHNICAL_RUNBOOK: "terminal-outline",
+  MAINTENANCE_CHECKLIST: "checkmark-done-outline",
+  POLICY: "shield-checkmark-outline",
+  SHOW_PRODUCTION: "star-outline",
+  TRAINING: "book-outline",
+  GENERAL: "bookmark-outline",
 };
 
 export const DOC_CATEGORIES = [

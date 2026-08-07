@@ -9,6 +9,7 @@ import { API_ORIGIN } from "../../config/env";
 import { useTheme } from "../../theme/ThemeContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { ShimmerDetail } from "../../components/Shimmer";
+import { useToast } from "../../components/toast/ToastProvider";
 import { Asset, AssetCategory, AssetLocation, AssetPhoto, AssetStatus, AssetUserRef, ASSET_STATUS_OPTIONS } from "../../types/asset";
 import { AssetsStackParamList } from "../../navigation/types";
 import { buildMediaFormData, isVideo, pickAssetMedia, PickedMedia } from "../../lib/mediaPicker";
@@ -17,6 +18,7 @@ type PickerKey = "category" | "location" | "assignedTo" | "status" | null;
 
 export function AssetFormScreen() {
   const { colors, spacing, radius } = useTheme();
+  const { showToast } = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<AssetsStackParamList>>();
   const route = useRoute<RouteProp<AssetsStackParamList, "AssetForm">>();
   const editingId = route.params?.id;
@@ -68,7 +70,7 @@ export function AssetFormScreen() {
       try {
         for (const media of picked) await uploadPhotoMutation.mutateAsync({ assetId: editingId, media });
       } catch {
-        Alert.alert("Upload failed", "Couldn't upload one or more files.");
+        showToast({ variant: "error", title: "Upload failed", message: "Couldn't upload one or more files." });
       } finally {
         setUploadingMedia(false);
       }

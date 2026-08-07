@@ -209,7 +209,7 @@ export function DocumentFormModal({
       {!document && (
         <>
           <hr style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "16px 0" }} />
-          <AccessGrantPicker users={users ?? []} teams={teams ?? []} value={newAccess} onChange={setNewAccess} />
+          <AccessGrantPicker users={users ?? []} teams={teams ?? []} value={newAccess} onChange={setNewAccess} levels={["EDIT", "DELETE", "DUPLICATE"]} />
         </>
       )}
 

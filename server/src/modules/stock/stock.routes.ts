@@ -54,7 +54,7 @@ router.get("/:id", requirePermission("stock", "view"), controller.getOne);
 router.post("/", requirePermission("stock", "create"), validateBody(createStockItemSchema), controller.create);
 router.patch("/:id", requirePermission("stock", "edit"), validateBody(updateStockItemSchema), controller.update);
 router.delete("/:id", requirePermission("stock", "delete"), controller.remove);
-router.post("/:id/duplicate", requirePermission("stock", "create"), controller.duplicate);
+router.post("/:id/duplicate", requirePermission("stock", "duplicate"), controller.duplicate);
 router.post("/:id/transactions", requirePermission("stock", "edit"), validateBody(createTransactionSchema), controller.addTransaction);
 router.post("/:id/transfer", requirePermission("stock", "edit"), validateBody(createTransferSchema), controller.transferStock);
 router.post("/:id/attachments", requirePermission("stock", "edit"), attachmentUpload.single("file"), controller.uploadAttachment);

@@ -23,7 +23,7 @@ export const MODULES = [
 ] as const;
 
 export type ModuleName = (typeof MODULES)[number];
-export type ActionName = "view" | "create" | "edit" | "delete" | "export" | "import";
+export type ActionName = "view" | "create" | "edit" | "delete" | "export" | "import" | "duplicate";
 
 export interface ModulePermission {
   canView: boolean;
@@ -32,6 +32,7 @@ export interface ModulePermission {
   canDelete: boolean;
   canExport: boolean;
   canImport: boolean;
+  canDuplicate: boolean;
 }
 
 export type PermissionMap = Partial<Record<ModuleName, ModulePermission>>;

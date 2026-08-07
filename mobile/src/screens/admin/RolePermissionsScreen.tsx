@@ -17,6 +17,7 @@ interface RolePermission {
   canDelete: boolean;
   canExport: boolean;
   canImport: boolean;
+  canDuplicate: boolean;
   scopeAssignedOnly?: boolean;
 }
 interface Role {
@@ -27,9 +28,9 @@ interface Role {
   permissions: RolePermission[];
 }
 
-type PermAction = "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport" | "canImport";
-const ACTIONS: PermAction[] = ["canView", "canCreate", "canEdit", "canDelete", "canExport", "canImport"];
-const ACTION_LABELS: Record<PermAction, string> = { canView: "View", canCreate: "Create", canEdit: "Edit", canDelete: "Delete", canExport: "Export", canImport: "Import" };
+type PermAction = "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport" | "canImport" | "canDuplicate";
+const ACTIONS: PermAction[] = ["canView", "canCreate", "canEdit", "canDelete", "canExport", "canImport", "canDuplicate"];
+const ACTION_LABELS: Record<PermAction, string> = { canView: "View", canCreate: "Create", canEdit: "Edit", canDelete: "Delete", canExport: "Export", canImport: "Import", canDuplicate: "Duplicate" };
 
 // Mirrors client/src/pages/admin/RolesTab.tsx's permission matrix — one card per module (a table
 // doesn't fit a phone width) with toggle chips for each action. The Change Management
@@ -57,7 +58,7 @@ const MODULE_LABELS: Record<ModuleName, string> = {
 };
 
 function buildFullMatrix(perms: RolePermission[]): RolePermission[] {
-  return MODULES.map((m) => perms.find((p) => p.module === m) ?? { module: m, canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false, scopeAssignedOnly: false });
+  return MODULES.map((m) => perms.find((p) => p.module === m) ?? { module: m, canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false, canDuplicate: false, scopeAssignedOnly: false });
 }
 
 export function RolePermissionsScreen() {

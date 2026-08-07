@@ -32,6 +32,7 @@ model RolePermission {
   canDelete         Boolean @default(false)
   canExport         Boolean @default(false)
   canImport         Boolean @default(false)
+  canDuplicate      Boolean @default(false)
   // Only consulted for module="helpdesk" today: when true, a holder of this role only sees tickets
   // they're assigned to or requested, instead of every ticket canView would otherwise grant.
   scopeAssignedOnly Boolean @default(false)
@@ -87,6 +88,7 @@ model User {
   contactEmails                 UserContactEmail[]
   preferences                   UserPreference[]
   mcpApiKeys                    McpApiKey[]
+  apiConnectionsCreated          ApiConnection[]
 
   projectCardsAssigned           ProjectCard[]           @relation("ProjectCardAssignee")
   projectCardsCreated            ProjectCard[]           @relation("ProjectCardCreator")
@@ -111,6 +113,7 @@ model User {
   purchaseOrdersCreated         PurchaseOrder[]
   emailTemplatesCreated         EmailTemplate[]
   loginPageDesignsUpdated       LoginPageDesign[]
+  mobileSplashSettingsUpdates   MobileSplashSettings[]
   documentsCreated              Document[]
   networkMonitorSettingsUpdates NetworkMonitorSettings[]
   backupSettingsUpdates         BackupSettings[]
@@ -2500,6 +2503,32 @@ model LoginPageDesign {
   updatedAt   DateTime @updatedAt
 }
 
+enum MobileSplashMediaType {
+  PHOTO
+  GIF
+  VIDEO
+}
+
+// The mobile app's custom in-app loading screen, shown right after the native OS launch screen
+// (which per Apple/Google guidelines must stay a static image and can't be swapped for this) —
+// see mobile/src/components/AppLoadingScreen.tsx for how the two hand off. System Admin/Super
+// Admin only, per mobileSplash.routes.ts's role check rather than the generic module-permission
+// system, since this needs to stay off-limits to plain Admin too (unlike every other "branding"
+// permission, which Admin already holds).
+model MobileSplashSettings {
+  id              Int                   @id @default(1)
+  enabled         Boolean               @default(false)
+  mediaType       MobileSplashMediaType @default(PHOTO)
+  mediaUrl        String?
+  backgroundColor String                @default("#0d1117")
+  // Floor on how long the custom screen stays up, so a fast-loading photo/gif doesn't just flash
+  // and vanish; videos still play to their own natural length on top of this floor.
+  minDisplayMs    Int                   @default(1500)
+  updatedById     Int?
+  updatedBy       User?                 @relation(fields: [updatedById], references: [id])
+  updatedAt       DateTime              @updatedAt
+}
+
 model AgentApiKey {
   id         Int       @id @default(autoincrement())
   key        String    @unique
@@ -2530,6 +2559,38 @@ model McpApiKey {
   isActive   Boolean   @default(true)
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
+}
+
+// Admin-issued credential for an external application to call this organization's REST API
+// gateway (/api/integrations/v1/*) — System Settings' and App Settings' "API Connections" card.
+// Unlike McpApiKey/AgentApiKey (a single opaque token compared directly), the secret here is
+// never stored in recoverable form: only its SHA-256 hash is kept (`secretHash`), and the
+// plaintext secret is shown to the admin exactly once, at creation. `apiKeyId` is the public
+// half (safe to log/display) used to look up the row and resolve the tenant schema via the
+// control-plane token index; the secret is the private half, sent by the caller and verified by
+// a timing-safe hash comparison. Permission is split per HTTP verb rather than a single
+// read/write flag so a connection can be scoped tightly (e.g. GET+POST only, no PATCH/DELETE).
+// `resources` names which resource families this key may touch (currently only "assets" has a
+// live gateway implementation — see apiIntegrations.routes.ts); it's a string array rather than
+// an enum so future resources don't need a migration to become grantable.
+model ApiConnection {
+  id          Int       @id @default(autoincrement())
+  name        String
+  apiKeyId    String    @unique
+  secretHash  String
+  resources   String[]  @default(["assets"])
+  canGet      Boolean   @default(true)
+  canPost     Boolean   @default(false)
+  canPut      Boolean   @default(false)
+  canPatch    Boolean   @default(false)
+  canDelete   Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdById Int
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  lastUsedAt  DateTime?
+  lastUsedIp  String?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
 }
 
 // ───────────────────────── Operations Tools ─────────────────────────
@@ -2598,6 +2659,9 @@ enum RecordAccessLevel {
   // Grants read access to a RESTRICTED record without also granting EDIT/DELETE — see
   // ProjectVisibility above for the first (and so far only) consumer of this level.
   VIEW
+  // Lets someone duplicate a record without also being able to edit or delete the original —
+  // consumed by Docs & SOPs and Knowledge Base's duplicate() handlers (see recordAccess.ts).
+  DUPLICATE
 }
 
 // App-wide creator/editor/delete-access grant system: any creator-owned record type (identified

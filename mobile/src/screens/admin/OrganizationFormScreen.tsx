@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { useToast } from "../../components/toast/ToastProvider";
 import { MoreStackParamList } from "../../navigation/types";
 
 interface OrganizationRow {
@@ -21,6 +22,7 @@ interface OrganizationRow {
 // branding like app icon/favicon is edited by switching into that org and using System Settings).
 export function OrganizationFormScreen() {
   const { colors, spacing, radius } = useTheme();
+  const { showToast } = useToast();
   const navigation = useNavigation();
   const route = useRoute<RouteProp<MoreStackParamList, "OrganizationForm">>();
   const queryClient = useQueryClient();
@@ -71,7 +73,7 @@ export function OrganizationFormScreen() {
       setLogoUrl(uploadRes.data.logoUrl);
       queryClient.invalidateQueries({ queryKey: ["mobile-app-settings-organizations"] });
     } catch {
-      Alert.alert("Upload failed", "Could not upload this logo.");
+      showToast({ variant: "error", title: "Upload failed", message: "Could not upload this logo." });
     } finally {
       setUploadingLogo(false);
     }

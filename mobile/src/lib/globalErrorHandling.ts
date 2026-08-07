@@ -1,22 +1,19 @@
-import { Alert } from "react-native";
+import { showGlobalToast } from "../components/toast/ToastProvider";
 
 // Catches everything that isn't already handled by a screen's own try/catch or a query/mutation's
 // own onError — a render error, a thrown exception outside of React's tree, or an unhandled
 // promise rejection would otherwise just silently fail or hard-crash with no feedback at all.
-// Surfaced via the platform's own alert (UIAlertController on iOS, AlertDialog on Android) rather
-// than an in-app toast, since by definition something has gone wrong that the normal UI can't be
-// trusted to render correctly.
 
 let lastAlertAt = 0;
 
 // A single bad render loop or a promise rejection inside a tight retry loop can otherwise queue
-// dozens of native alerts back to back — one every couple of seconds is plenty to inform without
+// dozens of toasts back to back — one every couple of seconds is plenty to inform without
 // making the app unusable while the underlying issue gets fixed.
 function showErrorAlert(title: string, message: string) {
   const now = Date.now();
   if (now - lastAlertAt < 2000) return;
   lastAlertAt = now;
-  Alert.alert(title, message, [{ text: "OK" }]);
+  showGlobalToast({ variant: "error", title, message });
 }
 
 function describeError(error: unknown): string {

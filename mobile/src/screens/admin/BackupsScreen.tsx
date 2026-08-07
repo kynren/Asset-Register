@@ -9,6 +9,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { ShimmerListItem } from "../../components/Shimmer";
+import { useToast } from "../../components/toast/ToastProvider";
 import { MoreStackParamList } from "../../navigation/types";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -63,6 +64,7 @@ function formatBytes(n: number | null): string {
 export function BackupsScreen() {
   const { colors, spacing, radius } = useTheme();
   const { hasPermission } = useAuth();
+  const { showToast } = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<MoreStackParamList>>();
   const queryClient = useQueryClient();
   const canEdit = hasPermission("app-settings", "edit");
@@ -85,7 +87,7 @@ export function BackupsScreen() {
     mutationFn: (values: BackupSettings) => axiosClient.put("/backups/settings", values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mobile-backup-settings"] });
-      Alert.alert("Backup schedule saved");
+      showToast({ variant: "success", title: "Backup schedule saved" });
     },
   });
   const runNowMutation = useMutation({

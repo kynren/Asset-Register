@@ -114,7 +114,7 @@ export function StockPage() {
           </PermissionGate>
           <button className="btn btn-secondary btn-sm btn-icon" title="View details / issue stock" onClick={() => setDetailItemId(row.original.id)}><Icon name="search" size={12} /></button>
           <button className="btn btn-secondary btn-sm btn-icon" title="Print QR label" onClick={() => setQrItem(row.original)}><Icon name="grid" size={12} /></button>
-          <PermissionGate module="stock" action="create">
+          <PermissionGate module="stock" action="duplicate">
             <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}><Icon name="paperclip" size={12} /></button>
           </PermissionGate>
         </div>

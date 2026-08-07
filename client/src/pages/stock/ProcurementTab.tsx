@@ -93,7 +93,7 @@ export function ProcurementTab() {
                   <td>{s.phone ?? "—"}</td>
                   <td>{s._count.purchaseOrders}</td>
                   <td>
-                    <PermissionGate module="stock" action="create">
+                    <PermissionGate module="stock" action="duplicate">
                       <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateSupplierMutation.mutate(s.id)}>
                         <Icon name="paperclip" size={12} />
                       </button>

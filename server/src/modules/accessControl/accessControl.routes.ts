@@ -346,7 +346,7 @@ router.delete("/devices/:id", requirePermission("access-control", "delete"), asy
 // ipAddress stays blank on the clone (same reasoning as NVR/Camera duplicate) — and since doors
 // are only ever discovered live from a real controller's IP, the clone starts with none until
 // someone sets its own address and runs Refresh Doors.
-router.post("/devices/:id/duplicate", requirePermission("access-control", "create"), async (req, res) => {
+router.post("/devices/:id/duplicate", requirePermission("access-control", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.accessControlDevice.findUnique({ where: { id } });
   if (!source) throw new ApiError(404, "Access control device not found");
@@ -819,7 +819,7 @@ router.delete("/persons/:id", requirePermission("access-control", "delete"), asy
 
 // Cards aren't copied — a PersonCard's cardNumber is a physical card's unique identity, and a
 // duplicate person hasn't been issued one yet.
-router.post("/persons/:id/duplicate", requirePermission("access-control", "create"), async (req, res) => {
+router.post("/persons/:id/duplicate", requirePermission("access-control", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.person.findUnique({ where: { id } });
   if (!source) throw new ApiError(404, "Person not found");
@@ -916,7 +916,7 @@ router.delete("/groups/:id", requirePermission("access-control", "delete"), asyn
   res.json({ ok: true });
 });
 
-router.post("/groups/:id/duplicate", requirePermission("access-control", "create"), async (req, res) => {
+router.post("/groups/:id/duplicate", requirePermission("access-control", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.accessGroup.findUnique({
     where: { id },

@@ -1,0 +1,49 @@
+{
+  "externalKey": "6d70c881-61d5-44b8-a4a8-9fd8170638b8",
+  "title": "REST API Integration & Security",
+  "docType": "SOP",
+  "category": "IT & Computing Systems",
+  "collectionName": "IT & Systems SOPs",
+  "summary": null,
+  "sections": {
+    "scope": "<p>Covers: issuing, using, and revoking an API Connection credential; the authentication scheme those credentials use; and the resources currently reachable through the gateway.</p><p>As of this writing the gateway (<code>/api/integrations/v1/*</code>) exposes one resource family, <strong>assets</strong> (GET list, GET by id, POST create, PUT full update, PATCH partial update, DELETE). Additional resources are added by extending <code>server/src/modules/apiIntegrations/apiIntegrations.routes.ts</code> and become selectable in the connection's <em>resources</em> list once wired up — they are not automatically granted to existing connections.</p><p>Out of scope: the in-app MCP Connection (a separate credential type for AI tool integrations, e.g. Claude Desktop) and the network relay agent's device key — both documented elsewhere.</p>",
+    "steps": [
+      {
+        "step": "<p>In the app, go to <strong>App Settings → Integrations</strong> (or <strong>Admin & Setup → System Settings</strong> — the same API Connections card appears on both).</p>"
+      },
+      {
+        "step": "<p>Under \"New connection\", enter a descriptive name (e.g. the name of the external system), tick the HTTP verbs it needs (GET is on by default; only enable POST/PUT/PATCH/DELETE if the integration genuinely needs to write), then click <strong>Create Connection</strong>.</p>"
+      },
+      {
+        "step": "<p>Copy the <code>Authorization: Bearer &lt;apiKeyId&gt;.&lt;secret&gt;</code> value shown in the one-time banner immediately — it is never shown again, and the server never stores the secret in a form it could show you a second time.</p>"
+      },
+      {
+        "step": "<p>Hand that bearer token to the integrator over a secure channel. They send it as a single <code>Authorization</code> header on every request — no request-signing or extra headers required.</p>"
+      },
+      {
+        "step": "<p>The integrator calls <code>https://&lt;your-domain&gt;/api/integrations/v1/assets</code> (and <code>/assets/:id</code>) with standard GET/POST/PUT/PATCH/DELETE, exactly as documented in the \"Example request\" box on the API Connections card.</p>"
+      },
+      {
+        "step": "<p>To change what a connection can do, tick/untick its verb checkboxes in the list — changes take effect on the connection's next call, no new credential needed.</p>"
+      },
+      {
+        "step": "<p>To retire a connection, click <strong>Revoke</strong> (keeps the record for audit history) or the trash icon to delete it outright. A revoked or deleted connection's credential stops working immediately.</p>"
+      },
+      {
+        "step": "<p>If a secret is suspected to have leaked, revoke the connection immediately and create a new one — there is no way to rotate a secret in place, by design (issuing a fresh credential is simpler and safer than trying to invalidate one specific leaked value while keeping the rest of a shared secret's history trustworthy).</p>"
+      }
+    ],
+    "purpose": "<p>This procedure covers the App Settings / System Settings <strong>API Connections</strong> feature, which lets an external application authenticate against this app's REST API gateway and read or write this organization's data over HTTPS, using an admin-issued credential rather than a user login.</p>",
+    "references": "<p>Admin UI: App Settings → Integrations, and Admin & Setup → System Settings (API Connections card).</p><p>Implementation: <code>server/src/modules/apiConnections/</code> (credential issuance) and <code>server/src/modules/apiIntegrations/</code> (the gateway itself). Auth middleware: <code>server/src/middleware/apiConnectionAuth.ts</code>.</p><p>Related: the MCP Connection card (same Integrations tab) documents the separate credential type used for AI-tool integrations, not covered by this SOP.</p>",
+    "safetyNotes": "<p><strong>How the credential is protected:</strong></p><ul><li>The secret is 256 bits of random data, generated server-side. Only its SHA-256 hash is ever stored — a database compromise alone cannot recover a usable credential.</li><li>Every gateway request is authenticated with a constant-time hash comparison, so response timing cannot be used to guess the secret one byte at a time.</li><li>HTTPS is required in production — the gateway rejects plain-HTTP requests outright, so the credential is never sent in the clear.</li><li>Each connection is rate-limited (120 requests/minute) to bound the damage a leaked or malfunctioning credential can do before it's noticed and revoked.</li><li>Every call is scoped both by HTTP verb (per-connection GET/POST/PUT/PATCH/DELETE flags) and by resource family (the connection's <code>resources</code> list) — a read-only integration should only ever be granted GET.</li><li>Every gateway call is written to the audit log (<code>external-api.&lt;verb&gt;</code>), and each connection records its last-used timestamp and source IP, visible on the API Connections card.</li></ul><p>Treat a connection's bearer token exactly like a password: never commit it to source control, never paste it into a chat channel, and grant only the verbs and resources the integration actually needs (least privilege).</p>",
+    "responsibilities": "<p>Only a <strong>System Admin</strong> or <strong>Super Admin</strong> (anyone holding the \"App Settings\" module's create/edit/delete permissions) can issue, modify, or revoke an API Connection — the same gate that already protects the rest of the App Settings / System Settings surface. The admin who creates a connection is responsible for handing the secret to the integrator through a secure channel (e.g. a password manager share, not email or chat) and for revoking it promptly if the integration is retired or the secret is suspected to have leaked.</p>"
+  },
+  "tags": [
+    "api",
+    "integrations",
+    "security"
+  ],
+  "isPublished": true,
+  "reviewDueDate": null,
+  "updatedAt": "2026-08-07T08:49:41.616Z"
+}
