@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { VaultEntry } from "../../types/vault";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -59,6 +60,7 @@ export function VaultFormScreen() {
   const canSubmit = title.trim().length > 0 && (editingId != null || password.trim().length > 0);
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -123,5 +125,6 @@ export function VaultFormScreen() {
         {mutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>{editingId ? "Save changes" : "Add vault entry"}</Text>}
       </TouchableOpacity>
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

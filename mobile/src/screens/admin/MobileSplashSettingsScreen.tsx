@@ -9,6 +9,7 @@ import { API_ORIGIN } from "../../config/env";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../components/toast/ToastProvider";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 
 type MediaType = "PHOTO" | "GIF" | "VIDEO";
 
@@ -119,6 +120,7 @@ export function MobileSplashSettingsScreen() {
   const previewUrl = form.mediaUrl ? `${API_ORIGIN}${form.mediaUrl}` : null;
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
       <View style={panel}>
         <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 8 }} onPress={() => setForm({ ...form, enabled: !form.enabled })}>
@@ -209,5 +211,6 @@ export function MobileSplashSettingsScreen() {
         {saveMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Save</Text>}
       </TouchableOpacity>
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }

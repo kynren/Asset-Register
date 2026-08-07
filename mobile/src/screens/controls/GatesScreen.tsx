@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ActivityIndicator, Alert, FlatList, Modal, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
@@ -249,7 +249,7 @@ function Net2ServerForm({
   const labelStyle = { color: colors.textMuted, fontSize: 11, fontWeight: "700" as const, textTransform: "uppercase" as const, marginBottom: 6, marginTop: spacing.sm };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#0008", justifyContent: "flex-end" }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "#0008", justifyContent: "flex-end" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, maxHeight: "88%" }}>
         <Text style={{ color: colors.text, fontSize: 16, fontWeight: "700" }}>{server ? `Edit "${server.name}"` : "Register Net2 Server"}</Text>
 
@@ -299,6 +299,6 @@ function Net2ServerForm({
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

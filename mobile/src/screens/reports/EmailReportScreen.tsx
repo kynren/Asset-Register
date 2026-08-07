@@ -5,6 +5,7 @@ import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from "reac
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { MoreStackParamList } from "../../navigation/types";
 
 function isValidEmail(v: string) {
@@ -41,6 +42,7 @@ export function EmailReportScreen() {
   const canSend = recipients.length > 0 && !emailMutation.isPending;
 
   return (
+    <KeyboardAvoidingScreen>
     <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.lg }}>
       {sent && (
         <View style={{ backgroundColor: colors.success + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -106,5 +108,6 @@ export function EmailReportScreen() {
         {emailMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>Send "{name}"</Text>}
       </TouchableOpacity>
     </View>
+    </KeyboardAvoidingScreen>
   );
 }

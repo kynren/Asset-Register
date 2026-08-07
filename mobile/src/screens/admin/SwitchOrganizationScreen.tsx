@@ -4,6 +4,7 @@ import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from "reac
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { MoreStackParamList } from "../../navigation/types";
 
 // Mirrors client/src/pages/appSettings/OrgSwitchConfirmModal.tsx — re-verifies the caller's own
@@ -37,6 +38,7 @@ export function SwitchOrganizationScreen() {
   const inputStyle = { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.text, backgroundColor: colors.surface };
 
   return (
+    <KeyboardAvoidingScreen>
     <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.lg }}>
       <Text style={{ color: colors.text, fontSize: 15, fontWeight: "700" }}>Switch to {route.params.name}?</Text>
       <Text style={{ color: colors.textMuted, fontSize: 12.5, marginTop: 6, marginBottom: spacing.lg }}>
@@ -82,5 +84,6 @@ export function SwitchOrganizationScreen() {
         {submitting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>Switch Organization</Text>}
       </TouchableOpacity>
     </View>
+    </KeyboardAvoidingScreen>
   );
 }

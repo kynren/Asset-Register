@@ -6,6 +6,7 @@ import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View 
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { KeyboardAvoidingScreen } from "../../components/KeyboardAvoidingScreen";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { ShimmerDetail } from "../../components/Shimmer";
 import { StockItem, StockItemType } from "../../types/stock";
@@ -89,6 +90,7 @@ export function StockFormScreen() {
   const locationLabel = locations?.find((l) => l.id === locationId)?.name ?? "None";
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg }}>
       {error && (
         <View style={{ backgroundColor: colors.danger + "22", borderRadius: radius.md, padding: 12, marginBottom: spacing.md }}>
@@ -128,6 +130,7 @@ export function StockFormScreen() {
       <PickerModal visible={openPicker === "type"} title="Type" options={typeOptions} selectedId={stockItemTypeId} allowClear searchable onSelect={(id) => setStockItemTypeId(id as number | null)} onClose={() => setOpenPicker(null)} />
       <PickerModal visible={openPicker === "location"} title="Location" options={locationOptions} selectedId={locationId} allowClear searchable onSelect={(id) => setLocationId(id as number | null)} onClose={() => setOpenPicker(null)} />
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }
 
