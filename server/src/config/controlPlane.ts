@@ -55,6 +55,12 @@ export async function bootstrapControlPlane(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  // System-Admin-only escalation for the external API gateway (see apiConnectionAuth.ts) — a token
+  // with this flag set still defaults to `schema_name` (its home/creating organization) unless the
+  // caller explicitly overrides it per-request via the X-Organization-Id header. Only "external-api"
+  // kind tokens ever set this true; every other kind (refresh/reset/magic/agent/mcp/invite) is
+  // created via registerToken's default of false and is unaffected.
+  await controlPlanePool.query(`ALTER TABLE public.token_index ADD COLUMN IF NOT EXISTS all_organizations BOOLEAN NOT NULL DEFAULT false;`);
 
   // Register the pre-existing `public` schema itself as Organization #1 — the app ran
   // single-tenant in `public` before multi-tenancy existed, so its data becomes the first
@@ -211,11 +217,11 @@ export async function registerAccount(email: string, schemaName: string, organiz
   );
 }
 
-export async function registerToken(token: string, schemaName: string, kind: string): Promise<void> {
+export async function registerToken(token: string, schemaName: string, kind: string, allOrganizations = false): Promise<void> {
   await controlPlanePool.query(
-    `INSERT INTO public.token_index (token, schema_name, kind) VALUES ($1, $2, $3)
-     ON CONFLICT (token) DO UPDATE SET schema_name = EXCLUDED.schema_name, kind = EXCLUDED.kind`,
-    [token, schemaName, kind]
+    `INSERT INTO public.token_index (token, schema_name, kind, all_organizations) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (token) DO UPDATE SET schema_name = EXCLUDED.schema_name, kind = EXCLUDED.kind, all_organizations = EXCLUDED.all_organizations`,
+    [token, schemaName, kind, allOrganizations]
   );
 }
 
@@ -225,6 +231,17 @@ export async function resolveTokenSchema(token: string): Promise<string | null> 
     [token]
   );
   return result.rows[0]?.schema_name ?? null;
+}
+
+// Used only by the external API gateway (verifyApiConnection) — every other token consumer just
+// needs the fixed home schema from resolveTokenSchema above.
+export async function resolveTokenScope(token: string): Promise<{ schemaName: string; allOrganizations: boolean } | null> {
+  const result = await controlPlanePool.query<{ schema_name: string; all_organizations: boolean }>(
+    `SELECT schema_name, all_organizations FROM public.token_index WHERE token = $1`,
+    [token]
+  );
+  const r = result.rows[0];
+  return r ? { schemaName: r.schema_name, allOrganizations: r.all_organizations } : null;
 }
 
 // Runs `fn` once per organization, each under its own tenant context, for background schedulers

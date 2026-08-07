@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { ApiConnection } from "@prisma/client";
 import { prisma, runWithTenant } from "../config/prisma";
-import { resolveTokenSchema } from "../config/controlPlane";
+import { getOrganizationById, resolveTokenScope } from "../config/controlPlane";
 import { hashSecret, timingSafeEqualHex } from "../lib/apiConnectionCrypto";
 import { logAudit } from "../lib/auditLogger";
 
@@ -63,28 +63,48 @@ export async function verifyApiConnection(req: ApiConnectionRequest, res: Respon
     return res.status(429).json({ error: "Rate limit exceeded. Try again shortly." });
   }
 
-  const schemaName = await resolveTokenSchema(apiKeyId);
-  if (!schemaName) return res.status(401).json({ error: "Invalid API credentials." });
+  const scope = await resolveTokenScope(apiKeyId);
+  if (!scope) return res.status(401).json({ error: "Invalid API credentials." });
 
-  await runWithTenant(schemaName, async () => {
-    const record = await prisma.apiConnection.findUnique({ where: { apiKeyId } });
-    if (!record || !record.isActive) return res.status(401).json({ error: "Invalid or revoked API credentials." });
+  // Identity (the ApiConnection row + its secret hash) always lives in the connection's home
+  // organization — resolved in its own tenant context, separately from whichever organization the
+  // actual resource call below ends up targeting.
+  const record = await runWithTenant(scope.schemaName, () => prisma.apiConnection.findUnique({ where: { apiKeyId } }));
+  if (!record || !record.isActive) return res.status(401).json({ error: "Invalid or revoked API credentials." });
 
-    if (!timingSafeEqualHex(hashSecret(secret), record.secretHash)) {
-      return res.status(401).json({ error: "Invalid API credentials." });
+  if (!timingSafeEqualHex(hashSecret(secret), record.secretHash)) {
+    return res.status(401).json({ error: "Invalid API credentials." });
+  }
+
+  const verbKey = VERB_PERMISSION[req.method];
+  if (!verbKey || !record[verbKey]) {
+    return res.status(403).json({ error: `This connection is not permitted to ${req.method}.` });
+  }
+
+  // Default target is always this connection's home organization. Only a connection explicitly
+  // scoped to "all organizations" (System Admin only, set at creation/edit — see
+  // apiConnections.routes.ts) may redirect a call elsewhere, and only when the caller explicitly
+  // asks via this header — omitting it always falls back to the home org. A connection that is
+  // NOT all-organizations scoped ignores this header entirely; it can never be redirected.
+  let targetSchema = scope.schemaName;
+  if (scope.allOrganizations) {
+    const orgIdHeader = req.header("x-organization-id");
+    if (orgIdHeader) {
+      const org = await getOrganizationById(Number(orgIdHeader));
+      if (!org) return res.status(400).json({ error: "Unknown organization in X-Organization-Id header." });
+      targetSchema = org.schemaName;
     }
+  }
 
-    const verbKey = VERB_PERMISSION[req.method];
-    if (!verbKey || !record[verbKey]) {
-      return res.status(403).json({ error: `This connection is not permitted to ${req.method}.` });
-    }
+  runWithTenant(scope.schemaName, () => prisma.apiConnection.update({ where: { id: record.id }, data: { lastUsedAt: new Date(), lastUsedIp: req.ip } })).catch(
+    () => undefined
+  );
+  logAudit({ action: `external-api.${req.method.toLowerCase()}`, entityType: "ApiConnection", entityId: record.id, metadata: { path: req.path, targetSchema } }).catch(
+    () => undefined
+  );
 
-    prisma.apiConnection.update({ where: { id: record.id }, data: { lastUsedAt: new Date(), lastUsedIp: req.ip } }).catch(() => undefined);
-    logAudit({ action: `external-api.${req.method.toLowerCase()}`, entityType: "ApiConnection", entityId: record.id, metadata: { path: req.path } }).catch(() => undefined);
-
-    req.apiConnection = record;
-    next();
-  });
+  req.apiConnection = record;
+  await runWithTenant(targetSchema, async () => next());
 }
 
 // Called by each resource route (e.g. the assets router) after verifyApiConnection has already

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
+import { useAuth } from "../../auth/AuthContext";
 import { Icon } from "../../components/Icon";
 import { copyToClipboard } from "../../lib/clipboard";
 
@@ -16,6 +17,7 @@ interface ApiConnection {
   canPatch: boolean;
   canDelete: boolean;
   isActive: boolean;
+  allOrganizations: boolean;
   lastUsedAt: string | null;
   lastUsedIp: string | null;
   createdAt: string;
@@ -34,7 +36,7 @@ const VERBS: { key: "canGet" | "canPost" | "canPut" | "canPatch" | "canDelete"; 
 // add an entry here (and a matching route) to make a new one selectable and show its endpoint.
 const RESOURCES: { key: string; label: string }[] = [{ key: "assets", label: "Assets" }];
 
-const DEFAULT_FORM = { name: "", resources: ["assets"] as string[], canGet: true, canPost: false, canPut: false, canPatch: false, canDelete: false };
+const DEFAULT_FORM = { name: "", resources: ["assets"] as string[], canGet: true, canPost: false, canPut: false, canPatch: false, canDelete: false, allOrganizations: false };
 
 // A little "endpoint + copy" row, reused for the live preview while picking data in the create
 // form and for each existing connection's granted resources in the list below.
@@ -55,6 +57,8 @@ function EndpointRow({ url, onCopy }: { url: string; onCopy: () => void }) {
 // (admin CRUD) and unlocks calls against /api/integrations/v1/* (the actual gateway other
 // applications call — see server/src/modules/apiIntegrations/apiIntegrations.routes.ts).
 export function ApiConnectionsCard() {
+  const { user } = useAuth();
+  const isSystemAdmin = user?.roleName === "System Admin";
   const queryClient = useQueryClient();
   const [form, setForm] = useState(DEFAULT_FORM);
   const [justCreated, setJustCreated] = useState<{ apiKeyId: string; bearerToken: string; resources: string[] } | null>(null);
@@ -138,6 +142,7 @@ export function ApiConnectionsCard() {
               </div>
               <div className="row gap-2" style={{ alignItems: "center" }}>
                 <span className={`badge ${c.isActive ? "badge-success" : "badge-neutral"}`}>{c.isActive ? "Active" : "Revoked"}</span>
+                {c.allOrganizations && <span className="badge badge-warning" title="Defaults to its home organization; a caller can target another via X-Organization-Id.">All organizations</span>}
                 <button className="btn btn-secondary btn-sm" onClick={() => toggleActiveMutation.mutate({ id: c.id, isActive: !c.isActive })}>
                   {c.isActive ? "Revoke" : "Reactivate"}
                 </button>
@@ -208,6 +213,13 @@ export function ApiConnectionsCard() {
             </label>
           ))}
         </div>
+        {isSystemAdmin && (
+          <label className="row gap-1" style={{ alignItems: "center", fontSize: 12, marginBottom: 10 }}>
+            <input type="checkbox" checked={form.allOrganizations} onChange={(e) => setForm((f) => ({ ...f, allOrganizations: e.target.checked }))} />
+            Allow this connection to access all organizations (defaults to this one; a caller can target another via the X-Organization-Id header)
+          </label>
+        )}
+
         <button
           className="btn btn-primary btn-sm"
           disabled={!form.name.trim() || !form.resources.length || createMutation.isPending}
