@@ -16,3 +16,14 @@ export const discoverNet2Schema = z.object({
   startIp: z.string().min(1),
   endIp: z.string().min(1),
 });
+
+export const createGateSchema = z.object({
+  name: z.string().min(1),
+  relayNumber: z.number().int().min(1),
+});
+
+export const updateGateSchema = createGateSchema.partial();
+
+export const gateControlSchema = z.object({
+  action: z.enum(["open", "close"]),
+});

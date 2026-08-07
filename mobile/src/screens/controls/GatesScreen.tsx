@@ -6,6 +6,19 @@ import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { ShimmerList } from "../../components/Shimmer";
+import { BottomSheet } from "../../components/BottomSheet";
+import { SwipeableRow } from "../../components/SwipeableRow";
+import { OpeningAnimation } from "../../components/OpeningAnimation";
+
+type GateState = "OPEN" | "CLOSED" | "UNKNOWN";
+
+interface Gate {
+  id: number;
+  name: string;
+  relayNumber: number;
+  state: GateState;
+  lastCheckedAt: string | null;
+}
 
 interface Net2Server {
   id: number;
@@ -19,11 +32,14 @@ interface Net2Server {
   status: "ONLINE" | "OFFLINE" | "UNKNOWN";
   lastCheckedAt: string | null;
   createdAt: string;
+  gates: Gate[];
 }
 interface DiscoveryCandidate {
   ipAddress: string;
   openPorts: number[];
 }
+
+const GATE_STATE_LABEL: Record<GateState, string> = { OPEN: "Open", CLOSED: "Closed", UNKNOWN: "Unknown" };
 
 const STATUS_COLOR: Record<string, string> = { ONLINE: "#22c55e", OFFLINE: "#ef4444", UNKNOWN: "#94a3b8" };
 
@@ -50,6 +66,14 @@ export function GatesScreen() {
   const [candidates, setCandidates] = useState<DiscoveryCandidate[] | null>(null);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
 
+  const [activeGate, setActiveGate] = useState<Gate | null>(null);
+  const [renamingGate, setRenamingGate] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [playKey, setPlayKey] = useState(0);
+  const [addGateServerId, setAddGateServerId] = useState<number | null>(null);
+  const [newGateName, setNewGateName] = useState("");
+  const [newGateRelay, setNewGateRelay] = useState("");
+
   const { data: servers, isLoading } = useQuery({
     queryKey: ["mobile-gates-servers"],
     queryFn: async () => (await axiosClient.get("/gates/servers")).data as Net2Server[],
@@ -75,6 +99,52 @@ export function GatesScreen() {
       { text: "Remove", style: "destructive", onPress: () => deleteMutation.mutate(server.id) },
     ]);
   }
+
+  const gateControlMutation = useMutation({
+    mutationFn: ({ id, action }: { id: number; action: "open" | "close" }) => axiosClient.post(`/gates/gates/${id}/control`, { action }),
+    onMutate: () => setPlayKey((k) => k + 1),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["mobile-gates-servers"] });
+      if (!res.data.ok) Alert.alert("Command failed", res.data.message ?? "The Net2 server rejected this command.");
+    },
+    onError: (err: any) => Alert.alert("Command failed", err?.response?.data?.error ?? "Could not reach the Net2 server."),
+  });
+
+  const renameGateMutation = useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) => axiosClient.patch(`/gates/gates/${id}`, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mobile-gates-servers"] });
+      setRenamingGate(false);
+      setActiveGate(null);
+    },
+  });
+
+  const deleteGateMutation = useMutation({
+    mutationFn: (id: number) => axiosClient.delete(`/gates/gates/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mobile-gates-servers"] });
+      setActiveGate(null);
+    },
+  });
+
+  const createGateMutation = useMutation({
+    mutationFn: () => axiosClient.post(`/gates/servers/${addGateServerId}/gates`, { name: newGateName.trim(), relayNumber: Number(newGateRelay) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mobile-gates-servers"] });
+      setAddGateServerId(null);
+      setNewGateName("");
+      setNewGateRelay("");
+    },
+  });
+
+  function confirmDeleteGate(gate: Gate) {
+    Alert.alert("Delete Gate", `Delete "${gate.name}"? This cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => deleteGateMutation.mutate(gate.id) },
+    ]);
+  }
+
+  const gateTone = (state: GateState) => (state === "UNKNOWN" ? colors.textMuted : state === "OPEN" ? colors.danger : colors.success);
 
   const canCreate = hasPermission("gates", "create");
   const canEdit = hasPermission("gates", "edit");
@@ -139,6 +209,43 @@ export function GatesScreen() {
                 {canDelete && (
                   <TouchableOpacity style={{ width: 40, alignItems: "center", justifyContent: "center", borderRadius: radius.md, borderWidth: 1, borderColor: colors.danger }} onPress={() => confirmDelete(item)}>
                     <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={{ marginTop: spacing.sm, gap: 6 }}>
+                {item.gates.map((gate) => (
+                  <SwipeableRow
+                    key={gate.id}
+                    disabled={!canEdit}
+                    onSwipeRight={() => gateControlMutation.mutate({ id: gate.id, action: "open" })}
+                    onSwipeLeft={() => gateControlMutation.mutate({ id: gate.id, action: "close" })}
+                    rightLabel="Open"
+                    leftLabel="Close"
+                    rightIcon="lock-open-outline"
+                    leftIcon="lock-closed-outline"
+                  >
+                    <TouchableOpacity
+                      style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.bg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: 10 }}
+                      onPress={() => setActiveGate(gate)}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.text, fontSize: 13, fontWeight: "600" }}>{gate.name}</Text>
+                        <Text style={{ color: colors.textMuted, fontSize: 10.5, marginTop: 1 }}>Relay {gate.relayNumber}</Text>
+                      </View>
+                      <View style={{ backgroundColor: gateTone(gate.state) + "22", borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3 }}>
+                        <Text style={{ color: gateTone(gate.state), fontSize: 10.5, fontWeight: "700" }}>{GATE_STATE_LABEL[gate.state]}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </SwipeableRow>
+                ))}
+                {canCreate && (
+                  <TouchableOpacity
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderStyle: "dashed", borderRadius: radius.md, paddingVertical: 8 }}
+                    onPress={() => setAddGateServerId(item.id)}
+                  >
+                    <Ionicons name="add" size={14} color={colors.textMuted} />
+                    <Text style={{ color: colors.textMuted, fontSize: 11.5, fontWeight: "700" }}>Add Gate</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -208,6 +315,109 @@ export function GatesScreen() {
           onSaved={() => { setShowForm(false); setEditing(null); setPrefill(null); queryClient.invalidateQueries({ queryKey: ["mobile-gates-servers"] }); }}
         />
       </Modal>
+
+      <BottomSheet
+        visible={!!activeGate}
+        onClose={() => { setActiveGate(null); setRenamingGate(false); }}
+        title={activeGate?.name}
+      >
+        {activeGate && (
+          <View style={{ gap: spacing.sm }}>
+            <View style={{ alignItems: "center", marginBottom: spacing.sm }}>
+              <OpeningAnimation kind="gate" playKey={playKey} active={activeGate.state === "OPEN"} size={52} />
+            </View>
+
+            {canEdit && (
+              <>
+                <TouchableOpacity
+                  disabled={gateControlMutation.isPending}
+                  onPress={() => gateControlMutation.mutate({ id: activeGate.id, action: "open" })}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.bg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md }}
+                >
+                  <Ionicons name="lock-open-outline" size={18} color={colors.primary} />
+                  <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>Open</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  disabled={gateControlMutation.isPending}
+                  onPress={() => gateControlMutation.mutate({ id: activeGate.id, action: "close" })}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.bg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md }}
+                >
+                  <Ionicons name="lock-closed-outline" size={18} color={colors.primary} />
+                  <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>Close</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {renamingGate ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: spacing.sm }}>
+                <TextInput
+                  style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.text, backgroundColor: colors.bg }}
+                  value={renameValue}
+                  onChangeText={setRenameValue}
+                  autoFocus
+                />
+                <TouchableOpacity
+                  disabled={renameGateMutation.isPending || !renameValue.trim()}
+                  onPress={() => renameGateMutation.mutate({ id: activeGate.id, name: renameValue.trim() })}
+                  style={{ backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10 }}
+                >
+                  {renameGateMutation.isPending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12.5 }}>Save</Text>}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              canEdit && (
+                <TouchableOpacity
+                  style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: spacing.sm, marginTop: spacing.xs }}
+                  onPress={() => { setRenameValue(activeGate.name); setRenamingGate(true); }}
+                >
+                  <Ionicons name="pencil-outline" size={17} color={colors.text} />
+                  <Text style={{ color: colors.text, fontSize: 13.5, fontWeight: "600" }}>Rename Gate</Text>
+                </TouchableOpacity>
+              )
+            )}
+
+            {canDelete && (
+              <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: spacing.sm }} onPress={() => confirmDeleteGate(activeGate)}>
+                <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                <Text style={{ color: colors.danger, fontSize: 13.5, fontWeight: "600" }}>Delete Gate</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </BottomSheet>
+
+      <BottomSheet visible={addGateServerId != null} onClose={() => setAddGateServerId(null)} title="Add Gate">
+        <View style={{ gap: spacing.md }}>
+          <View>
+            <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "700", marginBottom: 8, textTransform: "uppercase" }}>Gate Name</Text>
+            <TextInput
+              style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.text, backgroundColor: colors.bg }}
+              placeholder="e.g. Main Barrier"
+              placeholderTextColor={colors.textMuted}
+              value={newGateName}
+              onChangeText={setNewGateName}
+            />
+          </View>
+          <View>
+            <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "700", marginBottom: 8, textTransform: "uppercase" }}>Relay Number</Text>
+            <TextInput
+              style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.text, backgroundColor: colors.bg }}
+              placeholder="e.g. 1"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="numeric"
+              value={newGateRelay}
+              onChangeText={setNewGateRelay}
+            />
+          </View>
+          <TouchableOpacity
+            disabled={!newGateName.trim() || !newGateRelay.trim() || createGateMutation.isPending}
+            onPress={() => createGateMutation.mutate()}
+            style={{ backgroundColor: colors.primary, borderRadius: radius.md, alignItems: "center", paddingVertical: 13, opacity: !newGateName.trim() || !newGateRelay.trim() ? 0.5 : 1 }}
+          >
+            {createGateMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700" }}>Create Gate</Text>}
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
     </View>
   );
 }

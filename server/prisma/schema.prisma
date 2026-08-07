@@ -1853,6 +1853,26 @@ model Net2Server {
   createdById       Int
   createdBy         User         @relation(fields: [createdById], references: [id])
   createdAt         DateTime     @default(now())
+  gates             Gate[]
+}
+
+enum GateState {
+  OPEN
+  CLOSED
+  UNKNOWN
+}
+
+model Gate {
+  id            Int        @id @default(autoincrement())
+  net2ServerId  Int
+  net2Server    Net2Server @relation(fields: [net2ServerId], references: [id], onDelete: Cascade)
+  name          String
+  relayNumber   Int
+  state         GateState  @default(UNKNOWN)
+  lastCheckedAt DateTime?
+  createdAt     DateTime   @default(now())
+
+  @@unique([net2ServerId, relayNumber])
 }
 
 model AccessControlDevice {
