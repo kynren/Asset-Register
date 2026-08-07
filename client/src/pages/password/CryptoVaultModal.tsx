@@ -3,6 +3,7 @@ import { axiosClient } from "../../api/axiosClient";
 import { Icon } from "../../components/Icon";
 import { useAuth } from "../../auth/AuthContext";
 import { useBranding } from "../../theme/BrandingContext";
+import { pushToast } from "../../lib/toastBridge";
 
 type Stage = "decrypting" | "revealed" | "encrypting";
 
@@ -125,6 +126,7 @@ export function CryptoVaultModal({
   async function copyPlaintext() {
     if (!plaintext) return;
     await navigator.clipboard.writeText(plaintext);
+    pushToast({ variant: "success", message: "Password copied to clipboard" });
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   }

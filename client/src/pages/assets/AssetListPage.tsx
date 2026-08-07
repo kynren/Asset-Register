@@ -4,6 +4,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { NavigateFunction, useNavigate, useSearchParams } from "react-router-dom";
 import { axiosClient } from "../../api/axiosClient";
+import { copyToClipboard } from "../../lib/clipboard";
 import { DataTable } from "../../components/DataTable";
 import { Icon } from "../../components/Icon";
 import { CsvExportButton } from "../../components/CsvButtons";
@@ -210,7 +211,7 @@ export function AssetListPage() {
   }
 
   async function copyShareLink(asset: Asset) {
-    await navigator.clipboard.writeText(`${window.location.origin}/assets/${asset.id}`);
+    await copyToClipboard(`${window.location.origin}/assets/${asset.id}`, "Share link copied to clipboard");
   }
 
   async function downloadJson() {

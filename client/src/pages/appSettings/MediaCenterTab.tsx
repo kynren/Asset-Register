@@ -9,6 +9,7 @@ import { Skeleton } from "../../components/Skeleton";
 import { FilePreview } from "../../components/FilePreview";
 import { ChipSelect } from "../../components/ChipSelect";
 import { usePermission } from "../../auth/PermissionGate";
+import { copyToClipboard } from "../../lib/clipboard";
 
 interface MediaAsset {
   id: number;
@@ -176,7 +177,7 @@ function MediaLibrarySection() {
             </div>
             <div className="row gap-2">
               <input className="input" readOnly value={selected.url} onClick={(e) => (e.target as HTMLInputElement).select()} />
-              <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(window.location.origin + selected.url)}>
+              <button className="btn btn-secondary btn-sm" onClick={() => copyToClipboard(window.location.origin + selected.url, "URL copied to clipboard")}>
                 <Icon name="link" size={13} /> Copy URL
               </button>
             </div>
@@ -306,7 +307,7 @@ function AttachedPreviewModal({
         {item.url && (
           <div className="row gap-2">
             <input className="input" readOnly value={item.url} onClick={(e) => (e.target as HTMLInputElement).select()} />
-            <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(window.location.origin + item.url!)}>
+            <button className="btn btn-secondary btn-sm" onClick={() => copyToClipboard(window.location.origin + item.url!, "URL copied to clipboard")}>
               <Icon name="link" size={13} /> Copy URL
             </button>
           </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "../components/Icon";
 import { detectBrowser, detectOS } from "../lib/userAgent";
+import { copyToClipboard } from "../lib/clipboard";
 import { useClientInfo } from "../hooks/useClientInfo";
 
 interface ClientInfoModalProps {
@@ -58,7 +59,7 @@ export function ClientInfoModal({ onClose }: ClientInfoModalProps) {
   ].join("\n");
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(specsText);
+    await copyToClipboard(specsText, "Specs copied to clipboard");
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   }
