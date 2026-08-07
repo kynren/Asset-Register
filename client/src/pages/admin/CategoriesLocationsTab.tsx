@@ -78,7 +78,7 @@ function SimpleListManager({ title, url, queryKey, extraField }: { title: string
               <Icon name="edit" size={13} />
             </button>
           </PermissionGate>
-          <PermissionGate module="admin" action="create">
+          <PermissionGate module="admin" action="duplicate">
             <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
               <Icon name="paperclip" size={13} />
             </button>

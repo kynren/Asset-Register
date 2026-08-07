@@ -1,6 +1,7 @@
 import { Component, ReactNode } from "react";
-import { Alert, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import { useTheme } from "../theme/ThemeContext";
+import { showGlobalToast } from "./toast/ToastProvider";
 
 interface Props {
   children: ReactNode;
@@ -30,9 +31,9 @@ function ErrorBoundaryFallback({ onRetry }: { onRetry: () => void }) {
 
 // Catches render-time errors anywhere below it in the tree — the one class of crash React's own
 // error handling can surface, but that ErrorUtils/promise rejection tracking (globalErrorHandling.ts)
-// can't, since those only see errors thrown outside of a render pass. Shown as a native Alert to
-// match the rest of the app's uncaught-error handling, then falls back to a themed recovery screen
-// (Alert alone can't replace the crashed tree — something has to render in its place).
+// can't, since those only see errors thrown outside of a render pass. Surfaced via the same toast
+// used for the rest of the app's uncaught-error handling, then falls back to a themed recovery
+// screen (the toast alone can't replace the crashed tree — something has to render in its place).
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false };
 
@@ -41,7 +42,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error) {
-    Alert.alert("Something Went Wrong", error.message || "An unexpected error occurred.", [{ text: "OK" }]);
+    showGlobalToast({ variant: "error", title: "Something Went Wrong", message: error.message || "An unexpected error occurred." });
   }
 
   reset = () => this.setState({ hasError: false });

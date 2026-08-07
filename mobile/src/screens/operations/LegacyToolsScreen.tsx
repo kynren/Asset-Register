@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { useToast } from "../../components/toast/ToastProvider";
 import { downloadAndShare } from "../../lib/downloadFile";
 
 const STATUS_OPTIONS = ["IN_USE", "IN_STORAGE", "IN_REPAIR", "RETIRED", "LOST"];
@@ -17,6 +18,7 @@ const REPORTS = [
 
 export function LegacyToolsScreen() {
   const { colors, spacing, radius } = useTheme();
+  const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [bulkStatus, setBulkStatus] = useState("IN_STORAGE");
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
@@ -63,7 +65,7 @@ export function LegacyToolsScreen() {
     try {
       await downloadAndShare(`/operations/reports/${type}`, `${type}-report.${format}`, { format });
     } catch {
-      Alert.alert("Download failed", "Could not generate the report. Try again.");
+      showToast({ variant: "error", title: "Download failed", message: "Could not generate the report. Try again." });
     } finally {
       setDownloading(null);
     }

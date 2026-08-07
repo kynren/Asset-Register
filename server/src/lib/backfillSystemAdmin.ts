@@ -22,7 +22,7 @@ export async function backfillSystemAdmin(): Promise<void> {
       },
     });
     await prisma.rolePermission.createMany({
-      data: MODULES.map((module) => ({ roleId: role!.id, module, canView: true, canCreate: true, canEdit: true, canDelete: true, canExport: true, canImport: true })),
+      data: MODULES.map((module) => ({ roleId: role!.id, module, canView: true, canCreate: true, canEdit: true, canDelete: true, canExport: true, canImport: true, canDuplicate: true })),
     });
   }
 

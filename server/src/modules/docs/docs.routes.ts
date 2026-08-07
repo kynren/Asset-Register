@@ -47,7 +47,7 @@ router.get("/:id/export", requirePermission("docs", "view"), controller.exportDo
 router.post("/", requirePermission("docs", "create"), validateBody(createDocumentSchema), controller.create);
 router.patch("/:id", requirePermission("docs", "edit"), validateBody(updateDocumentSchema), controller.update);
 router.delete("/:id", requirePermission("docs", "delete"), controller.remove);
-router.post("/:id/duplicate", requirePermission("docs", "create"), controller.duplicate);
+router.post("/:id/duplicate", requirePermission("docs", "duplicate"), controller.duplicate);
 router.post("/:id/attachments", requirePermission("docs", "edit"), attachmentUpload.single("file"), controller.uploadAttachment);
 router.get("/:id/attachments/:attachmentId/file", requirePermission("docs", "view"), controller.downloadAttachment);
 router.delete("/:id/attachments/:attachmentId", requirePermission("docs", "edit"), controller.removeAttachment);

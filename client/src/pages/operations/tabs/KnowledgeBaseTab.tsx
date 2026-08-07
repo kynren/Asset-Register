@@ -7,7 +7,7 @@ import { FormModal } from "../../../components/FormModal";
 import { PermissionGate } from "../../../auth/PermissionGate";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { SkeletonText } from "../../../components/Skeleton";
-import { AccessGrant, AccessGrantPicker, AccessLevel, ManageAccessModal, canDeleteRecord, canEditRecord, canManageRecordAccess } from "../../../components/AccessControl";
+import { AccessGrant, AccessGrantPicker, AccessLevel, ManageAccessModal, canDeleteRecord, canDuplicateRecord, canEditRecord, canManageRecordAccess } from "../../../components/AccessControl";
 import { useAuth } from "../../../auth/AuthContext";
 
 interface Article {
@@ -69,6 +69,7 @@ export function KnowledgeBaseTab() {
           {articles.map((a) => {
             const canEdit = !!user && canEditRecord(a.createdById, a.access, user.id, user.roleName, myTeamIds);
             const canDelete = !!user && canDeleteRecord(a.createdById, a.access, user.id, user.roleName, myTeamIds);
+            const canDuplicate = !!user && canDuplicateRecord(a.createdById, a.access, user.id, user.roleName, myTeamIds);
             const canManageAccess = !!user && canManageRecordAccess(a.createdById, user.id, user.roleName);
             return (
               <div key={a.id} className="ot-item">
@@ -84,9 +85,11 @@ export function KnowledgeBaseTab() {
                     {canManageAccess && (
                       <button className="ad-btn" title="Manage Access" onClick={() => setManagingAccessId(a.id)}><Icon name="profile" size={12} /> {a.access.length}</button>
                     )}
-                    <PermissionGate module="operations" action="create">
-                      <button className="ad-btn" title="Duplicate" onClick={() => duplicateMutation.mutate(a.id)}><Icon name="paperclip" size={12} /></button>
-                    </PermissionGate>
+                    {canDuplicate && (
+                      <PermissionGate module="operations" action="duplicate">
+                        <button className="ad-btn" title="Duplicate" onClick={() => duplicateMutation.mutate(a.id)}><Icon name="paperclip" size={12} /></button>
+                      </PermissionGate>
+                    )}
                     {canEdit && (
                       <button className="ad-btn" title="Edit" onClick={() => setEditing(a)}><Icon name="edit" size={12} /></button>
                     )}
@@ -117,6 +120,7 @@ export function KnowledgeBaseTab() {
           users={users ?? []}
           teams={teams ?? []}
           queryKey={QUERY_KEY}
+          levels={["EDIT", "DELETE", "DUPLICATE"]}
           onClose={() => setManagingAccessId(null)}
         />
       )}
@@ -160,7 +164,7 @@ function ArticleFormModal({ initial, users, teams, onClose }: { initial: Article
       <div className="field"><label>Title *</label><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} /></div>
       <div className="field"><label>Category</label><input className="input" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Networking" /></div>
       <div className="field"><label>Content *</label><textarea className="input" rows={8} value={content} onChange={(e) => setContent(e.target.value)} /></div>
-      {!initial && <AccessGrantPicker users={users} teams={teams} value={newAccess} onChange={setNewAccess} />}
+      {!initial && <AccessGrantPicker users={users} teams={teams} value={newAccess} onChange={setNewAccess} levels={["EDIT", "DELETE", "DUPLICATE"]} />}
     </FormModal>
   );
 }

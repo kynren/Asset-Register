@@ -14,6 +14,9 @@ import { useTheme } from "../../theme/ThemeContext";
 import { StatusBadge } from "../../components/StatusBadge";
 import { TicketPriorityPill, TicketStatusPill } from "../../components/TicketPills";
 import { ShimmerDetail } from "../../components/Shimmer";
+import { CommentThread } from "../../components/CommentThread";
+import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { useToast } from "../../components/toast/ToastProvider";
 import { Asset, AssetCheckout, AssetPhoto, AssetTicketRef } from "../../types/asset";
 import { AssetsStackParamList } from "../../navigation/types";
 import { buildMediaFormData, isVideo, pickAssetMedia } from "../../lib/mediaPicker";
@@ -50,16 +53,24 @@ function RowList({ rows, colors }: { rows: [string, string][]; colors: any }) {
 export function AssetDetailScreen() {
   const { colors, spacing, radius } = useTheme();
   const { hasPermission } = useAuth();
+  const { showToast } = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<AssetsStackParamList>>();
   const route = useRoute<RouteProp<AssetsStackParamList, "AssetDetail">>();
   const { id } = route.params;
   const queryClient = useQueryClient();
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [checkoutPickerOpen, setCheckoutPickerOpen] = useState(false);
 
-  const { data: asset, isLoading } = useQuery({
+  const { data: asset, isLoading, isError, refetch: refetchAsset } = useQuery({
     queryKey: ["mobile-asset", id],
     queryFn: async () => (await axiosClient.get(`/assets/${id}`)).data as Asset,
+  });
+
+  const { data: directoryUsers } = useQuery({
+    queryKey: ["mobile-users-directory"],
+    queryFn: async () => (await axiosClient.get("/users/directory")).data as { id: number; firstName: string; lastName: string }[],
+    enabled: hasPermission("assets", "edit"),
   });
 
   const { data: photos } = useQuery({
@@ -80,6 +91,21 @@ export function AssetDetailScreen() {
   const deletePhotoMutation = useMutation({
     mutationFn: (photoId: number) => axiosClient.delete(`/asset-resources/${id}/photos/${photoId}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mobile-asset-photos", id] }),
+  });
+
+  const checkoutMutation = useMutation({
+    mutationFn: (checkedOutToId: number) => axiosClient.post(`/assets/${id}/checkout`, { checkedOutToId, dueBackAt: null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mobile-asset-checkouts", id] });
+      setCheckoutPickerOpen(false);
+    },
+    onError: (err: any) => showToast({ variant: "error", title: "Couldn't check out", message: err?.response?.data?.error ?? "Please try again." }),
+  });
+
+  const checkinMutation = useMutation({
+    mutationFn: () => axiosClient.post(`/assets/${id}/checkin`, {}),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mobile-asset-checkouts", id] }),
+    onError: (err: any) => showToast({ variant: "error", title: "Couldn't check in", message: err?.response?.data?.error ?? "Please try again." }),
   });
 
   const deleteMutation = useMutation({
@@ -104,7 +130,7 @@ export function AssetDetailScreen() {
     try {
       for (const media of picked) await uploadPhotoMutation.mutateAsync(buildMediaFormData(media));
     } catch {
-      Alert.alert("Upload failed", "Couldn't upload one or more files.");
+      showToast({ variant: "error", title: "Upload failed", message: "Couldn't upload one or more files." });
     } finally {
       setUploadingMedia(false);
     }
@@ -137,8 +163,24 @@ export function AssetDetailScreen() {
     });
   }, [navigation, asset, id, colors.primary]);
 
-  if (isLoading || !asset) {
+  if (isLoading) {
     return <ShimmerDetail />;
+  }
+
+  if (isError || !asset) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg, padding: spacing.xl }}>
+        <Ionicons name="cloud-offline-outline" size={40} color={colors.textMuted} />
+        <Text style={{ color: colors.text, fontSize: 15, fontWeight: "700", marginTop: spacing.md, textAlign: "center" }}>Couldn't load this asset</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4, textAlign: "center" }}>Check your connection and try again.</Text>
+        <TouchableOpacity
+          style={{ backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: 20, paddingVertical: 12, marginTop: spacing.lg }}
+          onPress={() => refetchAsset()}
+        >
+          <Text style={{ color: "#fff", fontWeight: "700" }}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   const overviewRows: [string, string][] = [
@@ -152,9 +194,20 @@ export function AssetDetailScreen() {
     ["Model", asset.model],
     ["Serial number", asset.serialNumber],
     ["Supplier", asset.supplier],
+    ["Invoice number", asset.invoiceNumber],
     ["Purchase date", asset.purchaseDate ? dayjs(asset.purchaseDate).format("DD MMM YYYY") : null],
     ["Purchase cost", asset.purchaseCost != null ? `£${asset.purchaseCost}` : null],
     ["Warranty expires", asset.warrantyExpiresAt ? dayjs(asset.warrantyExpiresAt).format("DD MMM YYYY") : null],
+    ["Next service date", asset.nextServiceDate ? dayjs(asset.nextServiceDate).format("DD MMM YYYY") : null],
+    ["Power", asset.gridPowered ? "Grid-powered" : "Battery / backup"],
+    ["Sign-off status", asset.signOffStatus === "CONFIRMED" ? "Confirmed" : "Pending"],
+  ].filter(([, v]) => v !== null && v !== undefined) as [string, string][];
+
+  const networkSettingsRows: [string, string][] = [
+    ["Static IP", asset.staticIpAddress],
+    ["Subnet mask", asset.subnetMask],
+    ["Default gateway", asset.defaultGateway],
+    ["DNS servers", asset.dnsServers],
   ].filter(([, v]) => v !== null && v !== undefined) as [string, string][];
 
   const customFieldRows: [string, string][] = asset.customFieldValues
@@ -171,16 +224,21 @@ export function AssetDetailScreen() {
         ["CPU", device.cpu],
         ["RAM", device.ramGb ? `${device.ramGb} GB` : null],
         ["Logged-in user", device.loggedInUser],
+        ["Last login", device.lastLoginAt ? dayjs(device.lastLoginAt).format("DD MMM YYYY HH:mm") : null],
         ["Last seen", device.lastSeen ? dayjs(device.lastSeen).format("DD MMM YYYY HH:mm") : null],
         ["Battery", device.batteryPresent ? `${device.batteryPercent ?? "—"}%${device.batteryCharging ? " (charging)" : ""}` : null],
       ].filter(([, v]) => v !== null && v !== undefined) as [string, string][])
     : [];
 
   const tickets = asset.tickets ?? [];
+  const userOptions: PickerOption[] = (directoryUsers ?? []).map((u) => ({ id: u.id, label: `${u.firstName} ${u.lastName}` }));
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
       <View style={{ alignItems: "center", backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg }}>
+        {asset.featuredImageUrl && (
+          <Image source={{ uri: `${API_ORIGIN}${asset.featuredImageUrl}` }} style={{ width: 120, height: 120, borderRadius: radius.md, marginBottom: spacing.md }} resizeMode="cover" />
+        )}
         <QRCode value={asset.assetTag} size={140} backgroundColor={colors.surface} color={colors.text} />
         <Text style={{ color: colors.text, fontSize: 16, fontWeight: "800", marginTop: spacing.md }}>{asset.name}</Text>
         <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 2 }}>{asset.assetTag}</Text>
@@ -211,18 +269,64 @@ export function AssetDetailScreen() {
         </Section>
       )}
 
-      {activeCheckout && (
+      {networkSettingsRows.length > 0 && (
+        <Section title="Network Settings" colors={colors} spacing={spacing}>
+          <RowList rows={networkSettingsRows} colors={colors} />
+        </Section>
+      )}
+
+      {hasPermission("assets", "edit") && (
         <Section title="Checkout Status" colors={colors} spacing={spacing}>
-          <RowList
-            rows={
-              [
-                ["Checked out to", activeCheckout.checkedOutTo ? `${activeCheckout.checkedOutTo.firstName} ${activeCheckout.checkedOutTo.lastName}` : "—"],
-                ["Checked out", dayjs(activeCheckout.checkedOutAt).format("DD MMM YYYY")],
-                ["Due back", activeCheckout.dueBackAt ? dayjs(activeCheckout.dueBackAt).format("DD MMM YYYY") : "—"],
-              ] as [string, string][]
-            }
-            colors={colors}
-          />
+          {activeCheckout ? (
+            <View style={{ gap: spacing.sm }}>
+              <RowList
+                rows={
+                  [
+                    ["Checked out to", activeCheckout.checkedOutTo ? `${activeCheckout.checkedOutTo.firstName} ${activeCheckout.checkedOutTo.lastName}` : "—"],
+                    ["Checked out", dayjs(activeCheckout.checkedOutAt).format("DD MMM YYYY")],
+                    ["Due back", activeCheckout.dueBackAt ? dayjs(activeCheckout.dueBackAt).format("DD MMM YYYY") : "—"],
+                  ] as [string, string][]
+                }
+                colors={colors}
+              />
+              <TouchableOpacity
+                style={{ borderWidth: 1.5, borderColor: colors.danger, borderRadius: radius.md, alignItems: "center", paddingVertical: 12, opacity: checkinMutation.isPending ? 0.6 : 1 }}
+                disabled={checkinMutation.isPending}
+                onPress={() => checkinMutation.mutate()}
+              >
+                <Text style={{ color: colors.danger, fontWeight: "700" }}>{checkinMutation.isPending ? "Checking in..." : "Check In"}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={{ backgroundColor: colors.primary, borderRadius: radius.md, alignItems: "center", paddingVertical: 12 }}
+              onPress={() => setCheckoutPickerOpen(true)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>Check Out</Text>
+            </TouchableOpacity>
+          )}
+        </Section>
+      )}
+
+      {!!checkouts?.length && (
+        <Section title="Checkout History" colors={colors} spacing={spacing}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.lg }}>
+            {checkouts.map((c, i, arr) => (
+              <View key={c.id} style={{ paddingVertical: 12, borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ color: colors.text, fontSize: 13, fontWeight: "600" }}>
+                    {c.checkedOutTo ? `${c.checkedOutTo.firstName} ${c.checkedOutTo.lastName}` : "—"}
+                  </Text>
+                  <Text style={{ color: c.checkedInAt ? colors.textMuted : colors.success, fontSize: 11, fontWeight: "700" }}>{c.checkedInAt ? "Returned" : "Active"}</Text>
+                </View>
+                <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                  Out {dayjs(c.checkedOutAt).format("DD MMM YYYY")}
+                  {c.dueBackAt ? ` · Due ${dayjs(c.dueBackAt).format("DD MMM YYYY")}` : ""}
+                  {c.checkedInAt ? ` · Returned ${dayjs(c.checkedInAt).format("DD MMM YYYY")}` : ""}
+                </Text>
+              </View>
+            ))}
+          </View>
         </Section>
       )}
 
@@ -274,6 +378,10 @@ export function AssetDetailScreen() {
         </Section>
       ) : null}
 
+      <Section title="Comments" colors={colors} spacing={spacing}>
+        <CommentThread entityType="Asset" entityId={asset.id} />
+      </Section>
+
       <Section title={`Tickets, Problems & Issues${tickets.length ? ` (${tickets.length})` : ""}`} colors={colors} spacing={spacing}>
         {tickets.length === 0 ? (
           <Text style={{ color: colors.textMuted, fontSize: 12.5 }}>No tickets linked to this asset.</Text>
@@ -315,6 +423,15 @@ export function AssetDetailScreen() {
       )}
 
       <MediaViewerModal url={viewerUrl} onClose={() => setViewerUrl(null)} />
+
+      <PickerModal
+        visible={checkoutPickerOpen}
+        title="Check out to"
+        options={userOptions}
+        searchable
+        onSelect={(v) => v != null && checkoutMutation.mutate(Number(v))}
+        onClose={() => setCheckoutPickerOpen(false)}
+      />
     </ScrollView>
   );
 }

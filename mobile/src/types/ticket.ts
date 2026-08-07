@@ -76,6 +76,14 @@ export interface TicketKnowledgeLink {
   article: { id: number; title: string };
 }
 
+export interface TicketAttachment {
+  id: number;
+  filename: string;
+  sizeBytes: number;
+  commentId: number | null;
+  createdAt: string;
+}
+
 export interface Ticket {
   id: number;
   ticketNumber: string;
@@ -94,6 +102,9 @@ export interface Ticket {
   location: { id: number; name: string } | null;
   dueAt: string | null;
   createdAt: string;
+  isWatching?: boolean;
+  satisfactionRating?: number | null;
+  satisfactionComment?: string | null;
   comments?: TicketComment[];
   tasks?: TicketTask[];
   solutions?: TicketSolution[];
@@ -101,6 +112,7 @@ export interface Ticket {
   linksFrom?: TicketLink[];
   linksTo?: TicketLink[];
   knowledgeArticles?: TicketKnowledgeLink[];
+  attachments?: TicketAttachment[];
 }
 
 export const TICKET_STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [

@@ -8,6 +8,7 @@ import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
 import { ShimmerList } from "../../components/Shimmer";
+import { useToast } from "../../components/toast/ToastProvider";
 import { EmailEventType, EVENT_DESCRIPTIONS, EVENT_LABELS, EVENT_TYPES } from "../../lib/emailTemplateConstants";
 
 interface EmailTemplate {
@@ -26,6 +27,7 @@ interface EmailTemplate {
 export function EmailTemplateListScreen() {
   const { colors, spacing, radius } = useTheme();
   const { hasPermission } = useAuth();
+  const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [eventFilter, setEventFilter] = useState<EmailEventType | "">("");
   const [filterPickerOpen, setFilterPickerOpen] = useState(false);
@@ -54,7 +56,7 @@ export function EmailTemplateListScreen() {
     onSuccess: () => {
       setTestingId(null);
       setTestEmail("");
-      Alert.alert("Test email sent");
+      showToast({ variant: "success", title: "Test email sent" });
     },
   });
   const createMutation = useMutation({

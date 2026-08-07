@@ -167,7 +167,7 @@ export function AutomationsTab() {
                   </label>
                   <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setEditing(a)}><Icon name="edit" size={12} /></button>
                 </PermissionGate>
-                <PermissionGate module="lighting" action="create">
+                <PermissionGate module="lighting" action="duplicate">
                   <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(a.id)}><Icon name="paperclip" size={12} /></button>
                 </PermissionGate>
                 <PermissionGate module="lighting" action="delete">

@@ -81,7 +81,7 @@ router.delete("/:id", requirePermission("admin", "delete"), async (req, res) => 
   res.json({ ok: true });
 });
 
-router.post("/:id/duplicate", requirePermission("admin", "create"), async (req, res) => {
+router.post("/:id/duplicate", requirePermission("admin", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.assetFormTemplate.findUnique({ where: { id }, include: { fields: { orderBy: { order: "asc" } } } });
   if (!source) throw new ApiError(404, "Form template not found");

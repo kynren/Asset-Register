@@ -1,17 +1,19 @@
 import { useRef, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
+import { useToast } from "../../components/toast/ToastProvider";
 import { AssetsStackParamList } from "../../navigation/types";
 
 // Scans an asset's QR code (the same code AssetDetailScreen renders, encoding the raw assetTag)
 // and looks it up via GET /assets/by-tag/:tag — same lookup the web app's QrCodeModal flow relies on.
 export function AssetScanScreen() {
   const { colors, spacing, radius } = useTheme();
+  const { showToast } = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<AssetsStackParamList>>();
   const [permission, requestPermission] = useCameraPermissions();
   const [lookingUp, setLookingUp] = useState(false);
@@ -25,9 +27,9 @@ export function AssetScanScreen() {
       const res = await axiosClient.get(`/assets/by-tag/${encodeURIComponent(data)}`);
       navigation.replace("AssetDetail", { id: res.data.id });
     } catch {
-      Alert.alert("Not found", `No asset found with tag "${data}"`, [
-        { text: "OK", onPress: () => { scannedRef.current = false; setLookingUp(false); } },
-      ]);
+      showToast({ variant: "error", title: "Not found", message: `No asset found with tag "${data}"` });
+      scannedRef.current = false;
+      setLookingUp(false);
     }
   }
 

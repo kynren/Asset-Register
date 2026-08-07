@@ -105,7 +105,7 @@ router.delete("/:id", requirePermission("nvr", "delete"), async (req, res) => {
 
 // ipAddress/port stay blank on the clone — copying a real NVR's network address would create a
 // second device claiming the same host, which isn't a duplicate anyone wants.
-router.post("/:id/duplicate", requirePermission("nvr", "create"), async (req, res) => {
+router.post("/:id/duplicate", requirePermission("nvr", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.nvr.findUnique({ where: { id } });
   if (!source) throw new ApiError(404, "NVR not found");
@@ -261,7 +261,7 @@ router.delete("/cameras/:cameraId", requirePermission("nvr", "delete"), async (r
 
 // ipAddress and streamUrl (which embeds the source IP) stay blank on the clone for the same
 // reason as NVR duplicate — same channel/PTZ config, but no claimed network address.
-router.post("/cameras/:cameraId/duplicate", requirePermission("nvr", "create"), async (req, res) => {
+router.post("/cameras/:cameraId/duplicate", requirePermission("nvr", "duplicate"), async (req, res) => {
   const cameraId = Number(req.params.cameraId);
   const source = await prisma.camera.findUnique({ where: { id: cameraId } });
   if (!source) throw new ApiError(404, "Camera not found");

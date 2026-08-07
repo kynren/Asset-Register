@@ -2,13 +2,14 @@ import { useLayoutEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { downloadAndShare } from "../../lib/downloadFile";
 import { ShimmerDetail } from "../../components/Shimmer";
+import { useToast } from "../../components/toast/ToastProvider";
 import { ReportResult, ReportSummary } from "../../types/reports";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -23,6 +24,7 @@ export function ReportViewScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MoreStackParamList>>();
   const route = useRoute<RouteProp<MoreStackParamList, "ReportView">>();
   const { hasPermission } = useAuth();
+  const { showToast } = useToast();
   const { id } = route.params;
   const [downloading, setDownloading] = useState<"csv" | "pdf" | null>(null);
 
@@ -36,7 +38,7 @@ export function ReportViewScreen() {
     try {
       await downloadAndShare(`/reports/${id}/export.${kind}`, `${(report?.name ?? "report").replace(/[^a-z0-9-_]+/gi, "_")}.${kind}`);
     } catch {
-      Alert.alert("Export failed", "Could not generate the export. Try again.");
+      showToast({ variant: "error", title: "Export failed", message: "Could not generate the export. Try again." });
     } finally {
       setDownloading(null);
     }

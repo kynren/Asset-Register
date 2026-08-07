@@ -86,7 +86,7 @@ export const SECTIONS_SCHEMA_BY_TYPE: Record<DocTypeValue, z.ZodTypeAny> = {
 };
 
 export const accessGrantSchema = z
-  .object({ userId: z.number().int().optional(), teamId: z.number().int().optional(), level: z.enum(["EDIT", "DELETE"]) })
+  .object({ userId: z.number().int().optional(), teamId: z.number().int().optional(), level: z.enum(["EDIT", "DELETE", "DUPLICATE"]) })
   .refine((v) => (v.userId != null) !== (v.teamId != null), { message: "Provide exactly one of userId or teamId" });
 
 export const createDocumentSchema = z.object({

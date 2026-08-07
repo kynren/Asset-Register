@@ -110,7 +110,7 @@ export function AccessGroupTab() {
             <PermissionGate module="access-control" action="create">
               <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}><Icon name="plus" size={13} /> Add</button>
             </PermissionGate>
-            <PermissionGate module="access-control" action="create">
+            <PermissionGate module="access-control" action="duplicate">
               <button className="btn btn-secondary btn-sm" disabled={!selected || duplicateMutation.isPending} onClick={() => selected && duplicateMutation.mutate(selected.id)}>
                 <Icon name="paperclip" size={13} /> Duplicate
               </button>

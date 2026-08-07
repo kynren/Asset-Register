@@ -9,8 +9,9 @@ import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { downloadAndShare } from "../../lib/downloadFile";
-import { canDeleteRecord, canEditRecord, canManageRecordAccess } from "../../lib/accessControl";
+import { canDeleteRecord, canDuplicateRecord, canEditRecord, canManageRecordAccess } from "../../lib/accessControl";
 import { ShimmerDetail } from "../../components/Shimmer";
+import { useToast } from "../../components/toast/ToastProvider";
 import { DOC_TYPE_LABELS, DocumentDetail } from "../../types/docs";
 import { MoreStackParamList } from "../../navigation/types";
 
@@ -85,6 +86,7 @@ function SectionValue({ value, depth = 0 }: { value: unknown; depth?: number }) 
 
 export function DocumentDetailScreen() {
   const { colors, spacing, radius } = useTheme();
+  const { showToast } = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<MoreStackParamList>>();
   const route = useRoute<RouteProp<MoreStackParamList, "DocumentDetail">>();
   const { user, hasPermission } = useAuth();
@@ -118,7 +120,7 @@ export function DocumentDetailScreen() {
     try {
       await downloadAndShare(`/docs/${id}/export`, `${(doc?.title ?? "document").replace(/[^a-z0-9-_]+/gi, "_")}.${format}`, { format });
     } catch {
-      Alert.alert("Export failed", "Could not generate the export. Try again.");
+      showToast({ variant: "error", title: "Export failed", message: "Could not generate the export. Try again." });
     } finally {
       setExporting(null);
     }
@@ -141,6 +143,7 @@ export function DocumentDetailScreen() {
   const myTeamIds: number[] = [];
   const canEdit = !!user && !!doc && canEditRecord(doc.createdById, doc.access, user.id, user.roleName, myTeamIds);
   const canDelete = !!user && !!doc && canDeleteRecord(doc.createdById, doc.access, user.id, user.roleName, myTeamIds);
+  const canDuplicate = !!user && !!doc && canDuplicateRecord(doc.createdById, doc.access, user.id, user.roleName, myTeamIds);
   const canManageAccess = !!user && !!doc && canManageRecordAccess(doc.createdById, user.id, user.roleName);
 
   if (isLoading || !doc) {
@@ -182,7 +185,7 @@ export function DocumentDetailScreen() {
         {canEdit && hasPermission("docs", "edit") && (
           <ActionButton icon="create-outline" label="Edit" onPress={() => navigation.navigate("DocumentForm", { id })} />
         )}
-        {hasPermission("docs", "create") && <ActionButton icon="copy-outline" label="Duplicate" loading={duplicateMutation.isPending} onPress={() => duplicateMutation.mutate()} />}
+        {canDuplicate && hasPermission("docs", "duplicate") && <ActionButton icon="copy-outline" label="Duplicate" loading={duplicateMutation.isPending} onPress={() => duplicateMutation.mutate()} />}
         <ActionButton icon="download-outline" label="PDF" loading={exporting === "pdf"} onPress={() => exportDocument("pdf")} />
         <ActionButton icon="download-outline" label="Word" loading={exporting === "docx"} onPress={() => exportDocument("docx")} />
         {canDelete && hasPermission("docs", "delete") && <ActionButton icon="trash-outline" label="Delete" danger onPress={confirmDelete} />}

@@ -3,6 +3,7 @@ import { MoreScreen } from "../screens/more/MoreScreen";
 import { AppHeader } from "../components/AppHeader";
 import { NotificationsScreen } from "../screens/notifications/NotificationsScreen";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
+import { NotificationPreferencesScreen } from "../screens/profile/NotificationPreferencesScreen";
 import { NetworkListScreen } from "../screens/network/NetworkListScreen";
 import { NetworkGraphScreen } from "../screens/network/NetworkGraphScreen";
 import { NetworkDeviceDetailScreen } from "../screens/network/NetworkDeviceDetailScreen";
@@ -50,12 +51,14 @@ import { VaultDetailScreen } from "../screens/vault/VaultDetailScreen";
 import { VaultFormScreen } from "../screens/vault/VaultFormScreen";
 import { AssistantScreen } from "../screens/assistant/AssistantScreen";
 import { AdminHomeScreen } from "../screens/admin/AdminHomeScreen";
+import { AppSettingsHomeScreen } from "../screens/admin/AppSettingsHomeScreen";
 import { UserListScreen } from "../screens/admin/UserListScreen";
 import { UserDetailScreen } from "../screens/admin/UserDetailScreen";
 import { UserFormScreen } from "../screens/admin/UserFormScreen";
 import { RoleListScreen } from "../screens/admin/RoleListScreen";
 import { RolePermissionsScreen } from "../screens/admin/RolePermissionsScreen";
 import { SystemSettingsScreen } from "../screens/admin/SystemSettingsScreen";
+import { MobileSplashSettingsScreen } from "../screens/admin/MobileSplashSettingsScreen";
 import { EmailTemplateListScreen } from "../screens/admin/EmailTemplateListScreen";
 import { AgentLogScreen } from "../screens/admin/AgentLogScreen";
 import { BackupsScreen } from "../screens/admin/BackupsScreen";
@@ -87,6 +90,7 @@ export function MoreStack() {
       <Stack.Screen name="MoreRoot" component={MoreScreen} options={{ title: "More", headerRight: () => <AppHeader /> }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Notifications" }} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
+      <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} options={{ title: "Notification Preferences" }} />
       <Stack.Screen name="NetworkList" component={NetworkListScreen} options={{ title: "Network Topology Map" }} />
       <Stack.Screen name="NetworkGraph" component={NetworkGraphScreen} options={{ title: "Topology Graph" }} />
       <Stack.Screen name="NetworkDeviceDetail" component={NetworkDeviceDetailScreen} options={{ title: "Device" }} />
@@ -134,12 +138,14 @@ export function MoreStack() {
       <Stack.Screen name="VaultForm" component={VaultFormScreen} options={{ title: "Vault Entry" }} />
       <Stack.Screen name="Assistant" component={AssistantScreen} options={{ title: "Virtual Assistant" }} />
       <Stack.Screen name="AdminHome" component={AdminHomeScreen} options={{ title: "Admin & Setup" }} />
+      <Stack.Screen name="AppSettingsHome" component={AppSettingsHomeScreen} options={{ title: "App Settings" }} />
       <Stack.Screen name="UserList" component={UserListScreen} options={{ title: "Users" }} />
       <Stack.Screen name="UserDetail" component={UserDetailScreen} options={{ title: "User" }} />
       <Stack.Screen name="UserForm" component={UserFormScreen} options={{ title: "Invite User" }} />
       <Stack.Screen name="RoleList" component={RoleListScreen} options={{ title: "Roles & Permissions" }} />
       <Stack.Screen name="RolePermissions" component={RolePermissionsScreen} options={{ title: "Role" }} />
       <Stack.Screen name="SystemSettings" component={SystemSettingsScreen} options={{ title: "System Settings" }} />
+      <Stack.Screen name="MobileSplashSettings" component={MobileSplashSettingsScreen} options={{ title: "App Loading Screen" }} />
       <Stack.Screen name="EmailTemplateList" component={EmailTemplateListScreen} options={{ title: "Email Templates" }} />
       <Stack.Screen name="AgentLog" component={AgentLogScreen} options={{ title: "Agent Log" }} />
       <Stack.Screen name="Backups" component={BackupsScreen} options={{ title: "Backups" }} />

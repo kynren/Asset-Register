@@ -65,7 +65,7 @@ router.post("/import", requirePermission("admin", "import"), upload.single("file
   res.json(result);
 });
 
-router.post("/:id/duplicate", requirePermission("admin", "create"), async (req, res) => {
+router.post("/:id/duplicate", requirePermission("admin", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.location.findUnique({ where: { id } });
   if (!source) throw new ApiError(404, "Location not found");

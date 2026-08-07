@@ -4,6 +4,7 @@ import { StockDetailScreen } from "../screens/stock/StockDetailScreen";
 import { StockFormScreen } from "../screens/stock/StockFormScreen";
 import { StockScanScreen } from "../screens/stock/StockScanScreen";
 import { StockAdjustScreen } from "../screens/stock/StockAdjustScreen";
+import { StockIssueScreen } from "../screens/stock/StockIssueScreen";
 import { AppHeader } from "../components/AppHeader";
 import { useTheme } from "../theme/ThemeContext";
 import { StockStackParamList } from "./types";
@@ -19,6 +20,7 @@ export function StockStack() {
       <Stack.Screen name="StockForm" component={StockFormScreen} options={({ route }) => ({ title: route.params?.id ? "Edit Stock Item" : "New Stock Item" })} />
       <Stack.Screen name="StockScan" component={StockScanScreen} options={{ title: "Scan Stock", headerStyle: { backgroundColor: "#000" }, headerTintColor: "#fff" }} />
       <Stack.Screen name="StockAdjust" component={StockAdjustScreen} options={{ title: "Adjust Stock", presentation: "modal" }} />
+      <Stack.Screen name="StockIssue" component={StockIssueScreen} options={{ title: "Issue Stock", presentation: "modal" }} />
     </Stack.Navigator>
   );
 }

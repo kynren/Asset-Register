@@ -213,7 +213,7 @@ function buildActionsColumn(ctx: AssetColumnBuilderContext): ColumnDef<Asset, an
           <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={() => onEdit(row.original)}><Icon name="edit" size={12} /></button>
         </PermissionGate>
         <button className="btn btn-secondary btn-sm btn-icon" title="Print QR label" onClick={() => onQr(row.original)}><Icon name="grid" size={12} /></button>
-        <PermissionGate module="assets" action="create">
+        <PermissionGate module="assets" action="duplicate">
           <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}><Icon name="paperclip" size={12} /></button>
         </PermissionGate>
         <button className="btn btn-secondary btn-sm btn-icon" title="Copy share link" onClick={() => copyShareLink(row.original)}><Icon name="chevronRight" size={12} /></button>

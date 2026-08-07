@@ -92,7 +92,7 @@ export function EmailTemplatesTab() {
               <Icon name="mail" size={12} />
             </button>
           </PermissionGate>
-          <PermissionGate module="admin" action="create">
+          <PermissionGate module="admin" action="duplicate">
             <button className="btn btn-secondary btn-sm btn-icon" title="Duplicate" onClick={() => duplicateMutation.mutate(row.original.id)}>
               <Icon name="paperclip" size={12} />
             </button>

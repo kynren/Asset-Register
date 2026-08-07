@@ -17,6 +17,7 @@ interface RolePermission {
   canDelete: boolean;
   canExport: boolean;
   canImport: boolean;
+  canDuplicate: boolean;
   scopeAssignedOnly?: boolean;
 }
 interface Role {
@@ -27,9 +28,9 @@ interface Role {
   permissions: RolePermission[];
 }
 
-type PermAction = "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport" | "canImport";
-const ACTIONS: PermAction[] = ["canView", "canCreate", "canEdit", "canDelete", "canExport", "canImport"];
-const ACTION_LABELS: Record<string, string> = { canView: "View", canCreate: "Create", canEdit: "Edit", canDelete: "Delete", canExport: "Export", canImport: "Import" };
+type PermAction = "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport" | "canImport" | "canDuplicate";
+const ACTIONS: PermAction[] = ["canView", "canCreate", "canEdit", "canDelete", "canExport", "canImport", "canDuplicate"];
+const ACTION_LABELS: Record<string, string> = { canView: "View", canCreate: "Create", canEdit: "Edit", canDelete: "Delete", canExport: "Export", canImport: "Import", canDuplicate: "Duplicate" };
 
 // Every feature area gated behind each module, kept in sync as new functionality lands —
 // several modules cover more than their name implies since newer features (Licenses,
@@ -116,7 +117,7 @@ export function RolesTab({
   });
 
   function buildFullMatrix(perms: RolePermission[]): RolePermission[] {
-    return MODULES.map((m) => perms.find((p) => p.module === m) ?? { module: m, canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false, scopeAssignedOnly: false });
+    return MODULES.map((m) => perms.find((p) => p.module === m) ?? { module: m, canView: false, canCreate: false, canEdit: false, canDelete: false, canExport: false, canImport: false, canDuplicate: false, scopeAssignedOnly: false });
   }
 
   const isSystemAdminRole = selectedRole?.name === "System Admin";
@@ -147,7 +148,7 @@ export function RolesTab({
   const matrix = buildFullMatrix(activePermissions);
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: "220px 1fr", gap: 16 }}>
+    <div className="grid" style={{ gridTemplateColumns: "220px 1fr", gap: 16, alignItems: "start" }}>
       <div className="card" style={{ padding: 10 }}>
         <div className="row" style={{ justifyContent: "space-between", padding: "4px 6px 10px" }}>
           <strong style={{ fontSize: 13 }}>Roles</strong>
@@ -199,9 +200,9 @@ export function RolesTab({
             </div>
           )}
 
-          <div style={{ overflowX: "auto" }}>
+          <div style={{ overflow: "auto", maxHeight: "70vh" }}>
             <table className="data-table">
-              <thead>
+              <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--color-surface)" }}>
                 <tr>
                   <th>Module</th>
                   {ACTIONS.map((a) => <th key={a} style={{ textAlign: "center" }}>{ACTION_LABELS[a]}</th>)}

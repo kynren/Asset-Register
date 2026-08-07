@@ -11,7 +11,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export function MainTabs() {
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false }} tabBar={(props) => <CustomTabBar {...props} />}>
+    <Tab.Navigator initialRouteName="HomeTab" screenOptions={{ headerShown: false }} tabBar={(props) => <CustomTabBar {...props} />}>
       <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: "Home" }} />
       <Tab.Screen name="AssetsTab" component={AssetsStack} options={{ title: "Assets" }} />
       <Tab.Screen name="StockTab" component={StockStack} options={{ title: "Stock" }} />

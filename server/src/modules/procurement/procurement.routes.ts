@@ -66,7 +66,7 @@ router.post("/suppliers/import", requirePermission("stock", "import"), upload.si
   res.json(result);
 });
 
-router.post("/suppliers/:id/duplicate", requirePermission("stock", "create"), async (req, res) => {
+router.post("/suppliers/:id/duplicate", requirePermission("stock", "duplicate"), async (req, res) => {
   const id = Number(req.params.id);
   const source = await prisma.supplier.findUnique({ where: { id } });
   if (!source) throw new ApiError(404, "Supplier not found");

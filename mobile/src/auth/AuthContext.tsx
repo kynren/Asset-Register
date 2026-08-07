@@ -52,6 +52,7 @@ const actionKey: Record<ActionName, keyof ModulePermission> = {
   delete: "canDelete",
   export: "canExport",
   import: "canImport",
+  duplicate: "canDuplicate",
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {

@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRoute, RouteProp } from "@react-navigation/native";
-import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { axiosClient } from "../../api/axiosClient";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
+import { useToast } from "../../components/toast/ToastProvider";
 import { useHlsStream } from "../../lib/useHlsStream";
 import { Nvr } from "../../types/nvr";
 import { MoreStackParamList } from "../../navigation/types";
@@ -22,6 +23,7 @@ interface PtzPreset {
 export function LiveCameraScreen() {
   const { colors, spacing, radius } = useTheme();
   const { hasPermission } = useAuth();
+  const { showToast } = useToast();
   const route = useRoute<RouteProp<MoreStackParamList, "LiveCamera">>();
   const queryClient = useQueryClient();
   const { id } = route.params;
@@ -60,7 +62,7 @@ export function LiveCameraScreen() {
   const recordMutation = useMutation({
     mutationFn: (action: "start" | "stop") => axiosClient.post(`/nvr/cameras/${id}/recordings/${action}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mobile-camera-recordings", id] }),
-    onError: (err: any) => Alert.alert("Recording", err?.response?.data?.error ?? "Could not change recording state."),
+    onError: (err: any) => showToast({ variant: "error", title: "Recording", message: err?.response?.data?.error ?? "Could not change recording state." }),
   });
   const { data: recordingInfo } = useQuery({
     queryKey: ["mobile-camera-recordings", id],

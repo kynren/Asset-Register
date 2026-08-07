@@ -142,7 +142,7 @@ export function PersonsTab() {
           <PermissionGate module="access-control" action="edit">
             <button className="btn btn-secondary btn-sm btn-icon" onClick={(e) => { e.stopPropagation(); setEditingPerson(row.original); }} title="Edit"><Icon name="edit" size={12} /></button>
           </PermissionGate>
-          <PermissionGate module="access-control" action="create">
+          <PermissionGate module="access-control" action="duplicate">
             <button className="btn btn-secondary btn-sm btn-icon" onClick={(e) => { e.stopPropagation(); duplicatePersonMutation.mutate(row.original.id); }} title="Duplicate"><Icon name="paperclip" size={12} /></button>
           </PermissionGate>
           <PermissionGate module="access-control" action="delete">

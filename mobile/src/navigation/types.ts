@@ -15,6 +15,7 @@ export type StockStackParamList = {
   StockForm: { id?: number } | undefined;
   StockScan: undefined;
   StockAdjust: { id: number };
+  StockIssue: { id: number };
 };
 
 export type HelpdeskStackParamList = {
@@ -27,6 +28,7 @@ export type MoreStackParamList = {
   MoreRoot: undefined;
   Notifications: undefined;
   Profile: undefined;
+  NotificationPreferences: undefined;
   NetworkList: undefined;
   NetworkGraph: undefined;
   NetworkDeviceDetail: { id: number };
@@ -74,12 +76,14 @@ export type MoreStackParamList = {
   VaultForm: { id?: number } | undefined;
   Assistant: undefined;
   AdminHome: undefined;
+  AppSettingsHome: undefined;
   UserList: undefined;
   UserDetail: { id: number };
   UserForm: undefined;
   RoleList: undefined;
   RolePermissions: { id: number };
   SystemSettings: undefined;
+  MobileSplashSettings: undefined;
   EmailTemplateList: undefined;
   AgentLog: undefined;
   Backups: undefined;

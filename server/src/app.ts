@@ -49,6 +49,7 @@ import auditRoutes from "./modules/audit/audit.routes";
 import settingsRoutes from "./modules/settings/settings.routes";
 import settingsPublicRoutes from "./modules/settings/settingsPublic.routes";
 import loginDesignRoutes from "./modules/settings/loginDesign.routes";
+import mobileSplashRoutes from "./modules/settings/mobileSplash.routes";
 import notificationsRoutes from "./modules/notifications/notifications.routes";
 import notificationPreferencesRoutes from "./modules/notifications/notificationPreferences.routes";
 import commentsRoutes from "./modules/comments/comments.routes";
@@ -71,6 +72,8 @@ import appSettingsRoutes from "./modules/appSettings/appSettings.routes";
 import scheduledChangesRoutes from "./modules/scheduledChanges/scheduledChanges.routes";
 import databaseManagerRoutes from "./modules/databaseManager/databaseManager.routes";
 import mediaCenterRoutes from "./modules/mediaCenter/mediaCenter.routes";
+import apiConnectionsRoutes from "./modules/apiConnections/apiConnections.routes";
+import apiIntegrationsRoutes from "./modules/apiIntegrations/apiIntegrations.routes";
 
 export function createApp() {
   const app = express();
@@ -86,6 +89,7 @@ export function createApp() {
   // Publicly servable, non-sensitive images (branding assets, avatars) — no auth required
   // so they can be used directly in <img>/<link> tags, including on the login screen.
   app.use("/uploads/branding", express.static(path.join(__dirname, "..", "uploads", "branding")));
+  app.use("/uploads/mobile-splash", express.static(path.join(__dirname, "..", "uploads", "mobile-splash")));
   app.use("/uploads/avatars", express.static(path.join(__dirname, "..", "uploads", "avatars")));
   app.use("/uploads/assets", express.static(path.join(__dirname, "..", "uploads", "assets")));
   app.use("/uploads/projects", express.static(path.join(__dirname, "..", "uploads", "projects")));
@@ -137,6 +141,7 @@ export function createApp() {
   app.use("/api/audit", auditRoutes);
   app.use("/api/settings/public", settingsPublicRoutes);
   app.use("/api/settings/login-design", loginDesignRoutes);
+  app.use("/api/settings/mobile-splash", mobileSplashRoutes);
   app.use("/api/public/asset-intake", assetIntakePublicRoutes);
   app.use("/api/settings", settingsRoutes);
   app.use("/api/notifications", notificationsRoutes);
@@ -152,6 +157,8 @@ export function createApp() {
   app.use("/api/email-templates", emailTemplatesRoutes);
   app.use("/api/backups", backupsRoutes);
   app.use("/api/app-settings", appSettingsRoutes);
+  app.use("/api/api-connections", apiConnectionsRoutes);
+  app.use("/api/integrations/v1", apiIntegrationsRoutes);
   app.use("/api/scheduled-changes", scheduledChangesRoutes);
   app.use("/api/database", databaseManagerRoutes);
   app.use("/api/media-center", mediaCenterRoutes);

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Animated, Easing, Image, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Easing, Image, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../api/axiosClient";
 import { API_ORIGIN } from "../config/env";
 import { useAuth } from "../auth/AuthContext";
 import { useTheme } from "../theme/ThemeContext";
+import { useToast } from "./toast/ToastProvider";
 import { AccountMenuSheet } from "./AccountMenuSheet";
 
 // Rendered as headerLeft/headerRight on the root screen of every bottom-tab stack (Home, Assets,
@@ -15,6 +16,7 @@ import { AccountMenuSheet } from "./AccountMenuSheet";
 export function AppHeader() {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -43,9 +45,9 @@ export function AppHeader() {
     setIsSyncing(true);
     try {
       await queryClient.refetchQueries({ type: "active" });
-      Alert.alert("Sync complete", "All items are up to date.");
+      showToast({ variant: "success", title: "Sync complete", message: "All items are up to date." });
     } catch {
-      Alert.alert("Sync failed", "Couldn't refresh data. Check your connection and try again.");
+      showToast({ variant: "error", title: "Sync failed", message: "Couldn't refresh data. Check your connection and try again." });
     } finally {
       setIsSyncing(false);
     }
@@ -64,15 +66,15 @@ export function AppHeader() {
           </Animated.View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.getParent()?.navigate("MoreTab", { screen: "Notifications" })} accessibilityLabel="Notifications">
+        <TouchableOpacity onPress={() => navigation.getParent()?.navigate("MoreTab", { screen: "Notifications" })} accessibilityLabel="Notifications" style={{ padding: 5 }}>
           <View>
             <Ionicons name="notifications-outline" size={22} color={colors.text} />
             {unreadCount > 0 && (
               <View
                 style={{
                   position: "absolute",
-                  top: -3,
-                  right: -5,
+                  top: -2,
+                  right: -4,
                   minWidth: 15,
                   height: 15,
                   borderRadius: 8,

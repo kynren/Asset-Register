@@ -9,12 +9,14 @@ import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { PickerModal, PickerOption } from "../../components/PickerModal";
+import { useToast } from "../../components/toast/ToastProvider";
 import { AdminUser, Role } from "../../types/admin";
 import { MoreStackParamList } from "../../navigation/types";
 
 export function UserDetailScreen() {
   const { colors, spacing, radius } = useTheme();
   const { user: currentUser, hasPermission } = useAuth();
+  const { showToast } = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<MoreStackParamList>>();
   const route = useRoute<RouteProp<MoreStackParamList, "UserDetail">>();
   const { id } = route.params;
@@ -40,7 +42,7 @@ export function UserDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["mobile-admin-user", id] });
       queryClient.invalidateQueries({ queryKey: ["mobile-admin-users"] });
     },
-    onError: (err: any) => Alert.alert("Couldn't update user", err?.response?.data?.error ?? "Try again."),
+    onError: (err: any) => showToast({ variant: "error", title: "Couldn't update user", message: err?.response?.data?.error ?? "Try again." }),
   });
 
   const resetPasswordMutation = useMutation({

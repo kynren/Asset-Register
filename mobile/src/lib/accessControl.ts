@@ -2,7 +2,7 @@
 // module built on the generic RecordAccessGrant system (Docs & SOPs, Knowledge Base, IT Projects,
 // Reports). Pure logic — no UI — shared across mobile screens that need to gate edit/delete/manage
 // actions against a record's creator + explicit grants.
-export type AccessLevel = "EDIT" | "DELETE" | "VIEW";
+export type AccessLevel = "EDIT" | "DELETE" | "VIEW" | "DUPLICATE";
 export type AccessTargetKind = "user" | "team";
 
 export interface AccessGrant {
@@ -24,6 +24,9 @@ export function canEditRecord(createdById: number, access: AccessGrant[], userId
 export function canDeleteRecord(createdById: number, access: AccessGrant[], userId: number, roleName: string, myTeamIds: number[]) {
   return createdById === userId || hasAccessGrant(access, userId, myTeamIds, "DELETE") || BYPASS_ROLE_NAMES.includes(roleName);
 }
+export function canDuplicateRecord(createdById: number, access: AccessGrant[], userId: number, roleName: string, myTeamIds: number[]) {
+  return createdById === userId || hasAccessGrant(access, userId, myTeamIds, "DUPLICATE") || BYPASS_ROLE_NAMES.includes(roleName);
+}
 export function canManageRecordAccess(createdById: number, userId: number, roleName: string) {
   return createdById === userId || BYPASS_ROLE_NAMES.includes(roleName);
 }
@@ -33,4 +36,4 @@ export function grantLabel(a: { userId: number | null; teamId: number | null; us
   return a.user ? `${a.user.firstName} ${a.user.lastName}` : `User #${a.userId}`;
 }
 
-export const LEVEL_LABELS: Record<AccessLevel, string> = { EDIT: "Can edit", DELETE: "Can delete", VIEW: "Can view" };
+export const LEVEL_LABELS: Record<AccessLevel, string> = { EDIT: "Can edit", DELETE: "Can delete", VIEW: "Can view", DUPLICATE: "Can duplicate" };

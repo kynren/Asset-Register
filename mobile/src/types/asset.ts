@@ -29,6 +29,7 @@ export interface AssetDevice {
   ramGb: number | null;
   diskInfo: string | null;
   loggedInUser: string | null;
+  lastLoginAt: string | null;
   lastSeen: string;
   batteryPresent: boolean | null;
   batteryPercent: number | null;
@@ -69,8 +70,16 @@ export interface Asset {
   purchaseDate: string | null;
   purchaseCost: number | null;
   warrantyExpiresAt: string | null;
+  nextServiceDate: string | null;
   supplier: string | null;
+  invoiceNumber: string | null;
+  signOffStatus: "PENDING" | "CONFIRMED";
+  gridPowered: boolean;
   featuredImageUrl: string | null;
+  staticIpAddress: string | null;
+  subnetMask: string | null;
+  defaultGateway: string | null;
+  dnsServers: string | null;
   device: AssetDevice | null;
   customFieldValues: AssetCustomFieldValue[];
   tickets: AssetTicketRef[];

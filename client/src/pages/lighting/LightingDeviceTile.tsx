@@ -105,7 +105,7 @@ export function LightingDeviceTile({
                 <Icon name="edit" size={12} /> Edit
               </button>
             </PermissionGate>
-            <PermissionGate module="lighting" action="create">
+            <PermissionGate module="lighting" action="duplicate">
               <button className="btn btn-secondary btn-sm" style={{ width: "100%", justifyContent: "flex-start", marginBottom: 2 }} onClick={() => { setMenuOpen(false); onDuplicate(); }}>
                 <Icon name="paperclip" size={12} /> Duplicate
               </button>

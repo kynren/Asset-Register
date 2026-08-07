@@ -21,6 +21,7 @@ export const updatePermissionsSchema = z.object({
       canDelete: z.boolean(),
       canExport: z.boolean(),
       canImport: z.boolean(),
+      canDuplicate: z.boolean(),
       scopeAssignedOnly: z.boolean().optional(),
     })
   ),
