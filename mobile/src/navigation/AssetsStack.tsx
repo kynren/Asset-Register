@@ -15,6 +15,7 @@ import { AssetSoftwareScreen } from "../screens/assets/AssetSoftwareScreen";
 import { AssetImpactAnalysisScreen } from "../screens/assets/AssetImpactAnalysisScreen";
 import { AssetHistoryScreen } from "../screens/assets/AssetHistoryScreen";
 import { AssetReportScreen } from "../screens/assets/AssetReportScreen";
+import { AssetIntakeQueueScreen } from "../screens/assets/AssetIntakeQueueScreen";
 import { AppHeader } from "../components/AppHeader";
 import { useTheme } from "../theme/ThemeContext";
 import { AssetsStackParamList } from "./types";
@@ -41,6 +42,7 @@ export function AssetsStack() {
       <Stack.Screen name="AssetImpactAnalysis" component={AssetImpactAnalysisScreen} options={{ title: "Impact Analysis" }} />
       <Stack.Screen name="AssetHistory" component={AssetHistoryScreen} options={{ title: "Location & History" }} />
       <Stack.Screen name="AssetReport" component={AssetReportScreen} options={{ title: "Asset Report" }} />
+      <Stack.Screen name="AssetIntakeQueue" component={AssetIntakeQueueScreen} options={{ title: "Asset Intake" }} />
     </Stack.Navigator>
   );
 }

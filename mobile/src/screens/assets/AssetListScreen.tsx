@@ -153,6 +153,12 @@ export function AssetListScreen() {
               <Text style={{ color: colors.text, fontSize: 12, fontWeight: "600" }}>Discover</Text>
             </TouchableOpacity>
           )}
+          {canEdit && (
+            <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8 }} onPress={() => navigation.navigate("AssetIntakeQueue")}>
+              <Ionicons name="link-outline" size={14} color={colors.text} />
+              <Text style={{ color: colors.text, fontSize: 12, fontWeight: "600" }}>Intake Queue</Text>
+            </TouchableOpacity>
+          )}
           {hasPermission("assets", "import") && (
             <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8 }} onPress={() => navigation.navigate("AssetImport")}>
               <Ionicons name="cloud-upload-outline" size={14} color={colors.text} />

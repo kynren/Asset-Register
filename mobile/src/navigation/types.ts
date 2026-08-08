@@ -20,6 +20,7 @@ export type AssetsStackParamList = {
   AssetImpactAnalysis: { assetId: number };
   AssetHistory: { assetId: number };
   AssetReport: { assetId: number };
+  AssetIntakeQueue: undefined;
 };
 
 export type StockStackParamList = {

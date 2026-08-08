@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, FlatList, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, Share, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
+import { API_ORIGIN } from "../../config/env";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuth } from "../../auth/AuthContext";
 import { ShimmerList } from "../../components/Shimmer";
@@ -149,7 +150,7 @@ function AssetCategoriesTab() {
   const inputStyle = { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.text, backgroundColor: colors.surface };
   const collectionOptions: PickerOption[] = (collections ?? []).map((c) => ({ id: c.id, label: c.name }));
   const templateOptions: PickerOption[] = (templates ?? []).map((t) => ({ id: t.id, label: t.name }));
-  const intakeUrl = editing?.publicIntakeToken ? `https://app/intake/${editing.publicIntakeToken}` : "";
+  const intakeUrl = editing?.publicIntakeToken ? `${API_ORIGIN}/intake/${editing.publicIntakeToken}` : "";
 
   if (isLoading) return <ShimmerList />;
 
@@ -194,10 +195,19 @@ function AssetCategoriesTab() {
                     <Switch value={editing.publicIntakeEnabled} onValueChange={(v) => intakeMutation.mutate(v)} trackColor={{ true: colors.primary, false: colors.border }} />
                   </View>
                   {editing.publicIntakeEnabled && editing.publicIntakeToken && (
-                    <TouchableOpacity onLongPress={() => setLinkCopied(true)} style={{ backgroundColor: colors.surface, borderRadius: radius.sm, padding: 8 }}>
-                      <Text selectable style={{ color: colors.text, fontSize: 10.5, fontFamily: "monospace" }}>{intakeUrl}</Text>
-                      <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 2 }}>{linkCopied ? "Long-pressed — select and copy the text above" : "Long-press to select the link, then copy"}</Text>
-                    </TouchableOpacity>
+                    <View style={{ gap: 6 }}>
+                      <TouchableOpacity onLongPress={() => setLinkCopied(true)} style={{ backgroundColor: colors.surface, borderRadius: radius.sm, padding: 8 }}>
+                        <Text selectable style={{ color: colors.text, fontSize: 10.5, fontFamily: "monospace" }}>{intakeUrl}</Text>
+                        <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 2 }}>{linkCopied ? "Long-pressed — select and copy the text above" : "Long-press to select the link, then copy"}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.sm, paddingVertical: 8 }}
+                        onPress={() => Share.share({ message: intakeUrl })}
+                      >
+                        <Ionicons name="share-outline" size={13} color={colors.primary} />
+                        <Text style={{ color: colors.primary, fontSize: 11.5, fontWeight: "700" }}>Share Link</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
               )}
