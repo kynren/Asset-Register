@@ -89,6 +89,7 @@ model User {
   preferences                   UserPreference[]
   mcpApiKeys                    McpApiKey[]
   apiConnectionsCreated          ApiConnection[]
+  externalConnectorsCreated      ExternalConnector[]
 
   projectCardsAssigned           ProjectCard[]           @relation("ProjectCardAssignee")
   projectCardsCreated            ProjectCard[]           @relation("ProjectCardCreator")
@@ -2653,6 +2654,81 @@ model ApiConnectionLog {
   occurredAt   DateTime      @default(now())
 
   @@index([connectionId, occurredAt])
+}
+
+enum ExternalConnectorDirection {
+  PUSH
+  PULL
+  BOTH
+}
+
+// The inverse of ApiConnection: instead of another app calling into us, this app calls out to
+// another system's API and pulls its data in ("App Connector" on App Settings' Integrations tab).
+// The contract is deliberately generic — GET {baseUrl}?since=<ISO> returns
+// { stores: { <storeName>: record[] } } — so one connector implementation works against any
+// external system willing to speak it, rather than hand-building a client per vendor the way
+// net2WebApi.ts/hikvisionIsapi.ts do for known protocols. `direction` is stored for display/intent
+// even though only PULL is actually wired up today (see externalConnectors.routes.ts); PUSH would
+// mirror this with an outbound POST and its own log entries once a real need for it shows up.
+model ExternalConnector {
+  id             Int      @id @default(autoincrement())
+  name           String
+  baseUrl        String
+  authHeaderName String   @default("Authorization")
+  // AES-256-GCM via lib/crypto.ts encryptSecret() — never stored or returned in plaintext, same as
+  // NVR/camera credentials and the network monitor's SNMP community string.
+  authHeaderValueEncrypted String
+  direction      ExternalConnectorDirection @default(PULL)
+  // Which local resource families this connector is allowed to pull into — reuses the same
+  // resource vocabulary as ApiConnection.resources (assets/tickets/stock/docs/network/users) so an
+  // admin only has to learn one picker, even though these are the opposite direction of each
+  // other. A store name the external API returns that isn't in this list is dropped, not stored.
+  resources      String[] @default([])
+  isEnabled      Boolean  @default(true)
+  lastPulledAt   DateTime?
+  lastPushedAt   DateTime?
+  createdById    Int
+  createdBy      User     @relation(fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  logs           ExternalConnectorLog[]
+  records        ExternalConnectorRecord[]
+}
+
+// One row per Test/Pull/Push attempt — mirrors ApiConnectionLog's per-call audit trail, but for
+// outbound calls this app itself made rather than inbound calls a credential holder made against
+// us. `recordCounts` is a { store: count } map so the Activity view can show "pulled 40 assets, 12
+// tickets" without re-querying ExternalConnectorRecord.
+model ExternalConnectorLog {
+  id           Int           @id @default(autoincrement())
+  connectorId  Int
+  connector    ExternalConnector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  direction    ExternalConnectorDirection
+  ok           Boolean
+  statusCode   Int?
+  recordCounts Json?
+  error        String?
+  occurredAt   DateTime      @default(now())
+
+  @@index([connectorId, occurredAt])
+}
+
+// Landed (staged) copy of a record pulled from an external system — deliberately raw/untyped
+// (`data Json`) rather than mapped into Asset/Ticket/StockItem/etc, since this app has no way to
+// know another system's field shapes in advance; a future mapping step can read from here. Records
+// with a stable `externalId` (the external system's own id for that record) upsert in place on
+// every pull; records without one always insert fresh, since there's nothing to match against.
+model ExternalConnectorRecord {
+  id          Int      @id @default(autoincrement())
+  connectorId Int
+  connector   ExternalConnector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  store       String
+  externalId  String?
+  data        Json
+  pulledAt    DateTime @default(now())
+
+  @@unique([connectorId, store, externalId])
+  @@index([connectorId, store])
 }
 
 // ───────────────────────── Operations Tools ─────────────────────────

@@ -11,6 +11,7 @@ import { DatabaseManagerTab } from "./DatabaseManagerTab";
 import { MediaCenterTab } from "./MediaCenterTab";
 import { McpConnectionCard } from "./McpConnectionCard";
 import { ApiConnectionsCard } from "./ApiConnectionsCard";
+import { ExternalConnectorsCard } from "./ExternalConnectorsCard";
 import { DocsImportLimitCard } from "../docs/DocsImportLimitCard";
 import { RolesTab } from "../admin/RolesTab";
 import { UsersTab } from "../admin/UsersTab";
@@ -153,6 +154,7 @@ export function AppSettingsPage() {
         <div className="stack gap-3">
           <McpConnectionCard />
           <ApiConnectionsCard />
+          <ExternalConnectorsCard />
         </div>
       )}
       {activeTab === "status" && <SystemStatusTab />}
