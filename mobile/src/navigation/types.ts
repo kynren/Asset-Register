@@ -90,6 +90,9 @@ export type MoreStackParamList = {
   Changelog: undefined;
   ChangeManagementList: undefined;
   TeamList: undefined;
+  CategoriesLocations: undefined;
+  HelpdeskConfig: undefined;
+  AutomationRules: undefined;
   AuditLog: undefined;
   ToastSettings: undefined;
   EmailIngestSettings: undefined;

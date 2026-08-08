@@ -65,6 +65,9 @@ import { SystemStatusScreen } from "../screens/admin/SystemStatusScreen";
 import { ChangelogScreen } from "../screens/admin/ChangelogScreen";
 import { ChangeManagementListScreen } from "../screens/admin/ChangeManagementListScreen";
 import { TeamListScreen } from "../screens/admin/TeamListScreen";
+import { CategoriesLocationsScreen } from "../screens/admin/CategoriesLocationsScreen";
+import { HelpdeskConfigScreen } from "../screens/admin/HelpdeskConfigScreen";
+import { AutomationRulesScreen } from "../screens/admin/AutomationRulesScreen";
 import { AuditLogScreen } from "../screens/admin/AuditLogScreen";
 import { ToastSettingsScreen } from "../screens/admin/ToastSettingsScreen";
 import { EmailIngestSettingsScreen } from "../screens/admin/EmailIngestSettingsScreen";
@@ -161,6 +164,9 @@ export function MoreStack() {
       <Stack.Screen name="Changelog" component={ChangelogScreen} options={{ title: "Changelog" }} />
       <Stack.Screen name="ChangeManagementList" component={ChangeManagementListScreen} options={{ title: "Change Management" }} />
       <Stack.Screen name="TeamList" component={TeamListScreen} options={{ title: "Teams" }} />
+      <Stack.Screen name="CategoriesLocations" component={CategoriesLocationsScreen} options={{ title: "Categories & Locations" }} />
+      <Stack.Screen name="HelpdeskConfig" component={HelpdeskConfigScreen} options={{ title: "Helpdesk Config" }} />
+      <Stack.Screen name="AutomationRules" component={AutomationRulesScreen} options={{ title: "Automation Rules" }} />
       <Stack.Screen name="AuditLog" component={AuditLogScreen} options={{ title: "Audit Log" }} />
       <Stack.Screen name="ToastSettings" component={ToastSettingsScreen} options={{ title: "Toast Designer" }} />
       <Stack.Screen name="EmailIngestSettings" component={EmailIngestSettingsScreen} options={{ title: "Email Ingestion" }} />
