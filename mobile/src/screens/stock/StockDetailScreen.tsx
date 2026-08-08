@@ -2,7 +2,7 @@ import { useLayoutEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, Alert, Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import QRCode from "react-native-qrcode-svg";
 import dayjs from "dayjs";
@@ -16,6 +16,7 @@ import { useToast } from "../../components/toast/ToastProvider";
 import { StockItem } from "../../types/stock";
 import { StockStackParamList } from "../../navigation/types";
 import { buildMediaFormData, isVideo, pickAssetMedia } from "../../lib/mediaPicker";
+import { useCustomColumns } from "../../hooks/useCustomColumns";
 
 const TRANSACTION_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   IN: "arrow-down-circle",
@@ -162,6 +163,8 @@ export function StockDetailScreen() {
         </View>
       )}
 
+      <CustomFieldsSection item={item} canEdit={hasPermission("stock", "edit")} />
+
       <View style={{ marginTop: spacing.lg }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
           <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "700", textTransform: "uppercase" }}>Photos & videos</Text>
@@ -233,5 +236,48 @@ export function StockDetailScreen() {
         </TouchableOpacity>
       )}
     </ScrollView>
+  );
+}
+
+// Mirrors buildCustomColumnDefs.tsx's inline-editable table cells, flattened into a list section
+// since mobile detail screens are card-based rather than tabular. Column management (add/remove
+// column definitions) lives on the Stock hub's Custom Columns sheet — this only edits values.
+function CustomFieldsSection({ item, canEdit }: { item: StockItem; canEdit: boolean }) {
+  const { colors, spacing, radius } = useTheme();
+  const { columns, setValueMutation } = useCustomColumns("StockItem");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+
+  if (columns.length === 0) return null;
+
+  return (
+    <View style={{ marginTop: spacing.lg, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.lg }}>
+      <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "700", textTransform: "uppercase", paddingTop: 12 }}>Custom fields</Text>
+      {columns.map((c, i) => {
+        const value = item.customColumnValues?.[c.id] ?? null;
+        const isEditing = editingId === c.id;
+        return (
+          <View key={c.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderBottomWidth: i < columns.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>{c.name}</Text>
+            {isEditing ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <TextInput
+                  style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 6, color: colors.text, fontSize: 13, minWidth: 100, textAlign: "right" }}
+                  value={draft}
+                  onChangeText={setDraft}
+                  keyboardType={c.fieldType === "NUMBER" ? "numeric" : "default"}
+                  autoFocus
+                  onBlur={() => { setValueMutation.mutate({ columnId: c.id, entityId: item.id, value: draft || null }); setEditingId(null); }}
+                />
+              </View>
+            ) : (
+              <TouchableOpacity disabled={!canEdit} onPress={() => { setDraft(value ?? ""); setEditingId(c.id); }}>
+                <Text style={{ color: colors.text, fontSize: 13, fontWeight: "600" }}>{value ?? (canEdit ? "Tap to set" : "—")}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      })}
+    </View>
   );
 }

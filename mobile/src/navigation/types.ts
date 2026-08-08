@@ -17,6 +17,9 @@ export type StockStackParamList = {
   StockScan: undefined;
   StockAdjust: { id: number };
   StockIssue: { id: number };
+  StockAnalytics: undefined;
+  StockProcurement: undefined;
+  StockDashboard: undefined;
 };
 
 export type HelpdeskStackParamList = {

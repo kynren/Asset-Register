@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { ShimmerList } from "../../components/Shimmer";
+import { CustomColumnsSheet } from "../../components/CustomColumnsSheet";
 import { StockItem } from "../../types/stock";
 import { PaginatedResponse } from "../../types/asset";
 import { StockStackParamList } from "../../navigation/types";
@@ -21,6 +22,7 @@ export function StockListScreen() {
 
   const [search, setSearch] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [showCustomColumns, setShowCustomColumns] = useState(false);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch, isRefetching } = useInfiniteQuery({
     queryKey: ["mobile-stock", search, lowStockOnly],
@@ -74,6 +76,32 @@ export function StockListScreen() {
           <Ionicons name="alert-circle-outline" size={14} color={lowStockOnly ? "#fff" : colors.textMuted} />
           <Text style={{ color: lowStockOnly ? "#fff" : colors.text, fontSize: 12.5, fontWeight: "600" }}>Low stock only</Text>
         </TouchableOpacity>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          {[
+            { key: "StockDashboard" as const, label: "Dashboard", icon: "grid-outline" as const },
+            { key: "StockAnalytics" as const, label: "Analytics", icon: "bar-chart-outline" as const },
+            { key: "StockProcurement" as const, label: "Suppliers & POs", icon: "cart-outline" as const },
+          ].map((b) => (
+            <TouchableOpacity
+              key={b.key}
+              style={{ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8 }}
+              onPress={() => navigation.navigate(b.key)}
+            >
+              <Ionicons name={b.icon} size={14} color={colors.text} />
+              <Text style={{ color: colors.text, fontSize: 12, fontWeight: "600" }}>{b.label}</Text>
+            </TouchableOpacity>
+          ))}
+          {hasPermission("stock", "edit") && (
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8 }}
+              onPress={() => setShowCustomColumns(true)}
+            >
+              <Ionicons name="options-outline" size={14} color={colors.text} />
+              <Text style={{ color: colors.text, fontSize: 12, fontWeight: "600" }}>Custom Columns</Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
       </View>
 
       {isLoading ? (
@@ -121,6 +149,8 @@ export function StockListScreen() {
           <Ionicons name="add" size={26} color="#fff" />
         </TouchableOpacity>
       )}
+
+      <CustomColumnsSheet visible={showCustomColumns} entityType="StockItem" title="Stock Custom Columns" onClose={() => setShowCustomColumns(false)} />
     </View>
   );
 }

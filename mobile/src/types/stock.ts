@@ -43,6 +43,7 @@ export interface StockItem {
   stockLevels?: StockLevel[];
   attachments?: StockItemAttachment[];
   transactions?: StockTransaction[];
+  customColumnValues?: Record<number, string | null>;
   createdAt: string;
   updatedAt: string;
 }
