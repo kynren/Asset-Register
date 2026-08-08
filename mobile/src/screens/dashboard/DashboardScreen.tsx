@@ -2,12 +2,15 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { HomeStackParamList } from "../../navigation/types";
+import { ACTIVE_DASHBOARD_QUERY_KEY } from "./activeDashboardKey";
+import { LayoutItem, visibleIdSet } from "./dashboardWidgets";
 
 dayjs.extend(relativeTime);
 
@@ -65,11 +68,27 @@ function statusLabel(status: string) {
 // Mirrors web's home Dashboard widget catalog (client/src/pages/dashboard/widgets.tsx) using the
 // same GET /dashboard/summary + /dashboard/activity endpoints, with the two chart widgets rendered
 // as plain label/count rows instead of bar/pie charts — no charting library on mobile — and the two
-// radial-gauge widgets rendered as simple "N / M" progress bars.
+// radial-gauge widgets rendered as simple "N / M" progress bars. Which sections show is driven by
+// the active Dashboard's layoutJson (see DashboardManagerScreen.tsx + dashboardWidgets.ts) — an
+// empty/default layout shows everything, matching ModuleDashboardTab.tsx's own fallback behavior.
 export function DashboardScreen() {
   const { colors, spacing, radius } = useTheme();
   const { user, organization, hasPermission } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
+
+  const { data: overrideDashboardId } = useQuery({ queryKey: ACTIVE_DASHBOARD_QUERY_KEY, queryFn: () => null as number | null, staleTime: Infinity });
+  const { data: defaultDashboard } = useQuery({
+    queryKey: ["mobile-dashboard-default-home"],
+    queryFn: async () => (await axiosClient.get("/dashboard/dashboards/default", { params: { module: "home" } })).data as { id: number; layoutJson: LayoutItem[] },
+    enabled: hasPermission("dashboard", "view"),
+  });
+  const hasOverride = overrideDashboardId != null && overrideDashboardId !== defaultDashboard?.id;
+  const { data: overrideLayout } = useQuery({
+    queryKey: ["mobile-dashboard-layout", overrideDashboardId],
+    queryFn: async () => (await axiosClient.get(`/dashboard/dashboards/${overrideDashboardId}/layout`)).data as { layoutJson: LayoutItem[] },
+    enabled: hasOverride,
+  });
+  const visibleIds = visibleIdSet(hasOverride ? overrideLayout?.layoutJson : defaultDashboard?.layoutJson);
 
   const { data: summary, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["mobile-dashboard-summary"],
@@ -104,11 +123,11 @@ export function DashboardScreen() {
 
   const kpis = summary?.kpis;
   const tiles = [
-    { key: "assets", label: "Assets", value: kpis?.totalAssets, tone: colors.primary },
-    { key: "tickets", label: "Open Tickets", value: kpis?.openTickets, tone: colors.warning },
-    { key: "stock", label: "Low Stock", value: kpis?.lowStockCount, tone: colors.danger },
-    { key: "docs", label: "Docs & SOPs", value: kpis?.documentsTotal, tone: kpis && kpis.docsReviewOverdue > 0 ? colors.danger : colors.success, sub: kpis && kpis.docsReviewOverdue > 0 ? `${kpis.docsReviewOverdue} overdue for review` : undefined },
-  ];
+    { key: "assets", widgetId: "kpi-total-assets", label: "Assets", value: kpis?.totalAssets, tone: colors.primary },
+    { key: "tickets", widgetId: "kpi-open-tickets", label: "Open Tickets", value: kpis?.openTickets, tone: colors.warning },
+    { key: "stock", widgetId: "kpi-low-stock", label: "Low Stock", value: kpis?.lowStockCount, tone: colors.danger },
+    { key: "docs", widgetId: "kpi-docs", label: "Docs & SOPs", value: kpis?.documentsTotal, tone: kpis && kpis.docsReviewOverdue > 0 ? colors.danger : colors.success, sub: kpis && kpis.docsReviewOverdue > 0 ? `${kpis.docsReviewOverdue} overdue for review` : undefined },
+  ].filter((t) => visibleIds.has(t.widgetId));
 
   const devicesOnlinePct = kpis && kpis.devicesTotal > 0 ? Math.round((kpis.devicesSeen24h / kpis.devicesTotal) * 100) : null;
   const ticketResolutionPct = kpis && kpis.openTickets + kpis.closedTickets > 0 ? Math.round((kpis.closedTickets / (kpis.openTickets + kpis.closedTickets)) * 100) : null;
@@ -133,8 +152,18 @@ export function DashboardScreen() {
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
     >
-      <Text style={[styles.greeting, { color: colors.text }]}>Hi, {user?.firstName ?? "there"}</Text>
-      <Text style={[styles.orgName, { color: colors.textMuted, marginBottom: spacing.lg }]}>{organization?.name ?? ""}</Text>
+      <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <View>
+          <Text style={[styles.greeting, { color: colors.text }]}>Hi, {user?.firstName ?? "there"}</Text>
+          <Text style={[styles.orgName, { color: colors.textMuted, marginBottom: spacing.lg }]}>{organization?.name ?? ""}</Text>
+        </View>
+        {hasPermission("dashboard", "view") && (
+          <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 6, paddingHorizontal: 4 }} onPress={() => navigation.navigate("DashboardManager")}>
+            <Ionicons name="grid-outline" size={16} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>Dashboards</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       <View style={styles.grid}>
         {tiles.map((t) => (
@@ -151,14 +180,14 @@ export function DashboardScreen() {
         ))}
       </View>
 
-      {kpis && kpis.devicesTotal > 0 && (
+      {kpis && kpis.devicesTotal > 0 && (visibleIds.has("kpi-devices") || (ticketResolutionPct != null && visibleIds.has("gauge-ticket-resolution"))) && (
         <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
-          <ProgressRow label="Devices Seen (24h)" value={`${kpis.devicesSeen24h} / ${kpis.devicesTotal}`} pct={devicesOnlinePct ?? 0} tone={colors.primary} />
-          {ticketResolutionPct != null && <ProgressRow label="Ticket Resolution Rate" value={`${ticketResolutionPct}%`} pct={ticketResolutionPct} tone={colors.success} />}
+          {visibleIds.has("kpi-devices") && <ProgressRow label="Devices Seen (24h)" value={`${kpis.devicesSeen24h} / ${kpis.devicesTotal}`} pct={devicesOnlinePct ?? 0} tone={colors.primary} />}
+          {ticketResolutionPct != null && visibleIds.has("gauge-ticket-resolution") && <ProgressRow label="Ticket Resolution Rate" value={`${ticketResolutionPct}%`} pct={ticketResolutionPct} tone={colors.success} />}
         </View>
       )}
 
-      {summary && summary.assetsByStatus.length > 0 && (
+      {summary && summary.assetsByStatus.length > 0 && visibleIds.has("chart-assets-status") && (
         <SectionCard title="Assets by Status">
           {summary.assetsByStatus.map((g) => (
             <StatusRow key={g.status} label={statusLabel(g.status)} count={g.count} />
@@ -166,7 +195,7 @@ export function DashboardScreen() {
         </SectionCard>
       )}
 
-      {summary && summary.ticketsByStatus.length > 0 && (
+      {summary && summary.ticketsByStatus.length > 0 && visibleIds.has("chart-tickets-status") && (
         <SectionCard title="Tickets by Status">
           {summary.ticketsByStatus.map((g) => (
             <StatusRow key={g.status} label={statusLabel(g.status)} count={g.count} />
@@ -174,7 +203,7 @@ export function DashboardScreen() {
         </SectionCard>
       )}
 
-      {lowStock && lowStock.length > 0 && (
+      {lowStock && lowStock.length > 0 && visibleIds.has("low-stock-list") && (
         <SectionCard title="Low Stock Items">
           {lowStock.slice(0, 5).map((item) => (
             <TouchableOpacity key={item.id} onPress={() => goToStock(item.id)} style={styles.listRow}>
@@ -188,7 +217,7 @@ export function DashboardScreen() {
         </SectionCard>
       )}
 
-      {maintenanceDue && maintenanceDue.length > 0 && (
+      {maintenanceDue && maintenanceDue.length > 0 && visibleIds.has("maintenance-due") && (
         <SectionCard title="Maintenance Due">
           {maintenanceDue.slice(0, 5).map((a) => (
             <TouchableOpacity key={a.id} onPress={() => goToAsset(a.id)} style={styles.listRow}>
@@ -202,7 +231,7 @@ export function DashboardScreen() {
         </SectionCard>
       )}
 
-      {offlineDevices.length > 0 && (
+      {offlineDevices.length > 0 && visibleIds.has("offline-devices") && (
         <SectionCard title="Offline Devices">
           {offlineDevices.slice(0, 5).map((d) => (
             <View key={d.id} style={styles.listRow}>
@@ -216,7 +245,7 @@ export function DashboardScreen() {
         </SectionCard>
       )}
 
-      {activity && activity.length > 0 && (
+      {activity && activity.length > 0 && visibleIds.has("recent-activity") && (
         <SectionCard title="Recent Activity">
           {activity.map((a) => (
             <View key={a.id} style={styles.listRow}>

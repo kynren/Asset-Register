@@ -1,5 +1,6 @@
 export type HomeStackParamList = {
   Dashboard: undefined;
+  DashboardManager: undefined;
 };
 
 export type AssetsStackParamList = {
