@@ -49,6 +49,8 @@ import { CameraDetailScreen } from "../screens/nvr/CameraDetailScreen";
 import { LiveCameraScreen } from "../screens/nvr/LiveCameraScreen";
 import { LiveVideoMatrixScreen } from "../screens/nvr/LiveVideoMatrixScreen";
 import { PlaybackCenterScreen } from "../screens/nvr/PlaybackCenterScreen";
+import { DiscoveryProtocolScreen } from "../screens/nvr/DiscoveryProtocolScreen";
+import { NvrEventLogScreen } from "../screens/nvr/NvrEventLogScreen";
 import { DocsListScreen } from "../screens/docs/DocsListScreen";
 import { DocumentDetailScreen } from "../screens/docs/DocumentDetailScreen";
 import { DocumentFormScreen } from "../screens/docs/DocumentFormScreen";
@@ -167,6 +169,8 @@ export function MoreStack() {
       <Stack.Screen name="LiveCamera" component={LiveCameraScreen} options={{ title: "Live" }} />
       <Stack.Screen name="LiveVideoMatrix" component={LiveVideoMatrixScreen} options={{ title: "Live Video Matrix" }} />
       <Stack.Screen name="PlaybackCenter" component={PlaybackCenterScreen} options={{ title: "Playback Center" }} />
+      <Stack.Screen name="DiscoveryProtocol" component={DiscoveryProtocolScreen} options={{ title: "Discovery Protocol" }} />
+      <Stack.Screen name="NvrEventLog" component={NvrEventLogScreen} options={{ title: "Event Log" }} />
       <Stack.Screen name="DocsList" component={DocsListScreen} options={{ title: "Docs & SOPs" }} />
       <Stack.Screen name="DocumentDetail" component={DocumentDetailScreen} options={{ title: "Document" }} />
       <Stack.Screen name="DocumentForm" component={DocumentFormScreen} options={({ route }) => ({ title: route.params?.id ? "Edit Document" : "New Document" })} />

@@ -76,6 +76,8 @@ export type MoreStackParamList = {
   LiveCamera: { id: number };
   LiveVideoMatrix: undefined;
   PlaybackCenter: undefined;
+  DiscoveryProtocol: undefined;
+  NvrEventLog: undefined;
   DocsList: undefined;
   DocumentDetail: { id: number };
   DocumentForm: { id?: number } | undefined;
