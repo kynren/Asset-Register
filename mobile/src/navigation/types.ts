@@ -35,6 +35,7 @@ export type MoreStackParamList = {
   NetworkGraph: undefined;
   NetworkDeviceDetail: { id: number };
   PingConsole: undefined;
+  IpRangeScanner: undefined;
   OperationsHome: undefined;
   ProjectList: undefined;
   ProjectDetail: { id: number };
