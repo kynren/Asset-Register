@@ -11,6 +11,7 @@ import { NetworkDeviceDetailScreen } from "../screens/network/NetworkDeviceDetai
 import { PingConsoleScreen } from "../screens/network/PingConsoleScreen";
 import { IpRangeScannerScreen } from "../screens/network/IpRangeScannerScreen";
 import { SwitchingScreen } from "../screens/network/SwitchingScreen";
+import { MonitorSettingsScreen } from "../screens/network/MonitorSettingsScreen";
 import { OperationsHomeScreen } from "../screens/operations/OperationsHomeScreen";
 import { ProjectListScreen } from "../screens/operations/ProjectListScreen";
 import { ProjectDetailScreen } from "../screens/operations/ProjectDetailScreen";
@@ -115,6 +116,7 @@ export function MoreStack() {
       <Stack.Screen name="PingConsole" component={PingConsoleScreen} options={{ title: "ICMP Pinger" }} />
       <Stack.Screen name="IpRangeScanner" component={IpRangeScannerScreen} options={{ title: "IP Range Scanner" }} />
       <Stack.Screen name="Switching" component={SwitchingScreen} options={{ title: "Switching" }} />
+      <Stack.Screen name="MonitorSettings" component={MonitorSettingsScreen} options={{ title: "Monitor Settings" }} />
       <Stack.Screen name="OperationsHome" component={OperationsHomeScreen} options={{ title: "Operations Tools" }} />
       <Stack.Screen name="ProjectList" component={ProjectListScreen} options={{ title: "IT Projects" }} />
       <Stack.Screen name="ProjectDetail" component={ProjectDetailScreen} options={{ title: "Project" }} />

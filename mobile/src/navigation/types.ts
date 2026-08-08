@@ -37,6 +37,7 @@ export type MoreStackParamList = {
   PingConsole: undefined;
   IpRangeScanner: undefined;
   Switching: undefined;
+  MonitorSettings: undefined;
   OperationsHome: undefined;
   ProjectList: undefined;
   ProjectDetail: { id: number };
