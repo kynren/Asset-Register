@@ -8,6 +8,9 @@ export type AssetsStackParamList = {
   AssetDetail: { id: number };
   AssetForm: { id?: number } | undefined;
   AssetScan: undefined;
+  AssetImport: undefined;
+  DiscoverAssets: undefined;
+  AssetCollections: undefined;
 };
 
 export type StockStackParamList = {

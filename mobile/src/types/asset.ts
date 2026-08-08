@@ -82,6 +82,7 @@ export interface Asset {
   dnsServers: string | null;
   device: AssetDevice | null;
   customFieldValues: AssetCustomFieldValue[];
+  customColumnValues?: Record<number, string | null>;
   tickets: AssetTicketRef[];
   createdAt: string;
   updatedAt: string;

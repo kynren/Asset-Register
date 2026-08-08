@@ -2,7 +2,7 @@ import { useLayoutEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, Alert, Image, Modal, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
 import QRCode from "react-native-qrcode-svg";
@@ -20,6 +20,7 @@ import { useToast } from "../../components/toast/ToastProvider";
 import { Asset, AssetCheckout, AssetPhoto, AssetTicketRef } from "../../types/asset";
 import { AssetsStackParamList } from "../../navigation/types";
 import { buildMediaFormData, isVideo, pickAssetMedia } from "../../lib/mediaPicker";
+import { useCustomColumns } from "../../hooks/useCustomColumns";
 
 const ITIL_TYPE_LABEL: Record<AssetTicketRef["itilType"], string> = {
   INCIDENT: "Incident",
@@ -378,6 +379,8 @@ export function AssetDetailScreen() {
         </Section>
       ) : null}
 
+      <CustomFieldsSection asset={asset} canEdit={hasPermission("assets", "edit")} colors={colors} spacing={spacing} radius={radius} />
+
       <Section title="Comments" colors={colors} spacing={spacing}>
         <CommentThread entityType="Asset" entityId={asset.id} />
       </Section>
@@ -433,6 +436,47 @@ export function AssetDetailScreen() {
         onClose={() => setCheckoutPickerOpen(false)}
       />
     </ScrollView>
+  );
+}
+
+// User-addable extra columns (client/src/components/customColumnDefs.tsx), flattened into a list
+// section since mobile detail screens are card-based rather than tabular — same pattern used on
+// StockDetailScreen. Column management lives on the Asset list's Custom Columns sheet.
+function CustomFieldsSection({ asset, canEdit, colors, spacing, radius }: { asset: Asset; canEdit: boolean; colors: any; spacing: any; radius: any }) {
+  const { columns, setValueMutation } = useCustomColumns("Asset");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+
+  if (columns.length === 0) return null;
+
+  return (
+    <Section title="Custom fields" colors={colors} spacing={spacing}>
+      <View style={{ backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16 }}>
+        {columns.map((c, i) => {
+          const value = asset.customColumnValues?.[c.id] ?? null;
+          const isEditing = editingId === c.id;
+          return (
+            <View key={c.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderBottomWidth: i < columns.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
+              <Text style={{ color: colors.textMuted, fontSize: 13 }}>{c.name}</Text>
+              {isEditing ? (
+                <TextInput
+                  style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 6, color: colors.text, fontSize: 13, minWidth: 100, textAlign: "right" }}
+                  value={draft}
+                  onChangeText={setDraft}
+                  keyboardType={c.fieldType === "NUMBER" ? "numeric" : "default"}
+                  autoFocus
+                  onBlur={() => { setValueMutation.mutate({ columnId: c.id, entityId: asset.id, value: draft || null }); setEditingId(null); }}
+                />
+              ) : (
+                <TouchableOpacity disabled={!canEdit} onPress={() => { setDraft(value ?? ""); setEditingId(c.id); }}>
+                  <Text style={{ color: colors.text, fontSize: 13, fontWeight: "600" }}>{value ?? (canEdit ? "Tap to set" : "—")}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    </Section>
   );
 }
 
