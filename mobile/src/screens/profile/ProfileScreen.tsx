@@ -68,6 +68,25 @@ export function ProfileScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.md,
+          backgroundColor: colors.surface,
+          borderRadius: radius.md,
+          padding: spacing.md,
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginTop: spacing.sm,
+        }}
+        onPress={() => navigation.navigate("Appearance")}
+      >
+        <Ionicons name="color-palette-outline" size={20} color={colors.primary} />
+        <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600", flex: 1 }}>Appearance</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
         style={[styles.logoutButton, { borderColor: colors.danger, borderRadius: radius.md, marginTop: spacing.xl }]}
         onPress={confirmLogout}
       >

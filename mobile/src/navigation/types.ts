@@ -28,6 +28,7 @@ export type MoreStackParamList = {
   MoreRoot: undefined;
   Profile: undefined;
   NotificationPreferences: undefined;
+  Appearance: undefined;
   OperationalContext: undefined;
   NetworkList: undefined;
   NetworkGraph: undefined;

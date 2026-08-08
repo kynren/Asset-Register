@@ -3,6 +3,7 @@ import { MoreScreen } from "../screens/more/MoreScreen";
 import { AppHeader } from "../components/AppHeader";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { NotificationPreferencesScreen } from "../screens/profile/NotificationPreferencesScreen";
+import { AppearanceScreen } from "../screens/profile/AppearanceScreen";
 import { OperationalContextScreen } from "../screens/more/OperationalContextScreen";
 import { NetworkListScreen } from "../screens/network/NetworkListScreen";
 import { NetworkGraphScreen } from "../screens/network/NetworkGraphScreen";
@@ -103,6 +104,7 @@ export function MoreStack() {
       <Stack.Screen name="MoreRoot" component={MoreScreen} options={{ title: "More", headerRight: () => <AppHeader /> }} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
       <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} options={{ title: "Notification Preferences" }} />
+      <Stack.Screen name="Appearance" component={AppearanceScreen} options={{ title: "Appearance" }} />
       <Stack.Screen name="OperationalContext" component={OperationalContextScreen} options={{ title: "Operational Context" }} />
       <Stack.Screen name="NetworkList" component={NetworkListScreen} options={{ title: "Network Topology Map" }} />
       <Stack.Screen name="NetworkGraph" component={NetworkGraphScreen} options={{ title: "Topology Graph" }} />
