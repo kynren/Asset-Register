@@ -78,13 +78,22 @@ export function NetworkListScreen() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10 }}
-          onPress={() => navigation.navigate("IpRangeScanner")}
-        >
-          <Ionicons name="radio-outline" size={16} color={colors.primary} />
-          <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>Open IP Range Scanner</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10 }}
+            onPress={() => navigation.navigate("IpRangeScanner")}
+          >
+            <Ionicons name="radio-outline" size={16} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>IP Range Scanner</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10 }}
+            onPress={() => navigation.navigate("Switching")}
+          >
+            <Ionicons name="swap-horizontal-outline" size={16} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>Switching</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md }]}>
           <Ionicons name="search" size={16} color={colors.textMuted} />
