@@ -11,6 +11,7 @@ import { MoreStackParamList } from "../../navigation/types";
 const ITEMS: { key: string; label: string; description: string; icon: keyof typeof Ionicons.glyphMap; route: keyof MoreStackParamList }[] = [
   { key: "organizations", label: "Organizations", description: "System Admin: create, edit & switch organizations", icon: "briefcase-outline", route: "OrganizationList" },
   { key: "settings", label: "System Settings", description: "Policy, network relay, agent keys", icon: "settings-outline", route: "SystemSettings" },
+  { key: "branding", label: "Branding", description: "App identity, colors, docs watermark", icon: "color-palette-outline", route: "Branding" },
   { key: "backups", label: "Backups", description: "Database backup history & schedule", icon: "cloud-download-outline", route: "Backups" },
   { key: "dbmanager", label: "Database Manager", description: "Browse tables & relationships", icon: "server-outline", route: "DatabaseTableList" },
   { key: "media", label: "Media Center", description: "Media library & attachments", icon: "images-outline", route: "MediaCenter" },

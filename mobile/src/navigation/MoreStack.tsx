@@ -68,6 +68,7 @@ import { TeamListScreen } from "../screens/admin/TeamListScreen";
 import { CategoriesLocationsScreen } from "../screens/admin/CategoriesLocationsScreen";
 import { HelpdeskConfigScreen } from "../screens/admin/HelpdeskConfigScreen";
 import { AutomationRulesScreen } from "../screens/admin/AutomationRulesScreen";
+import { BrandingScreen } from "../screens/admin/BrandingScreen";
 import { AuditLogScreen } from "../screens/admin/AuditLogScreen";
 import { ToastSettingsScreen } from "../screens/admin/ToastSettingsScreen";
 import { EmailIngestSettingsScreen } from "../screens/admin/EmailIngestSettingsScreen";
@@ -167,6 +168,7 @@ export function MoreStack() {
       <Stack.Screen name="CategoriesLocations" component={CategoriesLocationsScreen} options={{ title: "Categories & Locations" }} />
       <Stack.Screen name="HelpdeskConfig" component={HelpdeskConfigScreen} options={{ title: "Helpdesk Config" }} />
       <Stack.Screen name="AutomationRules" component={AutomationRulesScreen} options={{ title: "Automation Rules" }} />
+      <Stack.Screen name="Branding" component={BrandingScreen} options={{ title: "Branding" }} />
       <Stack.Screen name="AuditLog" component={AuditLogScreen} options={{ title: "Audit Log" }} />
       <Stack.Screen name="ToastSettings" component={ToastSettingsScreen} options={{ title: "Toast Designer" }} />
       <Stack.Screen name="EmailIngestSettings" component={EmailIngestSettingsScreen} options={{ title: "Email Ingestion" }} />
