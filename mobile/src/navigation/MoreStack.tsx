@@ -38,6 +38,11 @@ import { LightingSiteMapViewScreen } from "../screens/controls/LightingSiteMapVi
 import { GatesScreen } from "../screens/controls/GatesScreen";
 import { DoorListScreen } from "../screens/controls/DoorListScreen";
 import { DoorDetailScreen } from "../screens/controls/DoorDetailScreen";
+import { AccessDevicesScreen } from "../screens/controls/AccessDevicesScreen";
+import { PersonsScreen } from "../screens/controls/PersonsScreen";
+import { AccessGroupsScreen } from "../screens/controls/AccessGroupsScreen";
+import { CredentialsScreen } from "../screens/controls/CredentialsScreen";
+import { AccessEventLogScreen } from "../screens/controls/AccessEventLogScreen";
 import { NvrHomeScreen } from "../screens/nvr/NvrHomeScreen";
 import { CameraListScreen } from "../screens/nvr/CameraListScreen";
 import { CameraDetailScreen } from "../screens/nvr/CameraDetailScreen";
@@ -148,6 +153,14 @@ export function MoreStack() {
       <Stack.Screen name="Gates" component={GatesScreen} options={{ title: "Gates" }} />
       <Stack.Screen name="DoorList" component={DoorListScreen} options={{ title: "Access Control" }} />
       <Stack.Screen name="DoorDetail" component={DoorDetailScreen} options={{ title: "Door" }} />
+      <Stack.Screen name="AccessDevices" component={AccessDevicesScreen} options={{ title: "Devices" }} />
+      <Stack.Screen name="Persons" component={PersonsScreen} options={{ title: "Persons" }} />
+      <Stack.Screen name="AccessGroups" component={AccessGroupsScreen} options={{ title: "Access Groups" }} />
+      <Stack.Screen name="Credentials" component={CredentialsScreen} options={{ title: "Credentials" }} />
+      <Stack.Screen name="AccessEventLog" component={AccessEventLogScreen} options={{ title: "Event Log" }} />
+      <Stack.Screen name="AccessControlZigbee" options={{ title: "ZigBee" }}>
+        {() => <ZigbeeScaffoldScreen apiBase="/access-control" module="access-control" />}
+      </Stack.Screen>
       <Stack.Screen name="NvrHome" component={NvrHomeScreen} options={{ title: "NVR & Cameras" }} />
       <Stack.Screen name="CameraList" component={CameraListScreen} options={{ title: "Cameras" }} />
       <Stack.Screen name="CameraDetail" component={CameraDetailScreen} options={{ title: "Camera" }} />

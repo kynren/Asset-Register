@@ -64,6 +64,12 @@ export type MoreStackParamList = {
   Gates: undefined;
   DoorList: undefined;
   DoorDetail: { id: number };
+  AccessDevices: undefined;
+  Persons: undefined;
+  AccessGroups: undefined;
+  Credentials: undefined;
+  AccessEventLog: undefined;
+  AccessControlZigbee: undefined;
   NvrHome: undefined;
   CameraList: undefined;
   CameraDetail: { id: number };
