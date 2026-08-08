@@ -8,9 +8,11 @@ import { ApiConnectionRequest, requireApiConnectionResource, verifyApiConnection
 // External REST gateway for third-party applications holding an ApiConnection credential (see
 // apiConnections.routes.ts for how those are issued, and apiConnectionAuth.ts for how a request
 // here is authenticated). Mounted at /api/integrations/v1 — versioned so future breaking changes
-// to this surface don't disturb integrations already built against v1. "assets" is the only live
-// resource today; adding another means a new sub-router here plus that resource name being
-// selectable in the ApiConnection admin UI (see resources[] on the ApiConnection model).
+// to this surface don't disturb integrations already built against v1. "assets" has full CRUD;
+// tickets/stock/docs/network/users below are read-only (GET list + GET by id) since a connection
+// pulling data out of those tables has no established write-CRUD contract the way assets does.
+// Adding a new resource means a new sub-router here plus its name being added to RESOURCE_ENUM in
+// apiConnections.schema.ts and the RESOURCES arrays in the web/mobile connection-creation UI.
 const router = Router();
 router.use(verifyApiConnection);
 
@@ -125,6 +127,180 @@ router.delete("/assets/:id", async (req, res) => {
 
   await prisma.asset.delete({ where: { id: existing.id } });
   res.status(204).end();
+});
+
+// Read-only resources below — "assets" above is the only one with full write CRUD today. These
+// exist so a connection can be scoped to *pull* data out of the other tables (tickets, stock,
+// docs, network devices, users) without also handing out write access to them; a connection still
+// needs canGet (checked in verifyApiConnection) plus the matching resources[] entry to reach any
+// of these. Selects below deliberately exclude sensitive/internal columns (password/MFA secrets,
+// encrypted SNMP community strings, etc.) even though canGet-only callers could never reach a
+// write path anyway — the same "don't return what you don't have to" discipline as assetSelect.
+
+const ticketSelect = {
+  id: true,
+  ticketNumber: true,
+  title: true,
+  description: true,
+  type: true,
+  itilType: true,
+  status: true,
+  priority: true,
+  categoryId: true,
+  assetId: true,
+  locationId: true,
+  requesterId: true,
+  dueAt: true,
+  resolvedAt: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+router.use("/tickets", requireApiConnectionResource("tickets"));
+
+router.get("/tickets", async (req, res) => {
+  const { page, pageSize, skip, take } = getPagination(req);
+  const [items, total] = await Promise.all([
+    prisma.ticket.findMany({ select: ticketSelect, orderBy: { id: "desc" }, skip, take }),
+    prisma.ticket.count(),
+  ]);
+  res.json(paginatedResponse(items, total, page, pageSize));
+});
+
+router.get("/tickets/:id", async (req, res) => {
+  const ticket = await prisma.ticket.findUnique({ where: { id: Number(req.params.id) }, select: ticketSelect });
+  if (!ticket) throw new ApiError(404, "Ticket not found");
+  res.json(ticket);
+});
+
+const stockItemSelect = {
+  id: true,
+  sku: true,
+  name: true,
+  category: true,
+  stockItemTypeId: true,
+  unit: true,
+  quantityOnHand: true,
+  reorderLevel: true,
+  unitCost: true,
+  locationId: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+router.use("/stock", requireApiConnectionResource("stock"));
+
+router.get("/stock", async (req, res) => {
+  const { page, pageSize, skip, take } = getPagination(req);
+  const [items, total] = await Promise.all([
+    prisma.stockItem.findMany({ select: stockItemSelect, orderBy: { id: "desc" }, skip, take }),
+    prisma.stockItem.count(),
+  ]);
+  res.json(paginatedResponse(items, total, page, pageSize));
+});
+
+router.get("/stock/:id", async (req, res) => {
+  const item = await prisma.stockItem.findUnique({ where: { id: Number(req.params.id) }, select: stockItemSelect });
+  if (!item) throw new ApiError(404, "Stock item not found");
+  res.json(item);
+});
+
+const documentSelect = {
+  id: true,
+  title: true,
+  docType: true,
+  category: true,
+  collectionId: true,
+  summary: true,
+  sections: true,
+  tags: true,
+  isPublished: true,
+  reviewDueDate: true,
+  createdById: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+router.use("/docs", requireApiConnectionResource("docs"));
+
+router.get("/docs", async (req, res) => {
+  const { page, pageSize, skip, take } = getPagination(req);
+  const [items, total] = await Promise.all([
+    prisma.document.findMany({ select: documentSelect, orderBy: { id: "desc" }, skip, take }),
+    prisma.document.count(),
+  ]);
+  res.json(paginatedResponse(items, total, page, pageSize));
+});
+
+router.get("/docs/:id", async (req, res) => {
+  const doc = await prisma.document.findUnique({ where: { id: Number(req.params.id) }, select: documentSelect });
+  if (!doc) throw new ApiError(404, "Document not found");
+  res.json(doc);
+});
+
+const networkDeviceSelect = {
+  id: true,
+  key: true,
+  ipAddress: true,
+  macAddress: true,
+  hostname: true,
+  vendor: true,
+  deviceType: true,
+  os: true,
+  loggedInUser: true,
+  status: true,
+  firstSeenAt: true,
+  lastSeenAt: true,
+  snmpEnabled: true,
+  snmpSysName: true,
+};
+
+router.use("/network", requireApiConnectionResource("network"));
+
+router.get("/network", async (req, res) => {
+  const { page, pageSize, skip, take } = getPagination(req);
+  const [items, total] = await Promise.all([
+    prisma.monitoredNetworkDevice.findMany({ select: networkDeviceSelect, orderBy: { id: "desc" }, skip, take }),
+    prisma.monitoredNetworkDevice.count(),
+  ]);
+  res.json(paginatedResponse(items, total, page, pageSize));
+});
+
+router.get("/network/:id", async (req, res) => {
+  const device = await prisma.monitoredNetworkDevice.findUnique({ where: { id: Number(req.params.id) }, select: networkDeviceSelect });
+  if (!device) throw new ApiError(404, "Network device not found");
+  res.json(device);
+});
+
+// No password/MFA/PIN fields, ever — same rule applied everywhere else in the app a user record
+// crosses a trust boundary (e.g. /auth/me, the admin user list).
+const userSelect = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  roleId: true,
+  isActive: true,
+  lastLoginAt: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+router.use("/users", requireApiConnectionResource("users"));
+
+router.get("/users", async (req, res) => {
+  const { page, pageSize, skip, take } = getPagination(req);
+  const [items, total] = await Promise.all([
+    prisma.user.findMany({ select: userSelect, orderBy: { id: "desc" }, skip, take }),
+    prisma.user.count(),
+  ]);
+  res.json(paginatedResponse(items, total, page, pageSize));
+});
+
+router.get("/users/:id", async (req, res) => {
+  const user = await prisma.user.findUnique({ where: { id: Number(req.params.id) }, select: userSelect });
+  if (!user) throw new ApiError(404, "User not found");
+  res.json(user);
 });
 
 export default router;

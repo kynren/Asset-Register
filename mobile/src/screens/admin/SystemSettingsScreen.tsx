@@ -67,6 +67,17 @@ const API_CONNECTION_VERBS: { key: "canGet" | "canPost" | "canPut" | "canPatch" 
   { key: "canDelete", label: "DELETE" },
 ];
 
+// Mirrors client/src/pages/appSettings/ApiConnectionsCard.tsx's RESOURCES — "assets" has full
+// CRUD, the rest are read-only (GET) regardless of which verbs the connection is granted.
+const API_CONNECTION_RESOURCES: { key: string; label: string }[] = [
+  { key: "assets", label: "Assets" },
+  { key: "tickets", label: "Tickets" },
+  { key: "stock", label: "Stock Items" },
+  { key: "docs", label: "Docs & SOPs" },
+  { key: "network", label: "Network Devices" },
+  { key: "users", label: "Users" },
+];
+
 // Summary stats (registered / first connected / active-for / call count / last call) plus a
 // scrollable list of the most recent ~50 calls — no pagination UI on mobile, unlike the web
 // DataTable version, since a bottom sheet is a quick-glance surface, not a full audit screen.
@@ -161,16 +172,20 @@ export function SystemSettingsScreen() {
     queryKey: ["mobile-api-connections"],
     queryFn: async () => (await axiosClient.get("/api-connections")).data as ApiConnection[],
   });
-  const [apiConnForm, setApiConnForm] = useState({ name: "", canGet: true, canPost: false, canPut: false, canPatch: false, canDelete: false, allOrganizations: false });
+  const DEFAULT_API_CONN_FORM = { name: "", resources: ["assets"] as string[], canGet: true, canPost: false, canPut: false, canPatch: false, canDelete: false, allOrganizations: false };
+  const [apiConnForm, setApiConnForm] = useState(DEFAULT_API_CONN_FORM);
   const [apiConnJustCreated, setApiConnJustCreated] = useState<{ apiKeyId: string; bearerToken: string } | null>(null);
   const createApiConnMutation = useMutation({
-    mutationFn: () => axiosClient.post("/api-connections", { resources: ["assets"], ...apiConnForm }),
+    mutationFn: () => axiosClient.post("/api-connections", apiConnForm),
     onSuccess: (res) => {
       setApiConnJustCreated({ apiKeyId: res.data.apiKeyId, bearerToken: res.data.bearerToken });
-      setApiConnForm({ name: "", canGet: true, canPost: false, canPut: false, canPatch: false, canDelete: false, allOrganizations: false });
+      setApiConnForm(DEFAULT_API_CONN_FORM);
       queryClient.invalidateQueries({ queryKey: ["mobile-api-connections"] });
     },
   });
+  function toggleApiConnResource(key: string, checked: boolean) {
+    setApiConnForm((f) => ({ ...f, resources: checked ? [...f.resources, key] : f.resources.filter((r) => r !== key) }));
+  }
   const toggleApiConnActiveMutation = useMutation({
     mutationFn: (params: { id: number; isActive: boolean }) => axiosClient.patch(`/api-connections/${params.id}`, { isActive: params.isActive }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mobile-api-connections"] }),
@@ -321,6 +336,9 @@ export function SystemSettingsScreen() {
                 <Text style={{ color: colors.warning, fontSize: 10, fontWeight: "700" }}>All organizations</Text>
               </View>
             )}
+            <Text style={{ color: colors.textMuted, fontSize: 10.5, marginTop: 6 }}>
+              {c.resources.map((r) => API_CONNECTION_RESOURCES.find((x) => x.key === r)?.label ?? r).join(", ")}
+            </Text>
             <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
               <TouchableOpacity onPress={() => setActivityConnectionId(c.id)}>
                 <Text style={{ color: colors.text, fontSize: 11, fontWeight: "700" }}>Activity</Text>
@@ -350,6 +368,16 @@ export function SystemSettingsScreen() {
               value={apiConnForm.name}
               onChangeText={(v) => setApiConnForm((f) => ({ ...f, name: v }))}
             />
+            <Text style={{ color: colors.textMuted, fontSize: 10.5, fontWeight: "700", marginBottom: 6, textTransform: "uppercase" }}>Data</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 10 }}>
+              {API_CONNECTION_RESOURCES.map((r) => (
+                <TouchableOpacity key={r.key} style={{ flexDirection: "row", alignItems: "center", gap: 6 }} onPress={() => toggleApiConnResource(r.key, !apiConnForm.resources.includes(r.key))}>
+                  <Ionicons name={apiConnForm.resources.includes(r.key) ? "checkbox" : "square-outline"} size={18} color={apiConnForm.resources.includes(r.key) ? colors.primary : colors.textMuted} />
+                  <Text style={{ color: colors.text, fontSize: 12 }}>{r.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={{ color: colors.textMuted, fontSize: 10.5, fontWeight: "700", marginBottom: 6, textTransform: "uppercase" }}>Permissions</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 10 }}>
               {API_CONNECTION_VERBS.map((v) => (
                 <TouchableOpacity key={v.key} style={{ flexDirection: "row", alignItems: "center", gap: 6 }} onPress={() => setApiConnForm((f) => ({ ...f, [v.key]: !f[v.key] }))}>
@@ -368,8 +396,8 @@ export function SystemSettingsScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={{ backgroundColor: colors.primary, borderRadius: radius.md, alignItems: "center", paddingVertical: 12, opacity: apiConnForm.name.trim() ? 1 : 0.5 }}
-              disabled={!apiConnForm.name.trim() || createApiConnMutation.isPending}
+              style={{ backgroundColor: colors.primary, borderRadius: radius.md, alignItems: "center", paddingVertical: 12, opacity: apiConnForm.name.trim() && apiConnForm.resources.length ? 1 : 0.5 }}
+              disabled={!apiConnForm.name.trim() || !apiConnForm.resources.length || createApiConnMutation.isPending}
               onPress={() => createApiConnMutation.mutate()}
             >
               {createApiConnMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Create Connection</Text>}

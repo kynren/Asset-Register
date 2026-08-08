@@ -74,6 +74,7 @@ import databaseManagerRoutes from "./modules/databaseManager/databaseManager.rou
 import mediaCenterRoutes from "./modules/mediaCenter/mediaCenter.routes";
 import apiConnectionsRoutes from "./modules/apiConnections/apiConnections.routes";
 import apiIntegrationsRoutes from "./modules/apiIntegrations/apiIntegrations.routes";
+import externalConnectorsRoutes from "./modules/externalConnectors/externalConnectors.routes";
 
 export function createApp() {
   const app = express();
@@ -167,6 +168,7 @@ export function createApp() {
   app.use("/api/app-settings", appSettingsRoutes);
   app.use("/api/api-connections", apiConnectionsRoutes);
   app.use("/api/integrations/v1", apiIntegrationsRoutes);
+  app.use("/api/external-connectors", externalConnectorsRoutes);
   app.use("/api/scheduled-changes", scheduledChangesRoutes);
   app.use("/api/database", databaseManagerRoutes);
   app.use("/api/media-center", mediaCenterRoutes);
