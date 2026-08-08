@@ -248,6 +248,14 @@ export function AssetDetailScreen() {
         </View>
       </View>
 
+      <TouchableOpacity
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.primary + "1a", borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, paddingVertical: 12, marginTop: spacing.lg }}
+        onPress={() => navigation.navigate("AssetExplorer", { assetId: asset.id })}
+      >
+        <Ionicons name="compass-outline" size={16} color={colors.primary} />
+        <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>Asset Explorer — Components, Reports, Impact Analysis & more</Text>
+      </TouchableOpacity>
+
       <Section title="Overview" colors={colors} spacing={spacing}>
         <RowList rows={overviewRows} colors={colors} />
       </Section>

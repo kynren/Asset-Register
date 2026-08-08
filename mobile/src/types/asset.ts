@@ -6,6 +6,11 @@ export interface AssetCategory {
   isComputerAsset?: boolean;
 }
 
+export interface InstalledSoftwareEntry {
+  name: string;
+  version?: string;
+}
+
 export interface AssetLocation {
   id: number;
   name: string;
@@ -34,6 +39,7 @@ export interface AssetDevice {
   batteryPresent: boolean | null;
   batteryPercent: number | null;
   batteryCharging: boolean | null;
+  installedSoftware?: InstalledSoftwareEntry[] | null;
 }
 
 export interface AssetCustomFieldValue {
@@ -84,8 +90,25 @@ export interface Asset {
   customFieldValues: AssetCustomFieldValue[];
   customColumnValues?: Record<number, string | null>;
   tickets: AssetTicketRef[];
+  remoteManagementEnabled: boolean;
+  remoteManagementProtocol: string | null;
+  remoteManagementUrl: string | null;
+  isVirtual: boolean;
+  hypervisor: string | null;
+  vmHost: string | null;
+  antivirusProduct: string | null;
+  antivirusStatus: string | null;
+  antivirusLastScanAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AssetHistoryEntry {
+  id: number;
+  action: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  user: { id: number; firstName: string; lastName: string } | null;
 }
 
 export interface AssetPhoto {

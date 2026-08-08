@@ -11,6 +11,15 @@ export type AssetsStackParamList = {
   AssetImport: undefined;
   DiscoverAssets: undefined;
   AssetCollections: undefined;
+  AssetExplorer: { assetId: number };
+  AssetSubResource: { assetId: number; kind: "components" | "volumes" | "connections" | "network-ports" | "sockets" };
+  AssetFileResource: { assetId: number; kind: "contracts" | "documents" };
+  AssetManagement: { assetId: number };
+  AssetTechConfig: { assetId: number };
+  AssetSoftware: { assetId: number };
+  AssetImpactAnalysis: { assetId: number };
+  AssetHistory: { assetId: number };
+  AssetReport: { assetId: number };
 };
 
 export type StockStackParamList = {
