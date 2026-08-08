@@ -30,7 +30,10 @@ import { TimelineScreen } from "../screens/operations/TimelineScreen";
 import { LegacyToolsScreen } from "../screens/operations/LegacyToolsScreen";
 import { ControlsHomeScreen } from "../screens/controls/ControlsHomeScreen";
 import { LightingListScreen } from "../screens/controls/LightingListScreen";
+import { LightingScenesScreen } from "../screens/controls/LightingScenesScreen";
+import { LightingAutomationsScreen } from "../screens/controls/LightingAutomationsScreen";
 import { LightingSiteMapListScreen } from "../screens/controls/LightingSiteMapListScreen";
+import { ZigbeeScaffoldScreen } from "../components/ZigbeeScaffoldScreen";
 import { LightingSiteMapViewScreen } from "../screens/controls/LightingSiteMapViewScreen";
 import { GatesScreen } from "../screens/controls/GatesScreen";
 import { DoorListScreen } from "../screens/controls/DoorListScreen";
@@ -135,6 +138,11 @@ export function MoreStack() {
       <Stack.Screen name="LegacyTools" component={LegacyToolsScreen} options={{ title: "Legacy Tools" }} />
       <Stack.Screen name="ControlsHome" component={ControlsHomeScreen} options={{ title: "Controls" }} />
       <Stack.Screen name="LightingList" component={LightingListScreen} options={{ title: "Lighting" }} />
+      <Stack.Screen name="LightingScenes" component={LightingScenesScreen} options={{ title: "Scenes" }} />
+      <Stack.Screen name="LightingAutomations" component={LightingAutomationsScreen} options={{ title: "Automations" }} />
+      <Stack.Screen name="LightingZigbee" options={{ title: "ZigBee" }}>
+        {() => <ZigbeeScaffoldScreen apiBase="/lighting" module="lighting" />}
+      </Stack.Screen>
       <Stack.Screen name="LightingSiteMapList" component={LightingSiteMapListScreen} options={{ title: "Site Maps" }} />
       <Stack.Screen name="LightingSiteMapView" component={LightingSiteMapViewScreen} options={({ route }) => ({ title: route.params.name })} />
       <Stack.Screen name="Gates" component={GatesScreen} options={{ title: "Gates" }} />

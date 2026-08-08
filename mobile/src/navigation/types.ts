@@ -56,6 +56,9 @@ export type MoreStackParamList = {
   LegacyTools: undefined;
   ControlsHome: undefined;
   LightingList: undefined;
+  LightingScenes: undefined;
+  LightingAutomations: undefined;
+  LightingZigbee: undefined;
   LightingSiteMapList: undefined;
   LightingSiteMapView: { id: number; name: string };
   Gates: undefined;
