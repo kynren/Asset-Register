@@ -1,5 +1,6 @@
 export type HomeStackParamList = {
   Dashboard: undefined;
+  DashboardManager: undefined;
 };
 
 export type AssetsStackParamList = {
@@ -7,6 +8,19 @@ export type AssetsStackParamList = {
   AssetDetail: { id: number };
   AssetForm: { id?: number } | undefined;
   AssetScan: undefined;
+  AssetImport: undefined;
+  DiscoverAssets: undefined;
+  AssetCollections: undefined;
+  AssetExplorer: { assetId: number };
+  AssetSubResource: { assetId: number; kind: "components" | "volumes" | "connections" | "network-ports" | "sockets" };
+  AssetFileResource: { assetId: number; kind: "contracts" | "documents" };
+  AssetManagement: { assetId: number };
+  AssetTechConfig: { assetId: number };
+  AssetSoftware: { assetId: number };
+  AssetImpactAnalysis: { assetId: number };
+  AssetHistory: { assetId: number };
+  AssetReport: { assetId: number };
+  AssetIntakeQueue: undefined;
 };
 
 export type StockStackParamList = {
@@ -16,6 +30,9 @@ export type StockStackParamList = {
   StockScan: undefined;
   StockAdjust: { id: number };
   StockIssue: { id: number };
+  StockAnalytics: undefined;
+  StockProcurement: undefined;
+  StockDashboard: undefined;
 };
 
 export type HelpdeskStackParamList = {
@@ -28,9 +45,15 @@ export type MoreStackParamList = {
   MoreRoot: undefined;
   Profile: undefined;
   NotificationPreferences: undefined;
+  Appearance: undefined;
+  OperationalContext: undefined;
   NetworkList: undefined;
   NetworkGraph: undefined;
   NetworkDeviceDetail: { id: number };
+  PingConsole: undefined;
+  IpRangeScanner: undefined;
+  Switching: undefined;
+  MonitorSettings: undefined;
   OperationsHome: undefined;
   ProjectList: undefined;
   ProjectDetail: { id: number };
@@ -49,17 +72,28 @@ export type MoreStackParamList = {
   LegacyTools: undefined;
   ControlsHome: undefined;
   LightingList: undefined;
+  LightingScenes: undefined;
+  LightingAutomations: undefined;
+  LightingZigbee: undefined;
   LightingSiteMapList: undefined;
   LightingSiteMapView: { id: number; name: string };
   Gates: undefined;
   DoorList: undefined;
   DoorDetail: { id: number };
+  AccessDevices: undefined;
+  Persons: undefined;
+  AccessGroups: undefined;
+  Credentials: undefined;
+  AccessEventLog: undefined;
+  AccessControlZigbee: undefined;
   NvrHome: undefined;
   CameraList: undefined;
   CameraDetail: { id: number };
   LiveCamera: { id: number };
   LiveVideoMatrix: undefined;
   PlaybackCenter: undefined;
+  DiscoveryProtocol: undefined;
+  NvrEventLog: undefined;
   DocsList: undefined;
   DocumentDetail: { id: number };
   DocumentForm: { id?: number } | undefined;
@@ -85,6 +119,19 @@ export type MoreStackParamList = {
   MobileSplashSettings: undefined;
   EmailTemplateList: undefined;
   AgentLog: undefined;
+  SystemStatus: undefined;
+  Changelog: undefined;
+  ChangeManagementList: undefined;
+  TeamList: undefined;
+  CategoriesLocations: undefined;
+  HelpdeskConfig: undefined;
+  AutomationRules: undefined;
+  Branding: undefined;
+  AuditLog: undefined;
+  ToastSettings: undefined;
+  EmailIngestSettings: undefined;
+  McpKeyList: undefined;
+  ExternalConnectorList: undefined;
   Backups: undefined;
   BackupDestinationForm: { id?: number } | undefined;
   DatabaseTableList: undefined;

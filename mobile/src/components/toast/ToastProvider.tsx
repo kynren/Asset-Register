@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../theme/ThemeContext";
 
-export type ToastVariant = "success" | "error" | "info";
+export type ToastVariant = "success" | "error" | "warning" | "info";
 
 export interface ToastOptions {
   variant?: ToastVariant;
@@ -74,6 +74,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const variantMeta: Record<ToastVariant, { color: string; icon: keyof typeof Ionicons.glyphMap }> = {
     success: { color: colors.success, icon: "checkmark-circle" },
     error: { color: colors.danger, icon: "alert-circle" },
+    warning: { color: colors.warning, icon: "warning" },
     info: { color: colors.primary, icon: "information-circle" },
   };
 

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, Alert, FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { axiosClient } from "../../api/axiosClient";
 import { useAuth } from "../../auth/AuthContext";
@@ -101,8 +101,30 @@ export function DoorListScreen() {
 
   const tone = (state: DoorLockState) => (state === "UNKNOWN" ? colors.textMuted : state === "LOCKED" ? colors.success : colors.danger);
 
+  const NAV_BUTTONS: { key: keyof MoreStackParamList; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+    { key: "AccessDevices", label: "Devices", icon: "hardware-chip-outline" },
+    { key: "Persons", label: "Persons", icon: "people-outline" },
+    { key: "AccessGroups", label: "Access Groups", icon: "albums-outline" },
+    { key: "Credentials", label: "Credentials", icon: "id-card-outline" },
+    { key: "AccessEventLog", label: "Event Log", icon: "receipt-outline" },
+    { key: "AccessControlZigbee", label: "ZigBee", icon: "bluetooth-outline" },
+  ];
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
+        {NAV_BUTTONS.map((b) => (
+          <TouchableOpacity
+            key={b.key}
+            style={{ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8 }}
+            onPress={() => navigation.navigate(b.key as any)}
+          >
+            <Ionicons name={b.icon} size={14} color={colors.text} />
+            <Text style={{ color: colors.text, fontSize: 12, fontWeight: "600" }}>{b.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
       {canCreate && (
         <TouchableOpacity
           style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginHorizontal: spacing.lg, marginTop: spacing.lg, backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10 }}

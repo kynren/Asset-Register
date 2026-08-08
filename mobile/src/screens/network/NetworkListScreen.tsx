@@ -61,12 +61,46 @@ export function NetworkListScreen() {
           </View>
         )}
 
+        <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10 }}
+            onPress={() => navigation.navigate("NetworkGraph")}
+          >
+            <Ionicons name="git-network-outline" size={16} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>Topology Graph</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10 }}
+            onPress={() => navigation.navigate("PingConsole")}
+          >
+            <Ionicons name="pulse-outline" size={16} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>ICMP Pinger</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10 }}
+            onPress={() => navigation.navigate("IpRangeScanner")}
+          >
+            <Ionicons name="radio-outline" size={16} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>IP Range Scanner</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10 }}
+            onPress={() => navigation.navigate("Switching")}
+          >
+            <Ionicons name="swap-horizontal-outline" size={16} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>Switching</Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
           style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10 }}
-          onPress={() => navigation.navigate("NetworkGraph")}
+          onPress={() => navigation.navigate("MonitorSettings")}
         >
-          <Ionicons name="git-network-outline" size={16} color={colors.primary} />
-          <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>Open Topology Graph</Text>
+          <Ionicons name="options-outline" size={16} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>Monitor Settings & Discovered Subnets</Text>
         </TouchableOpacity>
 
         <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md }]}>

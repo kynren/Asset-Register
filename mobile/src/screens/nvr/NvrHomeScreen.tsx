@@ -9,6 +9,8 @@ const ITEMS: { key: string; label: string; description: string; icon: keyof type
   { key: "cameras", label: "Cameras", description: "Browse NVRs, camera status & events", icon: "videocam-outline", route: "CameraList" },
   { key: "matrix", label: "Live Video Matrix", description: "Watch up to 4 cameras at once", icon: "grid-outline", route: "LiveVideoMatrix" },
   { key: "playback", label: "Playback Center", description: "Browse and play back recordings", icon: "play-circle-outline", route: "PlaybackCenter" },
+  { key: "discovery", label: "Discovery Protocol", description: "Scan an NVR for channels via ONVIF/ISAPI, import as cameras", icon: "radio-outline", route: "DiscoveryProtocol" },
+  { key: "eventlog", label: "Event Log", description: "Camera/NVR online, offline & motion events", icon: "receipt-outline", route: "NvrEventLog" },
 ];
 
 export function NvrHomeScreen() {

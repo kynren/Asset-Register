@@ -114,7 +114,7 @@ export function LightingListScreen() {
           onPress={() => navigation.navigate("LightingSiteMapList")}
         >
           <Ionicons name="map-outline" size={16} color={colors.primary} />
-          <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>View Site Maps</Text>
+          <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>Site Maps</Text>
         </TouchableOpacity>
         {canCreate && (
           <TouchableOpacity
@@ -124,6 +124,29 @@ export function LightingListScreen() {
             <Ionicons name="add" size={16} color={colors.primary} />
           </TouchableOpacity>
         )}
+      </View>
+
+      <View style={{ flexDirection: "row", gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.sm }}>
+        <TouchableOpacity
+          style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10 }}
+          onPress={() => navigation.navigate("LightingScenes")}
+        >
+          <Ionicons name="star-outline" size={16} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>Scenes</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingVertical: 10 }}
+          onPress={() => navigation.navigate("LightingAutomations")}
+        >
+          <Ionicons name="time-outline" size={16} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12.5 }}>Automations</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: colors.primary + "1a", borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingHorizontal: 14 }}
+          onPress={() => navigation.navigate("LightingZigbee")}
+        >
+          <Ionicons name="bluetooth-outline" size={16} color={colors.primary} />
+        </TouchableOpacity>
       </View>
 
       {scenes.length > 0 && (

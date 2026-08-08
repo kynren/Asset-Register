@@ -13,6 +13,13 @@ const ITEMS: { key: string; label: string; description: string; icon: keyof type
   { key: "users", label: "Users", description: "Accounts, roles, reset passwords", icon: "people-outline", route: "UserList" },
   { key: "roles", label: "Roles & Permissions", description: "Permission matrix per role", icon: "shield-checkmark-outline", route: "RoleList" },
   { key: "email", label: "Email Templates", description: "Notification email designs", icon: "mail-outline", route: "EmailTemplateList" },
+  { key: "teams", label: "Teams", description: "Team membership for ticket assignment", icon: "people-circle-outline", route: "TeamList" },
+  { key: "categoriesLocations", label: "Categories & Locations", description: "Asset categories, form templates, locations, ticket categories", icon: "folder-outline", route: "CategoriesLocations" },
+  { key: "helpdeskConfig", label: "Helpdesk Config", description: "Templates, SLAs, recurring tickets, business rules, settings", icon: "construct-outline", route: "HelpdeskConfig" },
+  { key: "automationRules", label: "Automation Rules", description: "Condition/action rules for Assets and Stock", icon: "flash-outline", route: "AutomationRules" },
+  { key: "audit", label: "Audit Log", description: "Admin action history", icon: "list-outline", route: "AuditLog" },
+  { key: "toasts", label: "Toast Designer", description: "In-app notification style", icon: "chatbox-outline", route: "ToastSettings" },
+  { key: "emailIngest", label: "Email Ingestion", description: "IMAP email-to-ticket settings", icon: "at-outline", route: "EmailIngestSettings" },
 ];
 
 export function AdminHomeScreen() {

@@ -2,6 +2,7 @@ export interface LightingDevice {
   id: number;
   name: string;
   protocol: string;
+  kind?: "SWITCH" | "LIGHT" | null;
   icon: string | null;
   groupId: number | null;
   locationId: number | null;
