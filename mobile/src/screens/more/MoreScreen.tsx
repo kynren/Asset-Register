@@ -36,6 +36,7 @@ const ITEMS: MoreItem[] = [
   { key: "nvr", label: "NVR & Cameras", icon: "videocam-outline", module: "nvr", route: "NvrHome" },
   { key: "docs", label: "Docs & SOPs", icon: "document-text-outline", module: "docs", route: "DocsList" },
   { key: "reports", label: "Reports", icon: "bar-chart-outline", module: "reports", route: "ReportList" },
+  { key: "operational-context", label: "Operational Context", icon: "speedometer-outline", module: "operational-context", route: "OperationalContext" },
   { key: "virtual-assistant", label: "Virtual Assistant", icon: "sparkles-outline", module: "virtual-assistant", route: "Assistant" },
   { key: "password", label: "Password Management", icon: "lock-closed-outline", module: "password", route: "VaultList" },
   { key: "admin", label: "Admin & Setup", icon: "settings-outline", module: "admin", route: "AdminHome" },

@@ -15,6 +15,9 @@ const ITEMS: { key: string; label: string; description: string; icon: keyof type
   { key: "dbmanager", label: "Database Manager", description: "Browse tables & relationships", icon: "server-outline", route: "DatabaseTableList" },
   { key: "media", label: "Media Center", description: "Media library & attachments", icon: "images-outline", route: "MediaCenter" },
   { key: "agentlog", label: "Agent Log", description: "Relay agent activity", icon: "terminal-outline", route: "AgentLog" },
+  { key: "status", label: "System Status", description: "Component health & uptime history", icon: "pulse-outline", route: "SystemStatus" },
+  { key: "changeManagement", label: "Change Management", description: "Scheduled changes: review, approve, cancel", icon: "time-outline", route: "ChangeManagementList" },
+  { key: "changelog", label: "Changelog", description: "Release notes for this app", icon: "sparkles-outline", route: "Changelog" },
 ];
 
 export function AppSettingsHomeScreen() {

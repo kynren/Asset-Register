@@ -28,6 +28,7 @@ export type MoreStackParamList = {
   MoreRoot: undefined;
   Profile: undefined;
   NotificationPreferences: undefined;
+  OperationalContext: undefined;
   NetworkList: undefined;
   NetworkGraph: undefined;
   NetworkDeviceDetail: { id: number };
@@ -85,6 +86,9 @@ export type MoreStackParamList = {
   MobileSplashSettings: undefined;
   EmailTemplateList: undefined;
   AgentLog: undefined;
+  SystemStatus: undefined;
+  Changelog: undefined;
+  ChangeManagementList: undefined;
   Backups: undefined;
   BackupDestinationForm: { id?: number } | undefined;
   DatabaseTableList: undefined;

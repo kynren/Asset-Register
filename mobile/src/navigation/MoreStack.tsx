@@ -3,6 +3,7 @@ import { MoreScreen } from "../screens/more/MoreScreen";
 import { AppHeader } from "../components/AppHeader";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { NotificationPreferencesScreen } from "../screens/profile/NotificationPreferencesScreen";
+import { OperationalContextScreen } from "../screens/more/OperationalContextScreen";
 import { NetworkListScreen } from "../screens/network/NetworkListScreen";
 import { NetworkGraphScreen } from "../screens/network/NetworkGraphScreen";
 import { NetworkDeviceDetailScreen } from "../screens/network/NetworkDeviceDetailScreen";
@@ -60,6 +61,9 @@ import { SystemSettingsScreen } from "../screens/admin/SystemSettingsScreen";
 import { MobileSplashSettingsScreen } from "../screens/admin/MobileSplashSettingsScreen";
 import { EmailTemplateListScreen } from "../screens/admin/EmailTemplateListScreen";
 import { AgentLogScreen } from "../screens/admin/AgentLogScreen";
+import { SystemStatusScreen } from "../screens/admin/SystemStatusScreen";
+import { ChangelogScreen } from "../screens/admin/ChangelogScreen";
+import { ChangeManagementListScreen } from "../screens/admin/ChangeManagementListScreen";
 import { BackupsScreen } from "../screens/admin/BackupsScreen";
 import { BackupDestinationFormScreen } from "../screens/admin/BackupDestinationFormScreen";
 import { DatabaseTableListScreen } from "../screens/admin/DatabaseTableListScreen";
@@ -89,6 +93,7 @@ export function MoreStack() {
       <Stack.Screen name="MoreRoot" component={MoreScreen} options={{ title: "More", headerRight: () => <AppHeader /> }} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
       <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} options={{ title: "Notification Preferences" }} />
+      <Stack.Screen name="OperationalContext" component={OperationalContextScreen} options={{ title: "Operational Context" }} />
       <Stack.Screen name="NetworkList" component={NetworkListScreen} options={{ title: "Network Topology Map" }} />
       <Stack.Screen name="NetworkGraph" component={NetworkGraphScreen} options={{ title: "Topology Graph" }} />
       <Stack.Screen name="NetworkDeviceDetail" component={NetworkDeviceDetailScreen} options={{ title: "Device" }} />
@@ -146,6 +151,9 @@ export function MoreStack() {
       <Stack.Screen name="MobileSplashSettings" component={MobileSplashSettingsScreen} options={{ title: "App Loading Screen" }} />
       <Stack.Screen name="EmailTemplateList" component={EmailTemplateListScreen} options={{ title: "Email Templates" }} />
       <Stack.Screen name="AgentLog" component={AgentLogScreen} options={{ title: "Agent Log" }} />
+      <Stack.Screen name="SystemStatus" component={SystemStatusScreen} options={{ title: "System Status" }} />
+      <Stack.Screen name="Changelog" component={ChangelogScreen} options={{ title: "Changelog" }} />
+      <Stack.Screen name="ChangeManagementList" component={ChangeManagementListScreen} options={{ title: "Change Management" }} />
       <Stack.Screen name="Backups" component={BackupsScreen} options={{ title: "Backups" }} />
       <Stack.Screen name="BackupDestinationForm" component={BackupDestinationFormScreen} options={({ route }) => ({ title: route.params?.id ? "Edit Destination" : "Add Destination" })} />
       <Stack.Screen name="DatabaseTableList" component={DatabaseTableListScreen} options={{ title: "Database Manager" }} />
