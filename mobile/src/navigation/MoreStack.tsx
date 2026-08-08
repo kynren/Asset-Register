@@ -8,6 +8,7 @@ import { OperationalContextScreen } from "../screens/more/OperationalContextScre
 import { NetworkListScreen } from "../screens/network/NetworkListScreen";
 import { NetworkGraphScreen } from "../screens/network/NetworkGraphScreen";
 import { NetworkDeviceDetailScreen } from "../screens/network/NetworkDeviceDetailScreen";
+import { PingConsoleScreen } from "../screens/network/PingConsoleScreen";
 import { OperationsHomeScreen } from "../screens/operations/OperationsHomeScreen";
 import { ProjectListScreen } from "../screens/operations/ProjectListScreen";
 import { ProjectDetailScreen } from "../screens/operations/ProjectDetailScreen";
@@ -109,6 +110,7 @@ export function MoreStack() {
       <Stack.Screen name="NetworkList" component={NetworkListScreen} options={{ title: "Network Topology Map" }} />
       <Stack.Screen name="NetworkGraph" component={NetworkGraphScreen} options={{ title: "Topology Graph" }} />
       <Stack.Screen name="NetworkDeviceDetail" component={NetworkDeviceDetailScreen} options={{ title: "Device" }} />
+      <Stack.Screen name="PingConsole" component={PingConsoleScreen} options={{ title: "ICMP Pinger" }} />
       <Stack.Screen name="OperationsHome" component={OperationsHomeScreen} options={{ title: "Operations Tools" }} />
       <Stack.Screen name="ProjectList" component={ProjectListScreen} options={{ title: "IT Projects" }} />
       <Stack.Screen name="ProjectDetail" component={ProjectDetailScreen} options={{ title: "Project" }} />
