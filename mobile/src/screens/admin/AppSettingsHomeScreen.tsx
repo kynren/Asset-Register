@@ -18,6 +18,8 @@ const ITEMS: { key: string; label: string; description: string; icon: keyof type
   { key: "status", label: "System Status", description: "Component health & uptime history", icon: "pulse-outline", route: "SystemStatus" },
   { key: "changeManagement", label: "Change Management", description: "Scheduled changes: review, approve, cancel", icon: "time-outline", route: "ChangeManagementList" },
   { key: "changelog", label: "Changelog", description: "Release notes for this app", icon: "sparkles-outline", route: "Changelog" },
+  { key: "mcpKeys", label: "MCP Connections", description: "AI-tool API keys for this account", icon: "key-outline", route: "McpKeyList" },
+  { key: "externalConnectors", label: "App Connector", description: "Pull data in from another system's API", icon: "swap-horizontal-outline", route: "ExternalConnectorList" },
 ];
 
 export function AppSettingsHomeScreen() {

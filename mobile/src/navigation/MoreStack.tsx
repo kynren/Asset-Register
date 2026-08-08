@@ -64,6 +64,12 @@ import { AgentLogScreen } from "../screens/admin/AgentLogScreen";
 import { SystemStatusScreen } from "../screens/admin/SystemStatusScreen";
 import { ChangelogScreen } from "../screens/admin/ChangelogScreen";
 import { ChangeManagementListScreen } from "../screens/admin/ChangeManagementListScreen";
+import { TeamListScreen } from "../screens/admin/TeamListScreen";
+import { AuditLogScreen } from "../screens/admin/AuditLogScreen";
+import { ToastSettingsScreen } from "../screens/admin/ToastSettingsScreen";
+import { EmailIngestSettingsScreen } from "../screens/admin/EmailIngestSettingsScreen";
+import { McpKeyListScreen } from "../screens/admin/McpKeyListScreen";
+import { ExternalConnectorListScreen } from "../screens/admin/ExternalConnectorListScreen";
 import { BackupsScreen } from "../screens/admin/BackupsScreen";
 import { BackupDestinationFormScreen } from "../screens/admin/BackupDestinationFormScreen";
 import { DatabaseTableListScreen } from "../screens/admin/DatabaseTableListScreen";
@@ -154,6 +160,12 @@ export function MoreStack() {
       <Stack.Screen name="SystemStatus" component={SystemStatusScreen} options={{ title: "System Status" }} />
       <Stack.Screen name="Changelog" component={ChangelogScreen} options={{ title: "Changelog" }} />
       <Stack.Screen name="ChangeManagementList" component={ChangeManagementListScreen} options={{ title: "Change Management" }} />
+      <Stack.Screen name="TeamList" component={TeamListScreen} options={{ title: "Teams" }} />
+      <Stack.Screen name="AuditLog" component={AuditLogScreen} options={{ title: "Audit Log" }} />
+      <Stack.Screen name="ToastSettings" component={ToastSettingsScreen} options={{ title: "Toast Designer" }} />
+      <Stack.Screen name="EmailIngestSettings" component={EmailIngestSettingsScreen} options={{ title: "Email Ingestion" }} />
+      <Stack.Screen name="McpKeyList" component={McpKeyListScreen} options={{ title: "MCP Connections" }} />
+      <Stack.Screen name="ExternalConnectorList" component={ExternalConnectorListScreen} options={{ title: "App Connector" }} />
       <Stack.Screen name="Backups" component={BackupsScreen} options={{ title: "Backups" }} />
       <Stack.Screen name="BackupDestinationForm" component={BackupDestinationFormScreen} options={({ route }) => ({ title: route.params?.id ? "Edit Destination" : "Add Destination" })} />
       <Stack.Screen name="DatabaseTableList" component={DatabaseTableListScreen} options={{ title: "Database Manager" }} />

@@ -89,6 +89,12 @@ export type MoreStackParamList = {
   SystemStatus: undefined;
   Changelog: undefined;
   ChangeManagementList: undefined;
+  TeamList: undefined;
+  AuditLog: undefined;
+  ToastSettings: undefined;
+  EmailIngestSettings: undefined;
+  McpKeyList: undefined;
+  ExternalConnectorList: undefined;
   Backups: undefined;
   BackupDestinationForm: { id?: number } | undefined;
   DatabaseTableList: undefined;
